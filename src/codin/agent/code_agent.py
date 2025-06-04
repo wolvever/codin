@@ -46,7 +46,7 @@ from ..tool.executor import ToolExecutor
 from ..tool.core_tools import RunShellTool, CoreToolset
 from ..tool.sandbox import SandboxToolset
 from ..prompt import prompt_run, PromptResponse
-from ..memory.base import MemoryService, InMemoryStore
+from ..memory.base import MemoryService, MemMemoryService
 from ..config import load_config
 from ..model import create_llm_from_env
 from ..prompt.registry import get_registry
@@ -142,7 +142,7 @@ class CodeAgent(Agent):
         self.rules = rules
         
         # Initialize memory system
-        self.memory_system = memory_system or InMemoryStore()
+        self.memory_system = memory_system or MemMemoryService()
 
         # State tracking
         self._conversation_history: list[Message] = []

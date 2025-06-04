@@ -4,7 +4,7 @@ import pytest
 import uuid
 from datetime import datetime
 
-from codin.memory.base import MemoryService, InMemoryStore, MemoryChunk, ChunkType
+from codin.memory.base import MemoryService, MemMemoryService, MemoryChunk, ChunkType
 from a2a.types import Message, TextPart, Role
 
 
@@ -85,7 +85,7 @@ class TestInMemoryStore:
     @pytest.fixture
     def memory_store(self):
         """Create a fresh InMemoryStore for each test."""
-        return InMemoryStore()
+        return MemMemoryService()
     
     @pytest.fixture
     def sample_messages(self):
@@ -253,7 +253,7 @@ class TestMemorySystemIntegration:
     @pytest.mark.asyncio
     async def test_multiple_sessions(self):
         """Test handling multiple sessions."""
-        memory = InMemoryStore()
+        memory = MemMemoryService()
         
         # Add messages to different sessions
         msg1 = Message(
@@ -287,7 +287,7 @@ class TestMemorySystemIntegration:
     @pytest.mark.asyncio
     async def test_llm_summarizer_integration(self):
         """Test integration with LLM summarizer."""
-        memory = InMemoryStore()
+        memory = MemMemoryService()
         
         messages = [
             Message(
@@ -334,7 +334,7 @@ class TestMemorySystemIntegration:
     @pytest.mark.asyncio
     async def test_search_with_title_weighting(self):
         """Test search functionality with title weighting."""
-        memory = InMemoryStore()
+        memory = MemMemoryService()
         
         # Create chunks with different titles
         chunk1 = MemoryChunk(

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 import pydantic as _pyd
-from a2a.types import Message as A2AMessage, Task as A2ATask, TaskStatusUpdateEvent, TaskArtifactUpdateEvent, TaskState, TextPart
+from a2a.types import Message as A2AMessage, Task as A2ATask, TaskStatusUpdateEvent, TaskArtifactUpdateEvent, TaskState, TextPart, Role
 
 # Import ArtifactService and Memory from new locations - using TYPE_CHECKING to avoid circular imports
 if _t.TYPE_CHECKING:
@@ -35,6 +35,7 @@ __all__ = [
     "Task",
     "TaskStatus",
     "TextPart",
+    "ToolUsePart",
     
     # Services and configuration
     "Metrics",
@@ -42,75 +43,62 @@ __all__ = [
     
     # Event types
     "EventType",
-    "InternalEvent",
+    "RunEvent",
     "Event",
 ]
 
 
-# =============================================================================
-# A2A Compatible Types
-# =============================================================================
 
-class Message(A2AMessage):
-    """Extended A2A Message with additional functionality."""
-    
-    def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
-        """Add a text part to the message."""
-        from a2a.types import TextPart
-        text_part = TextPart(text=text, metadata=metadata)
-        self.parts.append(text_part)
-    
-    def add_file_part(self, file_data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
-        """Add a file part to the message."""
-        from a2a.types import FilePart
-        file_part = FilePart(file=file_data, metadata=metadata)
-        self.parts.append(file_part)
-    
-    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
-        """Add a data part to the message."""
-        from a2a.types import DataPart
-        data_part = DataPart(data=data, metadata=metadata)
-        self.parts.append(data_part)
 
+# =============================================================================
+# External
+#  
+# Agent.run(AgentRunInput) -> AgentRunOutput(Task|Message|Event)
+# =============================================================================
 
 class Task(A2ATask):
     """Extended A2A Task with additional functionality."""
+
+
+class Message(A2AMessage):
+    """Extended A2A Message with additional functionality."""
+
+
+class ToolUsePart(_pyd.BaseModel):
+    """Represents a tool use (call and/or result) segment within message parts."""
     
-    def add_message(self, message: Message) -> None:
-        """Add a message to the task history."""
-        if self.history is None:
-            self.history = []
-        self.history.append(message)
+    kind: _t.Literal['tool-use'] = 'tool-use'
+    """Part type - tool-use for ToolUseParts"""
     
-    def update_status(self, state: TaskState, message: Message | None = None, timestamp: str | None = None) -> None:
-        """Update the task status."""
-        from a2a.types import TaskStatus
-        self.status = TaskStatus(
-            state=state,
-            message=message,
-            timestamp=timestamp or datetime.now().isoformat()
-        )
+    type: _t.Literal['call', 'result'] = 'call'
+    """Whether this is a tool call or tool result"""
+    
+    id: str
+    """Unique identifier for the tool use"""
+    
+    name: str
+    """Name of the tool being called"""
+    
+    input: dict[str, _t.Any] | None = None
+    """Tool input/arguments (for calls)"""
+    
+    output: _t.Any | None = None
+    """Tool output/result (for results) - can be string, dict, or any serializable type"""
+    
+    metadata: dict[str, _t.Any] | None = None
+    """Optional metadata associated with the part."""
 
 
-# Task status alias for compatibility
-TaskStatus = TaskState
-
-
-# =============================================================================
-# Event Types
-# =============================================================================
-
-class EventType(Enum):
+class EventType(str, Enum):
     """Types of events for EventStep."""
     # A2A Events
     TASK_STATUS_UPDATE = "task_status_update"
     TASK_ARTIFACT_UPDATE = "task_artifact_update"
-    
-    # Internal Events
+
     TASK_START = "task_start"
     TASK_END = "task_end" 
     THINK = "think"
-    TOOL_CALL_BEGIN = "tool_call_begin"
+    TOOL_CALL_START = "tool_call_start"
     TOOL_CALL_END = "tool_call_end"
     TURN_START = "turn_start"
     TURN_END = "turn_end"
@@ -118,16 +106,16 @@ class EventType(Enum):
 
 
 @dataclass
-class InternalEvent:
+class RunEvent:
     """Internal event type for non-A2A events."""
     event_type: str
     data: dict[str, _t.Any]
-    timestamp: datetime = field(default_factory=datetime.now)
     metadata: dict[str, _t.Any] = field(default_factory=dict)
-
+    timestamp: datetime = field(default_factory=datetime.now)
 
 # Union type for all events
-Event = TaskStatusUpdateEvent | TaskArtifactUpdateEvent | InternalEvent
+Event = TaskStatusUpdateEvent | TaskArtifactUpdateEvent | RunEvent
+
 
 
 # =============================================================================
@@ -157,24 +145,34 @@ class AgentRunOutput(_pyd.BaseModel):
         arbitrary_types_allowed = True
 
 
-class ToolCall(_pyd.BaseModel):
-    """Represents a tool call from the LLM."""
-    call_id: str
-    name: str
-    arguments: dict[str, _t.Any]
+@dataclass
+class RunConfig:
+    """Budget constraints and agent configuration."""
+    turn_budget: int | None = None         # Maximum planning turns
+    token_budget: int | None = None        # Maximum tokens
+    cost_budget: float | None = None       # Maximum cost
+    time_budget: float | None = None       # Maximum execution time in seconds
+    deadline: datetime | None = None       # Absolute deadline
+    
+    def is_budget_exceeded(self, metrics: "Metrics", elapsed_time: float) -> tuple[bool, str]:
+        """Check if any budget constraints are exceeded."""
+        if self.turn_budget and metrics.iterations >= self.turn_budget:
+            return True, f"Turn budget exceeded: {metrics.iterations} >= {self.turn_budget}"
+        
+        if self.token_budget and metrics.tokens_used >= self.token_budget:
+            return True, f"Token budget exceeded: {metrics.tokens_used} >= {self.token_budget}"
+        
+        if self.cost_budget and metrics.cost_used >= self.cost_budget:
+            return True, f"Cost budget exceeded: {metrics.cost_used} >= {self.cost_budget}"
+        
+        if self.time_budget and elapsed_time >= self.time_budget:
+            return True, f"Time budget exceeded: {elapsed_time:.1f}s >= {self.time_budget}s"
+        
+        if self.deadline and datetime.now() >= self.deadline:
+            return True, f"Deadline exceeded: {datetime.now()} >= {self.deadline}"
+        
+        return False, ""
 
-
-class ToolCallResult(_pyd.BaseModel):
-    """Result of a tool execution."""
-    call_id: str
-    success: bool
-    output: str
-    error: str | None = None
-
-
-# =============================================================================
-# Metrics and Configuration
-# =============================================================================
 
 @dataclass
 class Metrics:
@@ -228,82 +226,42 @@ class Metrics:
         self.errors += 1
 
 
-@dataclass
-class RunConfig:
-    """Budget constraints and agent configuration."""
-    turn_budget: int | None = None         # Maximum planning turns
-    token_budget: int | None = None        # Maximum tokens
-    cost_budget: float | None = None       # Maximum cost
-    time_budget: float | None = None       # Maximum execution time in seconds
-    deadline: datetime | None = None       # Absolute deadline
-    
-    def is_budget_exceeded(self, metrics: Metrics, elapsed_time: float) -> tuple[bool, str]:
-        """Check if any budget constraints are exceeded."""
-        if self.turn_budget and metrics.iterations >= self.turn_budget:
-            return True, f"Turn budget exceeded: {metrics.iterations} >= {self.turn_budget}"
-        
-        if self.token_budget and metrics.tokens_used >= self.token_budget:
-            return True, f"Token budget exceeded: {metrics.tokens_used} >= {self.token_budget}"
-        
-        if self.cost_budget and metrics.cost_used >= self.cost_budget:
-            return True, f"Cost budget exceeded: {metrics.cost_used} >= {self.cost_budget}"
-        
-        if self.time_budget and elapsed_time >= self.time_budget:
-            return True, f"Time budget exceeded: {elapsed_time:.1f}s >= {self.time_budget}s"
-        
-        if self.deadline and datetime.now() >= self.deadline:
-            return True, f"Deadline exceeded: {datetime.now()} >= {self.deadline}"
-        
-        return False, ""
-
-
-# Backward compatibility alias
-AgentConfig = RunConfig
-
 
 # =============================================================================
-# Comprehensive State
+# Internal
+#  
+# Planner.next(State) -> Steps
 # =============================================================================
 
 @dataclass
 class State:
     """Comprehensive state containing all context for planning and execution."""
     
-    # Identity and hierarchy
+    # Static states that are set once and never change duration the task
     session_id: str
-    task_id: str | None = None
-    parent_task_id: str | None = None  
     agent_id: str = ""
-    
-    # Temporal context
+    config: RunConfig = field(default_factory=RunConfig)
+    tools: list["Tool"] = field(default_factory=list)  # Tool objects from base.py
     created_at: datetime = field(default_factory=datetime.now)
+
+    # Current task (A2A compatible)
+    task: Task | None = None
+    parent_task_id: str | None = None  
     iteration: int = 0
     
     # Memory references (readonly)
-    memory: "Memory | None" = None  # Read-only memory access
-    memory_writer: "MemoryWriter | None" = None  # Write memory access
+    history: list[Message] = field(default_factory=list)
     artifact_ref: "ArtifactService | None" = None  # Readonly reference
-    
-    # Tools and execution context - using Tool from base.py
-    tools: list["Tool"] = field(default_factory=list)  # Tool objects from base.py
-    tool_call_results: list[ToolCallResult] = field(default_factory=list)
     
     # Performance metrics
     metrics: Metrics = field(default_factory=Metrics)
-    
-    # Budget constraints
-    config: RunConfig = field(default_factory=RunConfig)
-    
-    # Current task (A2A compatible)
-    current_task: Task | None = None
-    
+
     # Additional context
-    context: dict[str, _t.Any] = field(default_factory=dict)
     metadata: dict[str, _t.Any] = field(default_factory=dict)
 
 
 # =============================================================================
-# Step Types (A2A Compatible)
+# Enhanced Step Types (A2A Compatible)
 # =============================================================================
 
 class StepType(Enum):
@@ -317,24 +275,48 @@ class StepType(Enum):
 
 @dataclass
 class Step:
-    """Base class for all planner steps - more general implementation."""
+    """Enhanced base class for all planner steps - supports both Message and Event content."""
     step_id: str
     step_type: StepType
     timestamp: datetime = field(default_factory=datetime.now)
     metadata: dict[str, _t.Any] = field(default_factory=dict)
     
-    # General content fields
-    message: Message | None = None
-    event: Event | None = None
-    tool_call: ToolCall | None = None
-    thinking: str | None = None
-    reason: str | None = None
+    # Content fields - can contain multiple types
+    message: Message | None = None              # A2A Message content
+    event: Event | None = None                  # A2A Event or Internal Event content
+    thinking: str | None = None                 # Internal reasoning
+    reason: str | None = None                   # Completion reason
     success: bool = True
+    
+    def has_message_content(self) -> bool:
+        """Check if step contains message content."""
+        return self.message is not None
+    
+    def has_event_content(self) -> bool:
+        """Check if step contains event content."""
+        return self.event is not None
+    
+    def has_tool_content(self) -> bool:
+        """Check if step contains tool call/result content (implemented by subclasses)."""
+        return False  # Base implementation, overridden by ToolCallStep
+    
+    def get_content_types(self) -> list[str]:
+        """Get list of content types present in this step."""
+        types = []
+        if self.has_message_content():
+            types.append("message")
+        if self.has_event_content():
+            types.append("event")
+        if self.has_tool_content():
+            types.append("tool")
+        if self.thinking:
+            types.append("thinking")
+        return types
 
 
 @dataclass
 class MessageStep(Step):
-    """A2A compatible message step."""
+    """A2A compatible message step with enhanced support for mixed content."""
     is_streaming: bool = False
     step_type: StepType = StepType.MESSAGE
     
@@ -344,17 +326,22 @@ class MessageStep(Step):
     
     async def stream_content(self) -> _t.AsyncGenerator[str, None]:
         """Stream message content if is_streaming=True."""
-        if not self.is_streaming:
+        if not self.is_streaming or not self.message:
             return
         
-        # Implementation depends on how streaming is handled
-        # This is a placeholder for the streaming interface
-        yield "streaming content would go here"
+        # Stream text parts from the message
+        for part in self.message.parts:
+            if hasattr(part, 'text'):
+                # Stream text content in chunks
+                text = part.text
+                chunk_size = 50  # Adjust as needed
+                for i in range(0, len(text), chunk_size):
+                    yield text[i:i + chunk_size]
 
 
 @dataclass  
 class EventStep(Step):
-    """A2A compatible event step with internal event support."""
+    """A2A compatible event step with support for both A2A and internal events."""
     event_type: EventType = field(default=None)  # Will be set via constructor
     step_type: StepType = StepType.EVENT
     
@@ -363,16 +350,54 @@ class EventStep(Step):
             raise ValueError("event is required for EventStep")
         if self.event_type is None:
             raise ValueError("event_type is required for EventStep")
+    
+    def is_a2a_event(self) -> bool:
+        """Check if this is an A2A standard event."""
+        return self.event_type in [EventType.TASK_STATUS_UPDATE, EventType.TASK_ARTIFACT_UPDATE]
+    
+    def is_internal_event(self) -> bool:
+        """Check if this is an internal (non-A2A) event."""
+        return not self.is_a2a_event()
 
 
 @dataclass
 class ToolCallStep(Step):
-    """Step for executing a tool call."""
+    """Step for executing a tool call with enhanced result handling."""
     step_type: StepType = StepType.TOOL_CALL
+    tool_call: ToolUsePart | None = None
+    tool_call_result: ToolUsePart | None = None
     
     def __post_init__(self):
         if self.tool_call is None:
-            raise ValueError("tool_call is required for ToolCallStep")
+            raise ValueError("tool_call (ToolUsePart type='call') is required for ToolCallStep")
+        if self.tool_call.type != 'call':
+            raise ValueError("ToolCallStep.tool_call must be a ToolUsePart with type='call'")
+    
+    def has_tool_content(self) -> bool:
+        """Check if step contains tool call/result content."""
+        return self.tool_call is not None or self.tool_call_result is not None
+    
+    def add_result(self, result: ToolUsePart) -> None:
+        """Add tool call result (ToolUsePart type='result') to this step."""
+        if result.type != 'result':
+            raise ValueError("Result added to ToolCallStep must be a ToolUsePart with type='result'")
+        self.tool_call_result = result
+        # Extract success from metadata; default to False if not present or malformed
+        success_val = result.metadata.get('success', False) if result.metadata else False
+        self.success = bool(success_val)
+    
+    def to_message_parts(self) -> tuple[ToolUsePart, ToolUsePart | None]:
+        """Convert tool call and result to A2A message parts.
+        
+        Returns the tool_call part and tool_call_result part directly.
+        """
+        # self.tool_call is already a ToolUsePart (type='call')
+        # self.tool_call_result is already a ToolUsePart (type='result') or None
+        if self.tool_call is None:
+            # This case should ideally be prevented by __post_init__, but as a safeguard:
+            raise ValueError("ToolCallStep.tool_call cannot be None when generating message parts")
+            
+        return self.tool_call, self.tool_call_result
 
 
 @dataclass 
@@ -387,18 +412,36 @@ class ThinkStep(Step):
 
 @dataclass
 class FinishStep(Step):
-    """Step indicating task completion."""
+    """Step indicating task completion with enhanced content support."""
     step_type: StepType = StepType.FINISH
+    final_message: Message | None = None
     
     def __post_init__(self):
         if self.reason is None:
             self.reason = "Task completed"
-        if self.message is None and self.reason:
+        # Only create a message if none is provided and we have a reason
+        if self.message is None and self.final_message is None and self.reason:
             # Create a simple message for the finish step
-            self.message = Message(
+            self.final_message = Message(
                 messageId=f"finish-{self.step_id}",
-                role="agent",
-                parts=[],
-                taskId=None
+                role=Role.agent,
+                parts=[TextPart(text=self.reason)],
+                contextId=None,
+                kind="message"
             )
-            self.message.add_text_part(self.reason) 
+    
+    def create_completion_event(self, task_id: str, context_id: str) -> TaskStatusUpdateEvent:
+        """Create a task completion event."""
+        from a2a.types import TaskStatus, TaskState
+        completion_status = TaskStatus(
+            state=TaskState.completed,
+            message=self.message,
+            timestamp=datetime.now().isoformat()
+        )
+        return TaskStatusUpdateEvent(
+            contextId=context_id,
+            taskId=task_id,
+            status=completion_status,
+            final=True,
+            metadata=self.metadata
+        ) 

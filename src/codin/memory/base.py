@@ -1,60 +1,39 @@
-from __future__ import annotations
-
 import abc
 import typing as _t
 import uuid
 from datetime import datetime
+from pydantic import BaseModel, Field
+from enum import Enum
 
 from a2a.types import Message, TextPart, Role
 
-__all__ = [
-    "MemoryService",
-    "InMemoryStore",
-    "MemoryChunk",
-    "ChunkType",
-    "Memory",
-    "MemoryWriter",
-    "InMemoryService",
-]
 
-
-from enum import Enum
-
-
-class ChunkType(Enum):
+class ChunkType(str, Enum):
     """Types of memory chunks for different content categories."""
     MEMORY_ENTITY = "memory_entity"
     MEMORY_ID_MAPPING = "memory_id_mapping" 
     MEMORY_SUMMARY = "memory_summary"
+    
 
-
-class MemoryChunk:
+class MemoryChunk(BaseModel):
     """Enhanced memory chunk with structured content and search optimization."""
     
-    def __init__(
-        self,
-        doc_id: str,
-        chunk_id: str,
-        session_id: str,
-        chunk_type: ChunkType,
-        content: str | dict[str, _t.Any],
-        title: str,
-        start_message_id: str | None = None,
-        end_message_id: str | None = None,
-        created_at: datetime | None = None,
-        message_count: int = 0,
-        metadata: dict[str, _t.Any] | None = None
-    ):
-        self.doc_id = doc_id
-        self.chunk_id = chunk_id
-        self.session_id = session_id
-        self.chunk_type = chunk_type
-        self.title = title
-        self.start_message_id = start_message_id
-        self.end_message_id = end_message_id
-        self.created_at = created_at or datetime.now()
-        self.message_count = message_count
-        self.metadata = metadata or {}
+    doc_id: str
+    chunk_id: str
+    session_id: str
+    chunk_type: ChunkType
+    title: str
+    start_message_id: str | None = None
+    end_message_id: str | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    message_count: int = 0
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    _content_dict: dict[str, _t.Any] | None = None
+    content: str
+
+    def __init__(self, **data):
+        content = data.pop('content', None)
+        super().__init__(**data)
         
         # Store content as string for search, preserve original for access
         if isinstance(content, dict):
@@ -63,7 +42,7 @@ class MemoryChunk:
         else:
             self._content_dict = None
             self.content = content
-    
+
     def _dict_to_searchable_string(self, content_dict: dict[str, _t.Any]) -> str:
         """Convert dictionary content to searchable string format."""
         searchable_parts = []
@@ -194,7 +173,7 @@ class MemoryService(abc.ABC):
         ...
 
 
-class InMemoryStore(MemoryService):
+class MemMemoryService(MemoryService):
     """In-memory implementation of MemorySystem with A2A Message support."""
     
     def __init__(self):
@@ -423,91 +402,3 @@ class InMemoryStore(MemoryService):
         
         return chunk_groups_created
 
-
-# =============================================================================
-# New Memory Service Interfaces (split from MemoryService)
-# =============================================================================
-
-class Memory(abc.ABC):
-    """Read-only memory interface for retrieving conversation history."""
-    
-    @abc.abstractmethod
-    async def get_history(
-        self, 
-        session_id: str, 
-        limit: int = 50,
-        query: str | None = None
-    ) -> list[Message]:
-        """Get conversation history with optional search query.
-        
-        Args:
-            session_id: Session identifier
-            limit: Maximum number of recent messages to return
-            query: Optional search query to include relevant memory chunks
-            
-        Returns:
-            List of Messages including recent messages and relevant memory chunks
-        """
-        ...
-
-
-class MemoryWriter(abc.ABC):
-    """Write interface for memory operations."""
-    
-    @abc.abstractmethod
-    async def add_message(self, session_id: str, message: Message) -> None:
-        """Add message to memory."""
-        ...
-    
-    @abc.abstractmethod
-    async def create_memory_chunk(
-        self,
-        session_id: str,
-        messages: list[Message],
-        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
-    ) -> list[MemoryChunk]:
-        """Create compressed memory chunks from a list of messages."""
-        ...
-
-
-class InMemoryService(Memory, MemoryWriter):
-    """Service implementation that bridges MemorySystem to the new split interfaces."""
-    
-    def __init__(self, memory_system: MemoryService | None = None):
-        self.memory_system = memory_system or InMemoryStore()
-    
-    async def get_history(
-        self, 
-        session_id: str, 
-        limit: int = 50,
-        query: str | None = None
-    ) -> list[Message]:
-        """Get conversation history with optional search query."""
-        return await self.memory_system.get_history(session_id, limit, query)
-    
-    async def add_message(self, session_id: str, message: Message) -> None:
-        """Add message to memory."""
-        await self.memory_system.add_message(message)
-    
-    async def create_memory_chunk(
-        self,
-        session_id: str,
-        messages: list[Message],
-        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
-    ) -> list[MemoryChunk]:
-        """Create compressed memory chunks from a list of messages."""
-        return await self.memory_system.create_memory_chunk(session_id, messages, llm_summarizer)
-    
-    async def compress_old_messages(
-        self,
-        session_id: str,
-        keep_recent: int = 20,
-        chunk_size: int = 10,
-        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
-    ) -> int:
-        """Compress old messages using the memory system."""
-        if hasattr(self.memory_system, 'compress_old_messages'):
-            return await self.memory_system.compress_old_messages(
-                session_id, keep_recent, chunk_size, llm_summarizer
-            )
-        return 0 

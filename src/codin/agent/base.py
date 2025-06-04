@@ -3,11 +3,12 @@ import typing as _t
 
 from ..id import new_id
 from ..tool.base import Tool
+from ..model.base import BaseLLM
+from ..memory.base import MemoryService
+from ..actor.mailbox import Mailbox
 from .types import (
     AgentRunInput, 
     AgentRunOutput, 
-    ToolCall, 
-    ToolCallResult, 
     Step, 
     StepType, 
     ThinkStep,
@@ -19,10 +20,9 @@ from .types import (
 
 __all__ = [
     "Agent",
+    "Planner",
     "AgentRunInput",
     "AgentRunOutput",
-    "ToolCall",
-    "ToolCallResult",
 ]
 
 
@@ -88,13 +88,27 @@ class Agent(abc.ABC):
 class Planner(abc.ABC):
     """Stateless planner that generates execution steps from state.
     
-    The planner is stateless and only READS from State - it never modifies it.
-    All state changes are handled by the Agent that orchestrates the planner.
+    The planner uses the codin prompt system for LLM interactions.
+    It should use prompt_run(template_name, variables) to interact with LLMs.
     """
+    
+    def __init__(self, llm: BaseLLM | None = None):
+        """Initialize planner with optional LLM injection.
+        
+        Args:
+            llm: Optional LLM client for direct model calls (alternative to prompt_run)
+        """
+        self.llm = llm
     
     @abc.abstractmethod
     async def next(self, state: State) -> _t.AsyncGenerator[Step, None]:
         """Generate the next execution steps based on current state.
+        
+        The planner should use:
+        - prompt_run(template_name, variables) for LLM interactions
+        - state.tools for available tools
+        - state.history for conversation context
+        - state.memory for long-term memory access
         
         Args:
             state: Current comprehensive execution state (READ-ONLY)
@@ -108,12 +122,7 @@ class Planner(abc.ABC):
         """
         ...
     
-    @abc.abstractmethod 
-    def get_config(self) -> dict[str, _t.Any]:
-        """Get planner configuration."""
-        ...
-    
     @abc.abstractmethod
-    async def cleanup(self) -> None:
-        """Cleanup planner resources."""
+    async def reset(self, state: State) -> None:
+        """Reset the planner to the initial state."""
         ... 

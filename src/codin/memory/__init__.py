@@ -1,13 +1,11 @@
 """Memory system subpackage."""
 
-from .base import MemorySystem, InMemoryStore
-from .service import ChatHistory, MemoryService, MemorySystemService, MemorySystemChatHistory
+from .base import MemorySystem, InMemoryStore, Memory, MemoryWriter, InMemoryService
  
 __all__ = [
     "MemorySystem",
     "InMemoryStore",
-    "ChatHistory",
-    "MemoryService",
-    "MemorySystemService",
-    "MemorySystemChatHistory",
+    "Memory",
+    "MemoryWriter", 
+    "InMemoryService",
 ] 

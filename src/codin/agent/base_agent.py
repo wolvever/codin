@@ -28,7 +28,7 @@ from .types import (
     InternalEvent,
 )
 from .planner import Planner
-from ..memory import MemoryService, MemorySystemService
+from ..memory import Memory, MemoryWriter, InMemoryService
 from ..artifact import ArtifactService, InMemoryArtifactService
 from ..session import SessionService, ReplayService, TaskService
 from ..tool.base import Tool, ToolContext
@@ -73,8 +73,9 @@ class BaseAgent(Agent):
         description: str = "Base agent with comprehensive service orchestration",
         agent_id: str | None = None,
         planner: Planner,
-        memory_service: MemoryService | None = None,
-        artifact_service: InMemoryArtifactService | None = None,
+        memory: Memory | None = None,
+        memory_writer: MemoryWriter | None = None,
+        artifact_service: ArtifactService | None = None,
         session_service: SessionService | None = None,
         replay_service: ReplayService | None = None,
         task_service: TaskService | None = None,
@@ -91,7 +92,8 @@ class BaseAgent(Agent):
             description: Agent description
             agent_id: Unique agent identifier
             planner: Planner instance for generating execution steps
-            memory_service: Service for chat history and memory
+            memory: Read-only memory service for retrieving history
+            memory_writer: Memory writer service for adding messages and creating chunks
             artifact_service: Service for code artifacts and files
             session_service: Service for session lifecycle
             replay_service: Service for execution replay logging
@@ -108,7 +110,15 @@ class BaseAgent(Agent):
         self.planner = planner
         
         # Service injection with defaults
-        self.memory_service = memory_service or MemorySystemService()
+        # Use single InMemoryService for both read and write if no specific services provided
+        if memory is None and memory_writer is None:
+            combined_service = InMemoryService()
+            self.memory = combined_service
+            self.memory_writer = combined_service
+        else:
+            self.memory = memory or InMemoryService()
+            self.memory_writer = memory_writer or InMemoryService()
+        
         self.artifact_service = artifact_service or InMemoryArtifactService()
         self.session_service = session_service or SessionService()
         self.replay_service = replay_service or ReplayService()
@@ -240,11 +250,11 @@ class BaseAgent(Agent):
         
         session_id = session["session_id"]
         
-        # Get chat history from MemoryService  
-        history = await self.memory_service.get_chat_history(session_id)
+        # Get chat history from Memory service
+        history = await self.memory.get_history(session_id)
         
         # Add input message to history
-        await self.memory_service.add_message(session_id, input_data.message)
+        await self.memory_writer.add_message(session_id, input_data.message)
         
         # Get available tools
         tools = self.tool_registry.get_tools()
@@ -269,8 +279,8 @@ class BaseAgent(Agent):
             agent_id=self.agent_id,
             created_at=session.get("created_at", datetime.now()),
             iteration=session.get("iteration_count", 0),
-            history=history,  # Readonly reference
-            memory_ref=self.memory_service,  # Readonly reference
+            memory=self.memory,  # Readonly reference
+            memory_writer=self.memory_writer,  # Write reference 
             artifact_ref=self.artifact_service,  # Readonly reference
             tools=tools,
             metrics=metrics,
@@ -404,7 +414,7 @@ class BaseAgent(Agent):
                 # Handle message step
                 if isinstance(step, MessageStep):
                     # Add message to memory
-                    await self.memory_service.add_message(session_id, step.message)
+                    await self.memory_writer.add_message(session_id, step.message)
                     
                     yield AgentRunOutput(
                         id=step.step_id,
@@ -451,7 +461,7 @@ class BaseAgent(Agent):
                         kind="tool_result"
                     )
                     
-                    await self.memory_service.add_message(session_id, result_message)
+                    await self.memory_writer.add_message(session_id, result_message)
                     
                     yield AgentRunOutput(
                         id=step.step_id,
@@ -477,7 +487,7 @@ class BaseAgent(Agent):
             elif step.step_type == StepType.FINISH:
                 # Handle finish step
                 if isinstance(step, FinishStep) and step.final_message:
-                    await self.memory_service.add_message(session_id, step.final_message)
+                    await self.memory_writer.add_message(session_id, step.final_message)
                     
                     yield AgentRunOutput(
                         id=step.step_id,

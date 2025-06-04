@@ -27,27 +27,34 @@ from .types import (
 )
 
 # Import service interfaces from their respective modules
-from ..memory import ChatHistory, MemoryService
+from ..memory import Memory, MemoryWriter, InMemoryService
 from ..artifact import ArtifactService
 
 # Import service implementations from new locations
-# Note: MemorySystemService not imported here to avoid circular imports
 from ..artifact import InMemoryArtifactService
-from ..session import SessionService, ReplayService, TaskService
 
 # Import core architecture components
 from .planner import Planner
-from .session import Session, SessionManager
-from .base_agent import BaseAgent
 
-# Import concrete implementations
-from .code_planner import CodePlanner, CodePlannerConfig
-from .code_agent import CodeAgent
+# Lazy imports to avoid circular dependencies
+def get_base_agent():
+    """Lazy import BaseAgent to avoid circular imports."""
+    from .base_agent import BaseAgent
+    return BaseAgent
+
+def get_code_planner():
+    """Lazy import CodePlanner to avoid circular imports."""
+    from .code_planner import CodePlanner, CodePlannerConfig
+    return CodePlanner, CodePlannerConfig
+
+def get_code_agent():
+    """Lazy import CodeAgent to avoid circular imports.""" 
+    from .code_agent import CodeAgent
+    return CodeAgent
 
 __all__ = [
     # Base agent interface
-    "Agent", 
-    "CodeAgent",
+    "Agent",
     
     # Input/Output types
     "AgentRunInput",
@@ -75,24 +82,19 @@ __all__ = [
     "AgentConfig",
     
     # Service interfaces
-    "ChatHistory",
-    "MemoryService", 
+    "Memory",
+    "MemoryWriter", 
     "ArtifactService",
     
     # Service implementations
-    # Note: MemorySystemService not exported here to avoid circular imports
+    "InMemoryService", 
     "InMemoryArtifactService", 
-    "SessionService",
-    "ReplayService",
-    "TaskService",
     
     # Core components
     "Planner",
-    "Session",
-    "SessionManager", 
-    "BaseAgent",
     
-    # Concrete planners
-    "CodePlanner",
-    "CodePlannerConfig",
+    # Lazy access functions
+    "get_base_agent",
+    "get_code_planner", 
+    "get_code_agent",
 ] 

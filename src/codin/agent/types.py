@@ -7,10 +7,10 @@ from datetime import datetime
 import pydantic as _pyd
 from a2a.types import Message, Task, TaskStatusUpdateEvent, TaskArtifactUpdateEvent
 
-# Import ArtifactService from new location - using TYPE_CHECKING to avoid circular imports
+# Import ArtifactService and Memory from new locations - using TYPE_CHECKING to avoid circular imports
 if _t.TYPE_CHECKING:
     from ..artifact.base import ArtifactService
-    from ..memory.service import ChatHistory, MemoryService
+    from ..memory.base import Memory, MemoryWriter
 
 __all__ = [
     # Agent types from base.py
@@ -191,11 +191,9 @@ class State:
     created_at: datetime = field(default_factory=datetime.now)
     iteration: int = 0
     
-    # Conversation history (readonly reference)
-    history: "ChatHistory | None" = None  # From MemoryService
-    
-    # Memory and artifact references (readonly)
-    memory_ref: "MemoryService | None" = None  # Readonly reference
+    # Memory references (readonly)
+    memory: "Memory | None" = None  # Read-only memory access
+    memory_writer: "MemoryWriter | None" = None  # Write memory access
     artifact_ref: "ArtifactService | None" = None  # Readonly reference
     
     # Tools and execution context

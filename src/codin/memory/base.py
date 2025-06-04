@@ -12,6 +12,9 @@ __all__ = [
     "InMemoryStore",
     "MemoryChunk",
     "ChunkType",
+    "Memory",
+    "MemoryWriter",
+    "InMemoryService",
 ]
 
 
@@ -418,4 +421,93 @@ class InMemoryStore(MemorySystem):
         # Remove compressed messages, keep only recent ones
         self._messages[session_id] = messages[-keep_recent:]
         
-        return chunk_groups_created 
+        return chunk_groups_created
+
+
+# =============================================================================
+# New Memory Service Interfaces (split from MemoryService)
+# =============================================================================
+
+class Memory(abc.ABC):
+    """Read-only memory interface for retrieving conversation history."""
+    
+    @abc.abstractmethod
+    async def get_history(
+        self, 
+        session_id: str, 
+        limit: int = 50,
+        query: str | None = None
+    ) -> list[Message]:
+        """Get conversation history with optional search query.
+        
+        Args:
+            session_id: Session identifier
+            limit: Maximum number of recent messages to return
+            query: Optional search query to include relevant memory chunks
+            
+        Returns:
+            List of Messages including recent messages and relevant memory chunks
+        """
+        ...
+
+
+class MemoryWriter(abc.ABC):
+    """Write interface for memory operations."""
+    
+    @abc.abstractmethod
+    async def add_message(self, session_id: str, message: Message) -> None:
+        """Add message to memory."""
+        ...
+    
+    @abc.abstractmethod
+    async def create_memory_chunk(
+        self,
+        session_id: str,
+        messages: list[Message],
+        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
+    ) -> list[MemoryChunk]:
+        """Create compressed memory chunks from a list of messages."""
+        ...
+
+
+class InMemoryService(Memory, MemoryWriter):
+    """Service implementation that bridges MemorySystem to the new split interfaces."""
+    
+    def __init__(self, memory_system: MemorySystem | None = None):
+        self.memory_system = memory_system or InMemoryStore()
+    
+    async def get_history(
+        self, 
+        session_id: str, 
+        limit: int = 50,
+        query: str | None = None
+    ) -> list[Message]:
+        """Get conversation history with optional search query."""
+        return await self.memory_system.get_history(session_id, limit, query)
+    
+    async def add_message(self, session_id: str, message: Message) -> None:
+        """Add message to memory."""
+        await self.memory_system.add_message(message)
+    
+    async def create_memory_chunk(
+        self,
+        session_id: str,
+        messages: list[Message],
+        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
+    ) -> list[MemoryChunk]:
+        """Create compressed memory chunks from a list of messages."""
+        return await self.memory_system.create_memory_chunk(session_id, messages, llm_summarizer)
+    
+    async def compress_old_messages(
+        self,
+        session_id: str,
+        keep_recent: int = 20,
+        chunk_size: int = 10,
+        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
+    ) -> int:
+        """Compress old messages using the memory system."""
+        if hasattr(self.memory_system, 'compress_old_messages'):
+            return await self.memory_system.compress_old_messages(
+                session_id, keep_recent, chunk_size, llm_summarizer
+            )
+        return 0 

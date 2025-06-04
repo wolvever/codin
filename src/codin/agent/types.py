@@ -7,6 +7,11 @@ from datetime import datetime
 import pydantic as _pyd
 from a2a.types import Message, Task, TaskStatusUpdateEvent, TaskArtifactUpdateEvent
 
+# Import ArtifactService from new location - using TYPE_CHECKING to avoid circular imports
+if _t.TYPE_CHECKING:
+    from ..artifact.base import ArtifactService
+    from ..memory.service import ChatHistory, MemoryService
+
 __all__ = [
     # Agent types from base.py
     "AgentRunInput",
@@ -31,9 +36,6 @@ __all__ = [
     # Services and configuration
     "Metrics",
     "AgentConfig",
-    "ChatHistory",
-    "MemoryService",
-    "ArtifactService",
     
     # Event types
     "EventType",
@@ -172,57 +174,6 @@ class AgentConfig:
 
 
 # =============================================================================
-# Service Interfaces
-# =============================================================================
-
-class ChatHistory(abc.ABC):
-    """Readonly chat history interface."""
-    
-    @abc.abstractmethod
-    def get_recent_messages(self, count: int = 10) -> list[Message]:
-        """Get recent messages for context."""
-        ...
-    
-    @abc.abstractmethod
-    def search_messages(self, query: str) -> list[Message]:
-        """Search through message history."""
-        ...
-    
-    @abc.abstractmethod
-    def get_all_messages(self) -> list[Message]:
-        """Get all messages in history."""
-        ...
-
-
-class MemoryService(abc.ABC):
-    """Service for managing conversation memory and chat history."""
-    
-    @abc.abstractmethod
-    async def get_chat_history(self, session_id: str) -> ChatHistory:
-        """Get chat history for session."""
-        ...
-    
-    @abc.abstractmethod 
-    async def add_message(self, session_id: str, message: Message) -> None:
-        """Add message to chat history."""
-        ...
-
-
-class ArtifactService(abc.ABC):
-    """Service for managing code artifacts and files."""
-    
-    @abc.abstractmethod
-    async def get_artifact(self, artifact_id: str) -> _t.Any:
-        """Get artifact by ID."""
-        ...
-    
-    @abc.abstractmethod
-    async def save_artifact(self, content: _t.Any, metadata: dict) -> str:
-        """Save artifact and return ID."""
-        ...
-
-
-# =============================================================================
 # Comprehensive State
 # =============================================================================
 
@@ -241,11 +192,11 @@ class State:
     iteration: int = 0
     
     # Conversation history (readonly reference)
-    history: ChatHistory | None = None  # From MemoryService
+    history: "ChatHistory | None" = None  # From MemoryService
     
     # Memory and artifact references (readonly)
-    memory_ref: MemoryService | None = None  # Readonly reference 
-    artifact_ref: ArtifactService | None = None  # Readonly reference
+    memory_ref: "MemoryService | None" = None  # Readonly reference
+    artifact_ref: "ArtifactService | None" = None  # Readonly reference
     
     # Tools and execution context
     tools: list[_t.Any] = field(default_factory=list)  # Tool objects

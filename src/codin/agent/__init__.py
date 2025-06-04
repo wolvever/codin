@@ -24,22 +24,16 @@ from .types import (
     # Configuration and metrics
     Metrics,
     AgentConfig,
-    
-    # Service interfaces
-    ChatHistory,
-    MemoryService,
-    ArtifactService,
 )
 
-# Import service implementations
-from .services import (
-    InMemoryChatHistory,
-    InMemoryMemoryService,
-    InMemoryArtifactService,
-    SessionService,
-    ReplayService,
-    TaskService,
-)
+# Import service interfaces from their respective modules
+from ..memory import ChatHistory, MemoryService
+from ..artifact import ArtifactService
+
+# Import service implementations from new locations
+# Note: MemorySystemService not imported here to avoid circular imports
+from ..artifact import InMemoryArtifactService
+from ..session import SessionService, ReplayService, TaskService
 
 # Import core architecture components
 from .planner import Planner
@@ -86,8 +80,7 @@ __all__ = [
     "ArtifactService",
     
     # Service implementations
-    "InMemoryChatHistory",
-    "InMemoryMemoryService",
+    # Note: MemorySystemService not exported here to avoid circular imports
     "InMemoryArtifactService", 
     "SessionService",
     "ReplayService",

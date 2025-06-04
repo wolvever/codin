@@ -1,126 +1,17 @@
-"""Service implementations for the agent architecture."""
+"""Session service implementations."""
 
 import typing as _t
 from datetime import datetime
 
-from a2a.types import Message
-
-from .types import (
-    ChatHistory, 
-    MemoryService, 
-    ArtifactService,
-    TaskInfo,
-    TaskStatus,
-)
+# Import TaskInfo and TaskStatus from agent types
+from ..agent.types import TaskInfo, TaskStatus
 
 __all__ = [
-    "InMemoryChatHistory",
-    "InMemoryMemoryService", 
-    "InMemoryArtifactService",
     "SessionService",
     "ReplayService",
     "TaskService",
 ]
 
-
-# =============================================================================
-# Chat History Implementation
-# =============================================================================
-
-class InMemoryChatHistory(ChatHistory):
-    """In-memory implementation of ChatHistory interface."""
-    
-    def __init__(self, messages: list[Message] | None = None):
-        self._messages = messages or []
-    
-    def get_recent_messages(self, count: int = 10) -> list[Message]:
-        """Get recent messages for context."""
-        return self._messages[-count:] if count > 0 else self._messages[:]
-    
-    def search_messages(self, query: str) -> list[Message]:
-        """Search through message history."""
-        # Simple text search - could be enhanced with semantic search
-        results = []
-        query_lower = query.lower()
-        
-        for message in self._messages:
-            for part in message.parts:
-                if hasattr(part, 'text') and query_lower in part.text.lower():
-                    results.append(message)
-                    break
-        
-        return results
-    
-    def get_all_messages(self) -> list[Message]:
-        """Get all messages in history."""
-        return self._messages[:]
-    
-    def add_message(self, message: Message) -> None:
-        """Add message to history (internal method)."""
-        self._messages.append(message)
-
-
-# =============================================================================
-# Memory Service Implementation
-# =============================================================================
-
-class InMemoryMemoryService(MemoryService):
-    """In-memory implementation of MemoryService."""
-    
-    def __init__(self):
-        self._chat_histories: dict[str, InMemoryChatHistory] = {}
-    
-    async def get_chat_history(self, session_id: str) -> ChatHistory:
-        """Get chat history for session."""
-        if session_id not in self._chat_histories:
-            self._chat_histories[session_id] = InMemoryChatHistory()
-        return self._chat_histories[session_id]
-    
-    async def add_message(self, session_id: str, message: Message) -> None:
-        """Add message to chat history."""
-        history = await self.get_chat_history(session_id)
-        if isinstance(history, InMemoryChatHistory):
-            history.add_message(message)
-
-
-# =============================================================================
-# Artifact Service Implementation
-# =============================================================================
-
-class InMemoryArtifactService(ArtifactService):
-    """In-memory implementation of ArtifactService."""
-    
-    def __init__(self):
-        self._artifacts: dict[str, _t.Any] = {}
-        self._metadata: dict[str, dict] = {}
-        self._counter = 0
-    
-    async def get_artifact(self, artifact_id: str) -> _t.Any:
-        """Get artifact by ID."""
-        return self._artifacts.get(artifact_id)
-    
-    async def save_artifact(self, content: _t.Any, metadata: dict) -> str:
-        """Save artifact and return ID."""
-        self._counter += 1
-        artifact_id = f"artifact_{self._counter}"
-        
-        self._artifacts[artifact_id] = content
-        self._metadata[artifact_id] = {
-            **metadata,
-            "created_at": datetime.now().isoformat(),
-            "id": artifact_id
-        }
-        
-        return artifact_id
-    
-    async def get_artifact_metadata(self, artifact_id: str) -> dict:
-        """Get artifact metadata."""
-        return self._metadata.get(artifact_id, {})
-
-
-# =============================================================================
-# Session Service
-# =============================================================================
 
 class SessionService:
     """Service for managing agent sessions."""
@@ -157,10 +48,6 @@ class SessionService:
         """Get session by ID."""
         return self._sessions.get(session_id)
 
-
-# =============================================================================
-# Replay Service
-# =============================================================================
 
 class ReplayService:
     """Service for recording execution replay logs."""
@@ -201,10 +88,6 @@ class ReplayService:
             "data": str(result)
         }
 
-
-# =============================================================================
-# Task Service
-# =============================================================================
 
 class TaskService:
     """Service for managing task lifecycle."""

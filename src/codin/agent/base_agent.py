@@ -24,19 +24,13 @@ from .types import (
     TaskStatus,
     Metrics,
     AgentConfig,
-    MemoryService,
-    ArtifactService,
     EventType,
     InternalEvent,
 )
 from .planner import Planner
-from .services import (
-    InMemoryMemoryService,
-    InMemoryArtifactService, 
-    SessionService,
-    ReplayService,
-    TaskService,
-)
+from ..memory import MemoryService, MemorySystemService
+from ..artifact import ArtifactService, InMemoryArtifactService
+from ..session import SessionService, ReplayService, TaskService
 from ..tool.base import Tool, ToolContext
 from ..tool.executor import ToolExecutor
 from ..tool.registry import ToolRegistry
@@ -80,7 +74,7 @@ class BaseAgent(Agent):
         agent_id: str | None = None,
         planner: Planner,
         memory_service: MemoryService | None = None,
-        artifact_service: ArtifactService | None = None,
+        artifact_service: InMemoryArtifactService | None = None,
         session_service: SessionService | None = None,
         replay_service: ReplayService | None = None,
         task_service: TaskService | None = None,
@@ -114,7 +108,7 @@ class BaseAgent(Agent):
         self.planner = planner
         
         # Service injection with defaults
-        self.memory_service = memory_service or InMemoryMemoryService()
+        self.memory_service = memory_service or MemorySystemService()
         self.artifact_service = artifact_service or InMemoryArtifactService()
         self.session_service = session_service or SessionService()
         self.replay_service = replay_service or ReplayService()

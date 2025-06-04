@@ -5,12 +5,12 @@ import typing as _t
 from datetime import datetime
 from dataclasses import dataclass, field
 
-# Import TaskInfo and TaskStatus from agent types
+# Import Task and TaskStatus from agent types
 if _t.TYPE_CHECKING:
-    from ..agent.types import TaskInfo, TaskStatus, State
+    from ..agent.types import Task, TaskStatus, State
 else:
     # Import at runtime only what we need to avoid circular imports
-    from ..agent.types import TaskInfo, TaskStatus
+    from ..agent.types import Task, TaskStatus
 
 __all__ = [
     "SessionService",
@@ -101,7 +101,7 @@ class TaskService:
     """Service for managing task lifecycle."""
     
     def __init__(self):
-        self._tasks: dict[str, TaskInfo] = {}
+        self._tasks: dict[str, Task] = {}
         self._counter = 0
     
     async def create_task(
@@ -109,44 +109,60 @@ class TaskService:
         query: str, 
         parent_id: str | None = None,
         metadata: dict | None = None
-    ) -> TaskInfo:
+    ) -> Task:
         """Create a new task."""
+        from a2a.types import TaskStatus as A2ATaskStatus
+        from ..agent.types import Message
+        
         self._counter += 1
         task_id = f"task_{self._counter}"
+        context_id = f"context_{self._counter}"
         
-        task = TaskInfo(
+        # Create initial message for the task
+        initial_message = Message(
+            messageId=f"initial_{task_id}",
+            role="user",
+            parts=[],
+            taskId=task_id,
+            contextId=context_id
+        )
+        initial_message.add_text_part(query)
+        
+        task = Task(
             id=task_id,
-            parent_id=parent_id,
-            query=query,
-            status=TaskStatus.PENDING,
-            created_at=datetime.now(),
+            contextId=context_id,
+            status=A2ATaskStatus(
+                state="submitted",
+                message=None,
+                timestamp=datetime.now().isoformat()
+            ),
+            history=[initial_message],
+            artifacts=None,
             metadata=metadata or {}
         )
         
         self._tasks[task_id] = task
         return task
     
-    async def get_task(self, task_id: str) -> TaskInfo | None:
+    async def get_task(self, task_id: str) -> Task | None:
         """Get task by ID."""
         return self._tasks.get(task_id)
     
     async def update_task_status(
         self, 
         task_id: str, 
-        status: TaskStatus,
+        state: str,
+        message: "Message | None" = None,
         metadata: dict | None = None
     ) -> bool:
         """Update task status."""
         if task_id in self._tasks:
             task = self._tasks[task_id]
-            task.status = status
-            
-            if status == TaskStatus.RUNNING and task.started_at is None:
-                task.started_at = datetime.now()
-            elif status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
-                task.completed_at = datetime.now()
+            task.update_status(state, message, datetime.now().isoformat())
             
             if metadata:
+                if task.metadata is None:
+                    task.metadata = {}
                 task.metadata.update(metadata)
             
             return True
@@ -154,30 +170,30 @@ class TaskService:
     
     async def start_task(self, task_id: str) -> bool:
         """Start task execution."""
-        return await self.update_task_status(task_id, TaskStatus.RUNNING)
+        return await self.update_task_status(task_id, "working")
     
     async def pause_task(self, task_id: str) -> bool:
         """Pause task execution."""
-        return await self.update_task_status(task_id, TaskStatus.PAUSED)
+        return await self.update_task_status(task_id, "input-required")
     
     async def resume_task(self, task_id: str) -> bool:
         """Resume paused task."""
-        return await self.update_task_status(task_id, TaskStatus.RUNNING)
+        return await self.update_task_status(task_id, "working")
     
     async def complete_task(self, task_id: str, metadata: dict | None = None) -> bool:
         """Mark task as completed."""
-        return await self.update_task_status(task_id, TaskStatus.COMPLETED, metadata)
+        return await self.update_task_status(task_id, "completed", None, metadata)
     
     async def cancel_task(self, task_id: str, metadata: dict | None = None) -> bool:
         """Cancel task execution."""
-        return await self.update_task_status(task_id, TaskStatus.CANCELLED, metadata)
+        return await self.update_task_status(task_id, "canceled", None, metadata)
     
     async def fail_task(self, task_id: str, error: str, metadata: dict | None = None) -> bool:
         """Mark task as failed."""
         fail_metadata = {"error": error}
         if metadata:
             fail_metadata.update(metadata)
-        return await self.update_task_status(task_id, TaskStatus.FAILED, fail_metadata)
+        return await self.update_task_status(task_id, "failed", None, fail_metadata)
 
 
 # =============================================================================
@@ -186,7 +202,7 @@ class TaskService:
 
 # Import needed for the merged classes
 from a2a.types import Message
-from ..memory.base import MemorySystem, InMemoryStore
+from ..memory.base import MemoryService, InMemoryStore
 
 
 @dataclass
@@ -206,7 +222,7 @@ class Session:
     context: dict[str, _t.Any] = field(default_factory=dict)
     
     # Optional external systems
-    memory_system: MemorySystem | None = None
+    memory_system: MemoryService | None = None
     rollout_recorder: _t.Any = None  # For audit trail - type depends on implementation
     
     def __post_init__(self):
@@ -288,7 +304,7 @@ class Session:
 class SessionManager:
     """Manages active sessions with optional cleanup and persistence."""
     
-    def __init__(self, memory_system_factory: _t.Callable[[], MemorySystem] | None = None):
+    def __init__(self, memory_system_factory: _t.Callable[[], MemoryService] | None = None):
         self._sessions: dict[str, Session] = {}
         self._memory_system_factory = memory_system_factory or (lambda: InMemoryStore())
         self._cleanup_lock = asyncio.Lock()
@@ -296,7 +312,7 @@ class SessionManager:
     async def get_or_create_session(
         self, 
         session_id: str,
-        memory_system: MemorySystem | None = None
+        memory_system: MemoryService | None = None
     ) -> Session:
         """Get existing session or create a new one."""
         if session_id not in self._sessions:

@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 from src.codin.agent.code_agent import CodeAgent, AgentEvent
 from src.codin.sandbox import LocalSandbox
 from src.codin.tool.registry import ToolRegistry
-from a2a.types import Message, Role, TextPart
-from src.codin.agent.base import AgentRunInput
+from a2a.types import Role, TextPart
+from src.codin.agent.types import Message, AgentRunInput
 
 
 class TestDebugEvents:

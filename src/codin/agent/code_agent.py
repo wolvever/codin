@@ -33,7 +33,8 @@ import inspect
 from pydantic import BaseModel
 
 # Use a2a types directly
-from a2a.types import Message, TextPart, Role
+from a2a.types import Role
+from .types import Message, TextPart
 from ..agent.base import Agent, AgentRunInput, AgentRunOutput, ToolCall, ToolCallResult
 from ..model.base import BaseLLM
 from ..model.factory import LLMFactory
@@ -45,7 +46,7 @@ from ..tool.executor import ToolExecutor
 from ..tool.core_tools import RunShellTool, CoreToolset
 from ..tool.sandbox import SandboxToolset
 from ..prompt import prompt_run, PromptResponse
-from ..memory.base import MemorySystem, InMemoryStore
+from ..memory.base import MemoryService, InMemoryStore
 from ..config import load_config
 from ..model import create_llm_from_env
 from ..prompt.registry import get_registry
@@ -89,7 +90,7 @@ class CodeAgent(Agent):
         approval_mode: ApprovalMode = ApprovalMode.UNSAFE_ONLY,
         max_turns: int = 100,
         rules: str | None = None,
-        memory_system: MemorySystem | None = None,
+        memory_system: MemoryService | None = None,
         debug: bool = False,
     ) -> None:
         """Initialize the CodeAgent.

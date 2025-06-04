@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from a2a.types import Message, Role, TextPart
 
 from .types import ToolCall
-from .planner import Planner
+from .base import Planner
 from .types import Step, StepType, ThinkStep, MessageStep, ToolCallStep, FinishStep, State
 from ..model.base import BaseLLM
 from ..model.factory import LLMFactory

@@ -5,12 +5,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 import pydantic as _pyd
-from a2a.types import Message, Task, TaskStatusUpdateEvent, TaskArtifactUpdateEvent
+from a2a.types import Message as A2AMessage, Task as A2ATask, TaskStatusUpdateEvent, TaskArtifactUpdateEvent, TaskState, TextPart
 
 # Import ArtifactService and Memory from new locations - using TYPE_CHECKING to avoid circular imports
 if _t.TYPE_CHECKING:
     from ..artifact.base import ArtifactService
     from ..memory.base import Memory, MemoryWriter
+    from ..tool.base import Tool
 
 __all__ = [
     # Agent types from base.py
@@ -29,189 +30,70 @@ __all__ = [
     "ThinkStep",
     "FinishStep",
     
-    # Task management
+    # A2A Compatible types
+    "Message",
+    "Task",
     "TaskStatus",
-    "TaskInfo",
+    "TextPart",
     
     # Services and configuration
     "Metrics",
-    "AgentConfig",
+    "RunConfig",
     
     # Event types
     "EventType",
     "InternalEvent",
+    "Event",
 ]
 
 
 # =============================================================================
-# Agent Types (from base.py)
+# A2A Compatible Types
 # =============================================================================
 
-class AgentRunInput(_pyd.BaseModel):
-    """Input for agent execution."""
-    id: str | int | None = None
-    message: Message
-    metadata: dict[str, _t.Any] | None = None
-    options: dict[str, _t.Any] | None = None
-    session_id: str | None = None
-    task_id: str | None = None  # Optional task ID for continuing existing task
-        
-    class Config:
-        arbitrary_types_allowed = True
-
-
-class AgentRunOutput(_pyd.BaseModel):
-    """Output from agent execution."""
-    id: str | int | None = None
-    result: Task | Message | TaskStatusUpdateEvent | TaskArtifactUpdateEvent
-    metadata: dict[str, _t.Any] | None = None
+class Message(A2AMessage):
+    """Extended A2A Message with additional functionality."""
     
-    class Config:
-        arbitrary_types_allowed = True
-
-
-class ToolCall(_pyd.BaseModel):
-    """Represents a tool call from the LLM."""
-    call_id: str
-    name: str
-    arguments: dict[str, _t.Any]
-
-
-class ToolCallResult(_pyd.BaseModel):
-    """Result of a tool execution."""
-    call_id: str
-    success: bool
-    output: str
-    error: str | None = None
-
-
-# =============================================================================
-# Task Management
-# =============================================================================
-
-class TaskStatus(Enum):
-    """Task execution status."""
-    PENDING = "pending"
-    RUNNING = "running" 
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-    FAILED = "failed"
-
-
-@dataclass
-class TaskInfo:
-    """Task information for State."""
-    id: str
-    parent_id: str | None = None
-    query: str = ""
-    status: TaskStatus = TaskStatus.PENDING
-    created_at: datetime = field(default_factory=datetime.now)
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-
-
-# =============================================================================
-# Metrics and Configuration
-# =============================================================================
-
-@dataclass
-class Metrics:
-    """Performance and usage metrics."""
-    iterations: int = 0
-    tokens_used: int = 0
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cost_used: float = 0.0
-    elapsed_seconds: float = 0.0
-    tool_calls_made: int = 0
-    errors_encountered: int = 0
+    def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
+        """Add a text part to the message."""
+        from a2a.types import TextPart
+        text_part = TextPart(text=text, metadata=metadata)
+        self.parts.append(text_part)
     
-    def add_tokens(self, input_tokens: int, output_tokens: int, cost: float = 0.0) -> None:
-        """Add token usage to metrics."""
-        self.input_tokens += input_tokens
-        self.output_tokens += output_tokens
-        self.tokens_used += input_tokens + output_tokens
-        self.cost_used += cost
+    def add_file_part(self, file_data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
+        """Add a file part to the message."""
+        from a2a.types import FilePart
+        file_part = FilePart(file=file_data, metadata=metadata)
+        self.parts.append(file_part)
     
-    def increment_tool_calls(self) -> None:
-        """Increment tool call counter."""
-        self.tool_calls_made += 1
-    
-    def increment_errors(self) -> None:
-        """Increment error counter."""
-        self.errors_encountered += 1
+    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
+        """Add a data part to the message."""
+        from a2a.types import DataPart
+        data_part = DataPart(data=data, metadata=metadata)
+        self.parts.append(data_part)
 
 
-@dataclass
-class AgentConfig:
-    """Budget constraints and agent configuration."""
-    turn_budget: int | None = None         # Maximum planning turns
-    token_budget: int | None = None        # Maximum tokens
-    cost_budget: float | None = None       # Maximum cost
-    time_budget: float | None = None       # Maximum execution time in seconds
-    deadline: datetime | None = None       # Absolute deadline
+class Task(A2ATask):
+    """Extended A2A Task with additional functionality."""
     
-    def is_budget_exceeded(self, metrics: Metrics, elapsed_time: float) -> tuple[bool, str]:
-        """Check if any budget constraints are exceeded."""
-        if self.turn_budget and metrics.iterations >= self.turn_budget:
-            return True, f"Turn budget exceeded: {metrics.iterations} >= {self.turn_budget}"
-        
-        if self.token_budget and metrics.tokens_used >= self.token_budget:
-            return True, f"Token budget exceeded: {metrics.tokens_used} >= {self.token_budget}"
-        
-        if self.cost_budget and metrics.cost_used >= self.cost_budget:
-            return True, f"Cost budget exceeded: {metrics.cost_used} >= {self.cost_budget}"
-        
-        if self.time_budget and elapsed_time >= self.time_budget:
-            return True, f"Time budget exceeded: {elapsed_time:.1f}s >= {self.time_budget}s"
-        
-        if self.deadline and datetime.now() >= self.deadline:
-            return True, f"Deadline exceeded: {datetime.now()} >= {self.deadline}"
-        
-        return False, ""
+    def add_message(self, message: Message) -> None:
+        """Add a message to the task history."""
+        if self.history is None:
+            self.history = []
+        self.history.append(message)
+    
+    def update_status(self, state: TaskState, message: Message | None = None, timestamp: str | None = None) -> None:
+        """Update the task status."""
+        from a2a.types import TaskStatus
+        self.status = TaskStatus(
+            state=state,
+            message=message,
+            timestamp=timestamp or datetime.now().isoformat()
+        )
 
 
-# =============================================================================
-# Comprehensive State
-# =============================================================================
-
-@dataclass
-class State:
-    """Comprehensive state containing all context for planning and execution."""
-    
-    # Identity and hierarchy
-    session_id: str
-    task_id: str | None = None
-    parent_task_id: str | None = None  
-    agent_id: str = ""
-    
-    # Temporal context
-    created_at: datetime = field(default_factory=datetime.now)
-    iteration: int = 0
-    
-    # Memory references (readonly)
-    memory: "Memory | None" = None  # Read-only memory access
-    memory_writer: "MemoryWriter | None" = None  # Write memory access
-    artifact_ref: "ArtifactService | None" = None  # Readonly reference
-    
-    # Tools and execution context
-    tools: list[_t.Any] = field(default_factory=list)  # Tool objects
-    tool_call_results: list[ToolCallResult] = field(default_factory=list)
-    
-    # Performance metrics
-    metrics: Metrics = field(default_factory=Metrics)
-    
-    # Budget constraints
-    config: AgentConfig = field(default_factory=AgentConfig)
-    
-    # Task management
-    current_task: TaskInfo | None = None
-    
-    # Additional context
-    context: dict[str, _t.Any] = field(default_factory=dict)
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+# Task status alias for compatibility
+TaskStatus = TaskState
 
 
 # =============================================================================
@@ -244,6 +126,182 @@ class InternalEvent:
     metadata: dict[str, _t.Any] = field(default_factory=dict)
 
 
+# Union type for all events
+Event = TaskStatusUpdateEvent | TaskArtifactUpdateEvent | InternalEvent
+
+
+# =============================================================================
+# Agent Types (from base.py) - Updated for A2A compatibility
+# =============================================================================
+
+class AgentRunInput(_pyd.BaseModel):
+    """Input for agent execution."""
+    id: str | int | None = None
+    message: Message
+    metadata: dict[str, _t.Any] | None = None
+    options: dict[str, _t.Any] | None = None
+    session_id: str | None = None
+    task_id: str | None = None  # Optional task ID for continuing existing task
+        
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class AgentRunOutput(_pyd.BaseModel):
+    """Output from agent execution."""
+    id: str | int | None = None
+    result: Task | Message | Event
+    metadata: dict[str, _t.Any] | None = None
+    
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class ToolCall(_pyd.BaseModel):
+    """Represents a tool call from the LLM."""
+    call_id: str
+    name: str
+    arguments: dict[str, _t.Any]
+
+
+class ToolCallResult(_pyd.BaseModel):
+    """Result of a tool execution."""
+    call_id: str
+    success: bool
+    output: str
+    error: str | None = None
+
+
+# =============================================================================
+# Metrics and Configuration
+# =============================================================================
+
+@dataclass
+class Metrics:
+    """Performance and usage metrics."""
+    iterations: int = 0
+    input_token_used: int = 0
+    output_token_used: int = 0
+    cost_used: float = 0.0
+    time_used: float = 0.0
+    tool_calls: int = 0
+    llm_calls: int = 0
+    errors: int = 0
+    
+    # Computed properties for backward compatibility
+    @property
+    def tokens_used(self) -> int:
+        """Total tokens used (input + output)."""
+        return self.input_token_used + self.output_token_used
+    
+    @property
+    def elapsed_seconds(self) -> float:
+        """Alias for time_used."""
+        return self.time_used
+    
+    @property
+    def tool_calls_made(self) -> int:
+        """Alias for tool_calls."""
+        return self.tool_calls
+    
+    @property
+    def errors_encountered(self) -> int:
+        """Alias for errors."""
+        return self.errors
+    
+    def add_tokens(self, input_tokens: int, output_tokens: int, cost: float = 0.0) -> None:
+        """Add token usage to metrics."""
+        self.input_token_used += input_tokens
+        self.output_token_used += output_tokens
+        self.cost_used += cost
+    
+    def increment_tool_calls(self) -> None:
+        """Increment tool call counter."""
+        self.tool_calls += 1
+    
+    def increment_llm_calls(self) -> None:
+        """Increment LLM call counter."""
+        self.llm_calls += 1
+    
+    def increment_errors(self) -> None:
+        """Increment error counter."""
+        self.errors += 1
+
+
+@dataclass
+class RunConfig:
+    """Budget constraints and agent configuration."""
+    turn_budget: int | None = None         # Maximum planning turns
+    token_budget: int | None = None        # Maximum tokens
+    cost_budget: float | None = None       # Maximum cost
+    time_budget: float | None = None       # Maximum execution time in seconds
+    deadline: datetime | None = None       # Absolute deadline
+    
+    def is_budget_exceeded(self, metrics: Metrics, elapsed_time: float) -> tuple[bool, str]:
+        """Check if any budget constraints are exceeded."""
+        if self.turn_budget and metrics.iterations >= self.turn_budget:
+            return True, f"Turn budget exceeded: {metrics.iterations} >= {self.turn_budget}"
+        
+        if self.token_budget and metrics.tokens_used >= self.token_budget:
+            return True, f"Token budget exceeded: {metrics.tokens_used} >= {self.token_budget}"
+        
+        if self.cost_budget and metrics.cost_used >= self.cost_budget:
+            return True, f"Cost budget exceeded: {metrics.cost_used} >= {self.cost_budget}"
+        
+        if self.time_budget and elapsed_time >= self.time_budget:
+            return True, f"Time budget exceeded: {elapsed_time:.1f}s >= {self.time_budget}s"
+        
+        if self.deadline and datetime.now() >= self.deadline:
+            return True, f"Deadline exceeded: {datetime.now()} >= {self.deadline}"
+        
+        return False, ""
+
+
+# Backward compatibility alias
+AgentConfig = RunConfig
+
+
+# =============================================================================
+# Comprehensive State
+# =============================================================================
+
+@dataclass
+class State:
+    """Comprehensive state containing all context for planning and execution."""
+    
+    # Identity and hierarchy
+    session_id: str
+    task_id: str | None = None
+    parent_task_id: str | None = None  
+    agent_id: str = ""
+    
+    # Temporal context
+    created_at: datetime = field(default_factory=datetime.now)
+    iteration: int = 0
+    
+    # Memory references (readonly)
+    memory: "Memory | None" = None  # Read-only memory access
+    memory_writer: "MemoryWriter | None" = None  # Write memory access
+    artifact_ref: "ArtifactService | None" = None  # Readonly reference
+    
+    # Tools and execution context - using Tool from base.py
+    tools: list["Tool"] = field(default_factory=list)  # Tool objects from base.py
+    tool_call_results: list[ToolCallResult] = field(default_factory=list)
+    
+    # Performance metrics
+    metrics: Metrics = field(default_factory=Metrics)
+    
+    # Budget constraints
+    config: RunConfig = field(default_factory=RunConfig)
+    
+    # Current task (A2A compatible)
+    current_task: Task | None = None
+    
+    # Additional context
+    context: dict[str, _t.Any] = field(default_factory=dict)
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+
+
 # =============================================================================
 # Step Types (A2A Compatible)
 # =============================================================================
@@ -259,17 +317,24 @@ class StepType(Enum):
 
 @dataclass
 class Step:
-    """Base class for all planner steps."""
+    """Base class for all planner steps - more general implementation."""
     step_id: str
     step_type: StepType
     timestamp: datetime = field(default_factory=datetime.now)
     metadata: dict[str, _t.Any] = field(default_factory=dict)
+    
+    # General content fields
+    message: Message | None = None
+    event: Event | None = None
+    tool_call: ToolCall | None = None
+    thinking: str | None = None
+    reason: str | None = None
+    success: bool = True
 
 
 @dataclass
 class MessageStep(Step):
     """A2A compatible message step."""
-    message: Message = field(default=None)  # Will be set via constructor
     is_streaming: bool = False
     step_type: StepType = StepType.MESSAGE
     
@@ -290,7 +355,6 @@ class MessageStep(Step):
 @dataclass  
 class EventStep(Step):
     """A2A compatible event step with internal event support."""
-    event: TaskStatusUpdateEvent | TaskArtifactUpdateEvent | InternalEvent = field(default=None)  # Will be set via constructor
     event_type: EventType = field(default=None)  # Will be set via constructor
     step_type: StepType = StepType.EVENT
     
@@ -304,7 +368,6 @@ class EventStep(Step):
 @dataclass
 class ToolCallStep(Step):
     """Step for executing a tool call."""
-    tool_call: ToolCall = field(default=None)  # Will be set via constructor
     step_type: StepType = StepType.TOOL_CALL
     
     def __post_init__(self):
@@ -315,14 +378,27 @@ class ToolCallStep(Step):
 @dataclass 
 class ThinkStep(Step):
     """Step for internal agent thinking/reasoning."""
-    thinking: str = field(default="")  # Default empty thinking
     step_type: StepType = StepType.THINK
+    
+    def __post_init__(self):
+        if self.thinking is None:
+            self.thinking = ""
 
 
 @dataclass
 class FinishStep(Step):
     """Step indicating task completion."""
-    reason: str = "Task completed"
-    success: bool = True
-    final_message: Message | None = None
-    step_type: StepType = StepType.FINISH 
+    step_type: StepType = StepType.FINISH
+    
+    def __post_init__(self):
+        if self.reason is None:
+            self.reason = "Task completed"
+        if self.message is None and self.reason:
+            # Create a simple message for the finish step
+            self.message = Message(
+                messageId=f"finish-{self.step_id}",
+                role="agent",
+                parts=[],
+                taskId=None
+            )
+            self.message.add_text_part(self.reason) 

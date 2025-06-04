@@ -8,7 +8,7 @@ from datetime import datetime
 from a2a.types import Message, TextPart, Role
 
 __all__ = [
-    "MemorySystem",
+    "MemoryService",
     "InMemoryStore",
     "MemoryChunk",
     "ChunkType",
@@ -128,7 +128,7 @@ class MemoryChunk:
         )
 
 
-class MemorySystem(abc.ABC):
+class MemoryService(abc.ABC):
     """Abstract chat/task memory backend with A2A Message support."""
 
     @abc.abstractmethod
@@ -194,7 +194,7 @@ class MemorySystem(abc.ABC):
         ...
 
 
-class InMemoryStore(MemorySystem):
+class InMemoryStore(MemoryService):
     """In-memory implementation of MemorySystem with A2A Message support."""
     
     def __init__(self):
@@ -473,7 +473,7 @@ class MemoryWriter(abc.ABC):
 class InMemoryService(Memory, MemoryWriter):
     """Service implementation that bridges MemorySystem to the new split interfaces."""
     
-    def __init__(self, memory_system: MemorySystem | None = None):
+    def __init__(self, memory_system: MemoryService | None = None):
         self.memory_system = memory_system or InMemoryStore()
     
     async def get_history(

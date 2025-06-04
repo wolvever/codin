@@ -9,8 +9,9 @@ from a2a.types import Message, Role, TextPart
 
 from .base import Agent
 from .types import (
-    AgentRunInput, 
-    AgentRunOutput, 
+    AgentRunInput,
+    AgentRunOutput,
+    ToolCall,
     ToolCallResult,
     State,
     Step, 
@@ -20,14 +21,16 @@ from .types import (
     ToolCallStep, 
     ThinkStep, 
     FinishStep,
-    TaskInfo,
+    Task,
     TaskStatus,
     Metrics,
+    RunConfig,
+    # Backward compatibility
     AgentConfig,
     EventType,
     InternalEvent,
 )
-from .planner import Planner
+from .base import Planner
 from ..memory import Memory, MemoryWriter, InMemoryService
 from ..artifact import ArtifactService, InMemoryArtifactService
 from ..session import SessionService, ReplayService, TaskService
@@ -81,7 +84,7 @@ class BaseAgent(Agent):
         task_service: TaskService | None = None,
         tool_registry: ToolRegistry | None = None,
         mailbox: _t.Any = None,  # Mailbox interface TBD
-        default_config: AgentConfig | None = None,
+        default_config: RunConfig | None = None,
         debug: bool = False,
         **kwargs
     ):
@@ -130,7 +133,7 @@ class BaseAgent(Agent):
         self.tool_executor = ToolExecutor(self.tool_registry)
         
         # Configuration
-        self.default_config = default_config or AgentConfig(
+        self.default_config = default_config or RunConfig(
             turn_budget=100,
             token_budget=100000,
             cost_budget=10.0,
@@ -208,7 +211,7 @@ class BaseAgent(Agent):
         self, 
         input_data: AgentRunInput, 
         session_id: str
-    ) -> TaskInfo | None:
+    ) -> Task | None:
         """Start new task if this is a new query."""
         
         # If task_id provided, get existing task
@@ -243,7 +246,7 @@ class BaseAgent(Agent):
     async def _build_state(
         self, 
         session: dict, 
-        task: TaskInfo | None, 
+        task: Task | None, 
         input_data: AgentRunInput
     ) -> State:
         """Build comprehensive State from session and services."""
@@ -269,7 +272,7 @@ class BaseAgent(Agent):
         
         # Use provided config or default
         config = input_data.options.get("config") if input_data.options else None
-        if not isinstance(config, AgentConfig):
+        if not isinstance(config, RunConfig):
             config = self.default_config
         
         return State(

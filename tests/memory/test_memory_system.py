@@ -4,7 +4,7 @@ import pytest
 import uuid
 from datetime import datetime
 
-from codin.memory.base import MemorySystem, InMemoryStore, MemoryChunk, ChunkType
+from codin.memory.base import MemoryService, InMemoryStore, MemoryChunk, ChunkType
 from a2a.types import Message, TextPart, Role
 
 

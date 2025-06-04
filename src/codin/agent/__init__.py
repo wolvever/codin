@@ -17,12 +17,17 @@ from .types import (
     FinishStep, 
     EventType,
     
-    # Task management
+    # A2A Compatible types
+    Message,
+    Task,
     TaskStatus,
-    TaskInfo,
+    Event,
+    InternalEvent,
     
     # Configuration and metrics
     Metrics,
+    RunConfig,
+    # Backward compatibility
     AgentConfig,
 )
 
@@ -34,7 +39,7 @@ from ..artifact import ArtifactService
 from ..artifact import InMemoryArtifactService
 
 # Import core architecture components
-from .planner import Planner
+from .base import Planner
 
 # Lazy imports to avoid circular dependencies
 def get_base_agent():
@@ -73,13 +78,17 @@ __all__ = [
     "FinishStep",
     "EventType",
     
-    # Task management
+    # A2A Compatible types
+    "Message",
+    "Task",
     "TaskStatus",
-    "TaskInfo",
+    "Event",
+    "InternalEvent",
     
     # Configuration and metrics  
     "Metrics",
-    "AgentConfig",
+    "RunConfig",
+    "AgentConfig",  # Backward compatibility
     
     # Service interfaces
     "Memory",

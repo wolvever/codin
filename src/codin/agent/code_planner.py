@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
 import uuid
 import typing as _t
 from datetime import datetime
+from dataclasses import dataclass
 
 from a2a.types import Message, Role, TextPart
 
@@ -23,7 +25,7 @@ __all__ = [
 logger = logging.getLogger("codin.agent.code_planner")
 
 
-@_t.dataclass
+@dataclass
 class CodePlannerConfig:
     """Configuration for CodePlanner."""
     model: str = "gpt-4"

@@ -24,17 +24,25 @@ __all__ = [
 
 
 class Planner(abc.ABC):
-    """Abstract planner that generates execution steps from state."""
+    """Stateless planner that generates execution steps from state.
+    
+    The planner is stateless and only READS from State - it never modifies it.
+    All state changes are handled by the Agent that orchestrates the planner.
+    """
     
     @abc.abstractmethod
     async def next(self, state: State) -> _t.AsyncGenerator[Step, None]:
         """Generate the next execution steps based on current state.
         
         Args:
-            state: Current conversation and execution state
+            state: Current comprehensive execution state (READ-ONLY)
             
         Yields:
             Step objects representing what the agent should do next
+            
+        Note:
+            The planner must ONLY read from state - any modifications should
+            be yielded as Steps for the Agent to execute and apply to state.
         """
         ...
     

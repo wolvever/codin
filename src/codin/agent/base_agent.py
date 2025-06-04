@@ -8,14 +8,38 @@ from datetime import datetime
 from a2a.types import Message, Role, TextPart
 
 from .base import Agent
-from .types import AgentRunInput, AgentRunOutput, ToolCallResult
+from .types import (
+    AgentRunInput, 
+    AgentRunOutput, 
+    ToolCallResult,
+    State,
+    Step, 
+    StepType, 
+    MessageStep,
+    EventStep,
+    ToolCallStep, 
+    ThinkStep, 
+    FinishStep,
+    TaskInfo,
+    TaskStatus,
+    Metrics,
+    AgentConfig,
+    MemoryService,
+    ArtifactService,
+    EventType,
+    InternalEvent,
+)
 from .planner import Planner
-from .types import Step, StepType, ThinkStep, MessageStep, ToolCallStep, FinishStep, State
-from .session import Session, SessionManager
+from .services import (
+    InMemoryMemoryService,
+    InMemoryArtifactService, 
+    SessionService,
+    ReplayService,
+    TaskService,
+)
 from ..tool.base import Tool, ToolContext
 from ..tool.executor import ToolExecutor
 from ..tool.registry import ToolRegistry
-from ..memory.base import MemorySystem, InMemoryStore
 
 __all__ = [
     "BaseAgent",
@@ -34,404 +58,484 @@ class ContinueDecision:
 
 
 class BaseAgent(Agent):
-    """Base agent that orchestrates Session, State, Planner and execution loop.
+    """Stateful agent that orchestrates Planner and services.
     
     This agent follows the new architecture where:
     1. Agent receives AgentRunInput
-    2. Creates or gets Session from SessionManager
-    3. Builds State from Session
-    4. Calls Planner to get Steps
-    5. Executes steps in a loop (messages, tool calls, etc.)
-    6. Continues until FinishStep or stopping conditions
+    2. Gets or creates Session from SessionService  
+    3. Starts new Task if needed using TaskService
+    4. Builds comprehensive State from Session, Task, and service references
+    5. Calls Planner to get Steps (Planner only reads State)
+    6. Executes Steps in a loop (messages, tool calls, events)
+    7. Updates State based on Step results
+    8. Continues until FinishStep or budget constraints
+    9. Records to ReplayService and updates Session
     """
     
     def __init__(
         self,
         *,
         name: str = "BaseAgent",
-        description: str = "Base agent with session management and planner execution",
+        description: str = "Base agent with comprehensive service orchestration",
+        agent_id: str | None = None,
         planner: Planner,
-        session_manager: SessionManager | None = None,
+        memory_service: MemoryService | None = None,
+        artifact_service: ArtifactService | None = None,
+        session_service: SessionService | None = None,
+        replay_service: ReplayService | None = None,
+        task_service: TaskService | None = None,
         tool_registry: ToolRegistry | None = None,
-        max_turns: int = 100,
-        max_execution_time: float = 300.0,  # 5 minutes
+        mailbox: _t.Any = None,  # Mailbox interface TBD
+        default_config: AgentConfig | None = None,
         debug: bool = False,
         **kwargs
     ):
-        """Initialize the BaseAgent.
+        """Initialize the BaseAgent with service injection.
         
         Args:
             name: Agent name
-            description: Agent description  
+            description: Agent description
+            agent_id: Unique agent identifier
             planner: Planner instance for generating execution steps
-            session_manager: Manager for session lifecycle
+            memory_service: Service for chat history and memory
+            artifact_service: Service for code artifacts and files
+            session_service: Service for session lifecycle
+            replay_service: Service for execution replay logging
+            task_service: Service for task lifecycle management
             tool_registry: Registry of available tools
-            max_turns: Maximum number of planner turns
-            max_execution_time: Maximum execution time in seconds
+            mailbox: Inter-agent communication (TBD)
+            default_config: Default budget constraints and configuration
             debug: Enable debug logging
         """
         super().__init__(name=name, description=description, **kwargs)
         
         # Core components
+        self.agent_id = agent_id or f"agent_{uuid.uuid4().hex[:8]}"
         self.planner = planner
-        self.session_manager = session_manager or SessionManager()
+        
+        # Service injection with defaults
+        self.memory_service = memory_service or InMemoryMemoryService()
+        self.artifact_service = artifact_service or InMemoryArtifactService()
+        self.session_service = session_service or SessionService()
+        self.replay_service = replay_service or ReplayService()
+        self.task_service = task_service or TaskService()
         self.tool_registry = tool_registry or ToolRegistry()
+        self.mailbox = mailbox  # TBD
+        
+        # Tool execution
         self.tool_executor = ToolExecutor(self.tool_registry)
         
         # Configuration
-        self.max_turns = max_turns
-        self.max_execution_time = max_execution_time
+        self.default_config = default_config or AgentConfig(
+            turn_budget=100,
+            token_budget=100000,
+            cost_budget=10.0,
+            time_budget=300.0
+        )
         self.debug = debug
         
         # Event callbacks for monitoring
         self._event_callbacks: list[_t.Callable[[dict], _t.Awaitable[None]]] = []
         
-        logger.info(f"Initialized {name} with {len(self.tool_registry.get_tools())} tools")
+        logger.info(f"Initialized {self.agent_id} with {len(self.tool_registry.get_tools())} tools")
     
     def add_event_callback(self, callback: _t.Callable[[dict], _t.Awaitable[None]]) -> None:
-        """Add an event callback for monitoring agent execution."""
+        """Add event callback for monitoring."""
         self._event_callbacks.append(callback)
     
-    async def _emit_event(self, event_type: str, data: dict[str, _t.Any]) -> None:
-        """Emit an event to all registered callbacks."""
-        event = {
-            "event_type": event_type,
-            "event_id": str(uuid.uuid4()),
-            "timestamp": datetime.now(),
-            "data": data
-        }
-        
+    async def _emit_event(self, event_type: str, data: dict) -> None:
+        """Emit event to all callbacks."""
+        event = {"type": event_type, "timestamp": datetime.now().isoformat(), **data}
         for callback in self._event_callbacks:
             try:
                 await callback(event)
             except Exception as e:
-                logger.error(f"Error in event callback: {e}")
+                logger.warning(f"Event callback error: {e}")
     
-    async def run(self, input_data: AgentRunInput) -> AgentRunOutput:
-        """Execute the agent with the new session/planner architecture."""
+    async def run(self, input_data: AgentRunInput) -> _t.AsyncGenerator[AgentRunOutput, None]:
+        """Main execution method implementing the new architecture."""
         start_time = time.time()
         
-        # Get or create session
-        session_id = input_data.session_id or str(uuid.uuid4())
-        session = await self.session_manager.get_or_create_session(session_id)
-        
-        # Record the input message
-        await session.record(input_data.message)
-        
-        await self._emit_event("task_start", {
-            "session_id": session_id,
-            "input_message": self._extract_text_from_message(input_data.message)
-        })
-        
         try:
-            # Main execution loop
-            turn_count = 0
-            final_message = None
+            # 1. Get or create session
+            session = await self.session_service.get_or_create_session(input_data.session_id)
+            session_id = session["session_id"]
             
-            while turn_count < self.max_turns:
-                elapsed_time = time.time() - start_time
-                
-                # Check execution time limit
-                if elapsed_time > self.max_execution_time:
-                    logger.warning(f"Execution time limit reached: {elapsed_time:.1f}s")
-                    break
-                
-                # Build current state from session
-                state = session.build_state()
-                state.turn_count = turn_count
-                
-                await self._emit_event("turn_start", {
-                    "session_id": session_id,
-                    "turn": turn_count,
-                    "state_summary": {
-                        "message_count": len(state.history),
-                        "task_completed": len(state.task_list.get("completed", [])),
-                        "task_pending": len(state.task_list.get("pending", []))
-                    }
-                })
-                
-                # Get steps from planner
-                steps_executed = 0
-                task_finished = False
-                
-                try:
-                    async for step in self.planner.next(state):
-                        steps_executed += 1
-                        
-                        if self.debug:
-                            logger.debug(f"Executing step {step.step_id}: {step.step_type.value}")
-                        
-                        # Execute the step
-                        step_result = await self._execute_step(step, session, state)
-                        
-                        # Check if this is a finish step
-                        if step.step_type == StepType.FINISH:
-                            final_message = step.final_message
-                            task_finished = True
-                            await self._emit_event("task_complete", {
-                                "session_id": session_id,
-                                "turn": turn_count,
-                                "reason": step.reason if isinstance(step, FinishStep) else "Finished"
-                            })
-                            break
-                        
-                        # Update session from any state changes
-                        session.update_from_state(state)
-                        
-                        # Limit steps per turn to prevent runaway planners
-                        if steps_executed >= 10:
-                            logger.warning("Maximum steps per turn reached")
-                            break
-                
-                except Exception as e:
-                    logger.error(f"Error in planner execution: {e}")
-                    await self._emit_event("turn_error", {
-                        "session_id": session_id,
-                        "turn": turn_count,
-                        "error": str(e)
-                    })
-                    break
-                
-                await self._emit_event("turn_end", {
-                    "session_id": session_id,
-                    "turn": turn_count,
-                    "steps_executed": steps_executed,
-                    "task_finished": task_finished
-                })
-                
-                # Exit if task is finished
-                if task_finished:
-                    break
-                
-                turn_count += 1
-                session.turn_count = turn_count
-            
-            # Get final response message
-            if not final_message:
-                # Get the last assistant message from session
-                for msg in reversed(session.messages):
-                    if msg.role == Role.agent:
-                        final_message = msg
-                        break
-                
-                if not final_message:
-                    # Create a default completion message
-                    final_message = Message(
-                        messageId=str(uuid.uuid4()),
-                        role=Role.agent,
-                        parts=[TextPart(text="Task completed.")],
-                        contextId=session_id,
-                        kind="message"
-                    )
-            
-            # Update final metrics
-            elapsed_time = time.time() - start_time
-            session.metrics.update({
-                "total_turns": turn_count,
-                "execution_time": elapsed_time,
-                "completed_at": datetime.now().timestamp()
+            await self._emit_event("run_start", {
+                "agent_id": self.agent_id,
+                "session_id": session_id,
+                "input_message_id": input_data.message.messageId
             })
             
-            return AgentRunOutput(
-                result=final_message,
-                metadata={
-                    "session_id": session_id,
-                    "turns": turn_count,
-                    "execution_time": elapsed_time,
-                    "session_metrics": session.get_metrics_summary()
-                }
-            )
+            # 2. Start new task if needed  
+            task = await self._start_task_if_needed(input_data, session_id)
             
+            # 3. Build comprehensive State
+            state = await self._build_state(session, task, input_data)
+            
+            # 4. Execute planning loop until completion
+            async for output in self._execute_planning_loop(state, session_id, start_time):
+                yield output
+                
         except Exception as e:
-            logger.error(f"Error in agent execution: {e}", exc_info=True)
-            await self._emit_event("task_error", {
-                "session_id": session_id,
+            logger.error(f"Error in agent run: {e}", exc_info=True)
+            await self._emit_event("run_error", {
+                "agent_id": self.agent_id,
+                "session_id": input_data.session_id,
                 "error": str(e)
             })
             
-            # Create error response
+            # Yield error message
             error_message = Message(
                 messageId=str(uuid.uuid4()),
                 role=Role.agent,
                 parts=[TextPart(text=f"I encountered an error: {str(e)}")],
-                contextId=session_id,
+                contextId=input_data.session_id or "unknown",
                 kind="message"
             )
             
-            return AgentRunOutput(
+            yield AgentRunOutput(
+                id=str(uuid.uuid4()),
                 result=error_message,
-                metadata={
-                    "session_id": session_id,
-                    "error": str(e),
-                    "execution_time": time.time() - start_time
-                }
+                metadata={"error": str(e), "agent_id": self.agent_id}
             )
     
-    async def _execute_step(self, step: Step, session: Session, state: State) -> _t.Any:
-        """Execute a single step and update session/state accordingly."""
+    async def _start_task_if_needed(
+        self, 
+        input_data: AgentRunInput, 
+        session_id: str
+    ) -> TaskInfo | None:
+        """Start new task if this is a new query."""
         
-        if step.step_type == StepType.THINK:
-            # Handle thinking step
-            think_step = _t.cast(ThinkStep, step)
-            await self._emit_event("agent_thinking", {
-                "session_id": session.session_id,
-                "thinking": think_step.thinking
-            })
-            # Thinking doesn't produce messages, just internal processing
-            return None
-            
-        elif step.step_type == StepType.MESSAGE:
-            # Handle message step
-            message_step = _t.cast(MessageStep, step)
-            await session.record(message_step.message)
-            state.add_message(message_step.message)
-            
-            await self._emit_event("agent_message", {
-                "session_id": session.session_id,
-                "message_id": message_step.message.messageId,
-                "is_streaming": message_step.is_streaming
-            })
-            return message_step.message
-            
-        elif step.step_type == StepType.TOOL_CALL:
-            # Handle tool call step
-            tool_step = _t.cast(ToolCallStep, step)
-            return await self._execute_tool_call(tool_step, session, state)
-            
-        elif step.step_type == StepType.FINISH:
-            # Handle finish step
-            finish_step = _t.cast(FinishStep, step)
-            if finish_step.final_message:
-                await session.record(finish_step.final_message)
-                state.add_message(finish_step.final_message)
-            return finish_step
-            
-        else:
-            logger.warning(f"Unknown step type: {step.step_type}")
-            return None
+        # If task_id provided, get existing task
+        if input_data.task_id:
+            task = await self.task_service.get_task(input_data.task_id)
+            if task:
+                await self.task_service.start_task(task.id)
+                return task
+        
+        # Extract query from message
+        query = ""
+        for part in input_data.message.parts:
+            if hasattr(part, 'text'):
+                query = part.text
+                break
+        
+        if query:
+            # Create new task
+            task = await self.task_service.create_task(
+                query=query,
+                metadata={
+                    "session_id": session_id,
+                    "agent_id": self.agent_id,
+                    "input_message_id": input_data.message.messageId
+                }
+            )
+            await self.task_service.start_task(task.id)
+            return task
+        
+        return None
     
-    async def _execute_tool_call(self, tool_step: ToolCallStep, session: Session, state: State) -> ToolCallResult:
-        """Execute a tool call and record results."""
-        tool_call = tool_step.tool_call
+    async def _build_state(
+        self, 
+        session: dict, 
+        task: TaskInfo | None, 
+        input_data: AgentRunInput
+    ) -> State:
+        """Build comprehensive State from session and services."""
         
-        await self._emit_event("tool_call_start", {
-            "session_id": session.session_id,
-            "call_id": tool_call.call_id,
-            "tool_name": tool_call.name,
-            "arguments": tool_call.arguments
-        })
+        session_id = session["session_id"]
+        
+        # Get chat history from MemoryService  
+        history = await self.memory_service.get_chat_history(session_id)
+        
+        # Add input message to history
+        await self.memory_service.add_message(session_id, input_data.message)
+        
+        # Get available tools
+        tools = self.tool_registry.get_tools()
+        
+        # Build metrics from session
+        metrics = Metrics(
+            iterations=session.get("iteration_count", 0),
+            tokens_used=session.get("total_tokens", 0),
+            cost_used=session.get("total_cost", 0.0),
+            elapsed_seconds=session.get("elapsed_time", 0.0)
+        )
+        
+        # Use provided config or default
+        config = input_data.options.get("config") if input_data.options else None
+        if not isinstance(config, AgentConfig):
+            config = self.default_config
+        
+        return State(
+            session_id=session_id,
+            task_id=task.id if task else None,
+            parent_task_id=task.parent_id if task else None,
+            agent_id=self.agent_id,
+            created_at=session.get("created_at", datetime.now()),
+            iteration=session.get("iteration_count", 0),
+            history=history,  # Readonly reference
+            memory_ref=self.memory_service,  # Readonly reference
+            artifact_ref=self.artifact_service,  # Readonly reference
+            tools=tools,
+            metrics=metrics,
+            config=config,
+            current_task=task,
+            context=input_data.metadata or {},
+            metadata={
+                "agent_id": self.agent_id,
+                "input_options": input_data.options or {}
+            }
+        )
+    
+    async def _execute_planning_loop(
+        self, 
+        state: State, 
+        session_id: str, 
+        start_time: float
+    ) -> _t.AsyncGenerator[AgentRunOutput, None]:
+        """Execute the main planning and execution loop."""
+        
+        while state.iteration < (state.config.turn_budget or 100):
+            elapsed_time = time.time() - start_time
+            
+            # Check budget constraints
+            is_exceeded, reason = state.config.is_budget_exceeded(state.metrics, elapsed_time)
+            if is_exceeded:
+                logger.warning(f"Budget constraint exceeded: {reason}")
+                break
+            
+            await self._emit_event("turn_start", {
+                "session_id": session_id,
+                "iteration": state.iteration,
+                "metrics": {
+                    "tokens_used": state.metrics.tokens_used,
+                    "cost_used": state.metrics.cost_used,
+                    "elapsed_seconds": elapsed_time
+                }
+            })
+            
+            # Get steps from planner (READONLY access to state)
+            steps_executed = 0
+            task_finished = False
+            
+            try:
+                async for step in self.planner.next(state):
+                    steps_executed += 1
+                    
+                    if self.debug:
+                        logger.debug(f"Executing step {step.step_id}: {step.step_type.value}")
+                    
+                    # Execute the step and yield outputs
+                    async for output in self._execute_step(step, state, session_id):
+                        yield output
+                    
+                    # Check if this is a finish step
+                    if step.step_type == StepType.FINISH:
+                        task_finished = True
+                        if state.current_task:
+                            success = isinstance(step, FinishStep) and step.success
+                            if success:
+                                await self.task_service.complete_task(
+                                    state.current_task.id,
+                                    {"finish_reason": step.reason}
+                                )
+                            else:
+                                await self.task_service.fail_task(
+                                    state.current_task.id,
+                                    step.reason,
+                                    {"finish_reason": step.reason}
+                                )
+                        
+                        await self._emit_event("task_complete", {
+                            "session_id": session_id,
+                            "task_id": state.task_id,
+                            "iteration": state.iteration,
+                            "reason": step.reason if isinstance(step, FinishStep) else "Finished",
+                            "success": isinstance(step, FinishStep) and step.success
+                        })
+                        break
+                    
+                    # Record step for replay
+                    await self.replay_service.record_step(session_id, step, "executed")
+                    
+                    # Limit steps per turn to prevent runaway planners
+                    if steps_executed >= 10:
+                        logger.warning("Maximum steps per turn reached")
+                        break
+                
+                if task_finished:
+                    break
+                    
+                # Update iteration counter
+                state.iteration += 1
+                state.metrics.iterations = state.iteration
+                
+                # Update session with metrics
+                await self.session_service.update_session(session_id, {
+                    "iteration_count": state.iteration,
+                    "total_tokens": state.metrics.tokens_used,
+                    "total_cost": state.metrics.cost_used,
+                    "elapsed_time": elapsed_time
+                })
+                
+                await self._emit_event("turn_end", {
+                    "session_id": session_id,
+                    "iteration": state.iteration,
+                    "steps_executed": steps_executed
+                })
+                
+            except Exception as e:
+                logger.error(f"Error in planning loop: {e}", exc_info=True)
+                state.metrics.increment_errors()
+                
+                await self._emit_event("turn_error", {
+                    "session_id": session_id,
+                    "iteration": state.iteration,
+                    "error": str(e)
+                })
+                break
+    
+    async def _execute_step(
+        self, 
+        step: Step, 
+        state: State, 
+        session_id: str
+    ) -> _t.AsyncGenerator[AgentRunOutput, None]:
+        """Execute a single step and yield outputs."""
         
         try:
-            # Check if tool exists
-            tool = self.tool_registry.get_tool(tool_call.name)
-            if tool is None:
-                result = ToolCallResult(
-                    call_id=tool_call.call_id,
-                    success=False,
-                    output="",
-                    error=f"Unknown tool: {tool_call.name}"
-                )
-            else:
-                # Execute the tool
-                tool_context = ToolContext(
-                    tool_name=tool_call.name,
-                    arguments=tool_call.arguments,
-                    session_id=session.session_id
-                )
-                
-                result_data = await self.tool_executor.execute(
-                    tool_call.name, 
-                    tool_call.arguments, 
-                    tool_context
-                )
-                
-                output = str(result_data) if result_data is not None else ""
-                
-                result = ToolCallResult(
-                    call_id=tool_call.call_id,
-                    success=True,
-                    output=output
-                )
+            if step.step_type == StepType.MESSAGE:
+                # Handle message step
+                if isinstance(step, MessageStep):
+                    # Add message to memory
+                    await self.memory_service.add_message(session_id, step.message)
+                    
+                    yield AgentRunOutput(
+                        id=step.step_id,
+                        result=step.message,
+                        metadata={
+                            "step_type": "message",
+                            "is_streaming": step.is_streaming,
+                            "agent_id": self.agent_id
+                        }
+                    )
             
-            # Update metrics
-            session.metrics["total_tool_calls"] = session.metrics.get("total_tool_calls", 0) + 1
-            state.update_metrics("total_tool_calls", session.metrics["total_tool_calls"])
+            elif step.step_type == StepType.EVENT:
+                # Handle event step
+                if isinstance(step, EventStep):
+                    yield AgentRunOutput(
+                        id=step.step_id,
+                        result=step.event,
+                        metadata={
+                            "step_type": "event", 
+                            "event_type": step.event_type.value,
+                            "agent_id": self.agent_id
+                        }
+                    )
             
-            # Store last tool results in context
-            if not state.last_tool_results:
-                state.last_tool_results = []
-            state.last_tool_results.append(result)
-            state.context["last_tool_results"] = state.last_tool_results
+            elif step.step_type == StepType.TOOL_CALL:
+                # Handle tool call step
+                if isinstance(step, ToolCallStep):
+                    result = await self._execute_tool_call(step.tool_call, state)
+                    state.tool_call_results.append(result)
+                    state.metrics.increment_tool_calls()
+                    
+                    # Create result message
+                    result_text = f"Tool '{step.tool_call.name}' {'succeeded' if result.success else 'failed'}"
+                    if result.output:
+                        result_text += f":\n{result.output}"
+                    if result.error:
+                        result_text += f"\nError: {result.error}"
+                    
+                    result_message = Message(
+                        messageId=str(uuid.uuid4()),
+                        role=Role.agent,
+                        parts=[TextPart(text=result_text)],
+                        contextId=session_id,
+                        kind="tool_result"
+                    )
+                    
+                    await self.memory_service.add_message(session_id, result_message)
+                    
+                    yield AgentRunOutput(
+                        id=step.step_id,
+                        result=result_message,
+                        metadata={
+                            "step_type": "tool_call",
+                            "tool_name": step.tool_call.name,
+                            "success": result.success,
+                            "agent_id": self.agent_id
+                        }
+                    )
             
-            await self._emit_event("tool_call_end", {
-                "session_id": session.session_id,
-                "call_id": tool_call.call_id,
-                "tool_name": tool_call.name,
-                "success": result.success,
-                "output": result.output,
-                "error": result.error
+            elif step.step_type == StepType.THINK:
+                # Handle thinking step (internal, may or may not be yielded)
+                if isinstance(step, ThinkStep) and self.debug:
+                    # Only emit thinking events in debug mode
+                    await self._emit_event("agent_thinking", {
+                        "session_id": session_id,
+                        "step_id": step.step_id,
+                        "thinking": step.thinking
+                    })
+            
+            elif step.step_type == StepType.FINISH:
+                # Handle finish step
+                if isinstance(step, FinishStep) and step.final_message:
+                    await self.memory_service.add_message(session_id, step.final_message)
+                    
+                    yield AgentRunOutput(
+                        id=step.step_id,
+                        result=step.final_message,
+                        metadata={
+                            "step_type": "finish",
+                            "reason": step.reason,
+                            "success": step.success,
+                            "agent_id": self.agent_id
+                        }
+                    )
+        
+        except Exception as e:
+            logger.error(f"Error executing step {step.step_id}: {e}", exc_info=True)
+            state.metrics.increment_errors()
+            
+            # Emit error event
+            await self._emit_event("step_error", {
+                "session_id": session_id,
+                "step_id": step.step_id,
+                "step_type": step.step_type.value,
+                "error": str(e)
             })
+    
+    async def _execute_tool_call(self, tool_call, state: State) -> ToolCallResult:
+        """Execute a tool call using the tool executor."""
+        try:
+            # Create tool context
+            context = ToolContext(
+                agent_id=self.agent_id,
+                session_id=state.session_id,
+                metadata=state.metadata
+            )
             
-            return result
+            # Execute tool
+            result = await self.tool_executor.execute(
+                tool_call.name,
+                tool_call.arguments,
+                context
+            )
+            
+            return ToolCallResult(
+                call_id=tool_call.call_id,
+                success=True,
+                output=str(result)
+            )
             
         except Exception as e:
-            error_msg = f"Tool execution error: {str(e)}"
-            logger.error(f"Error executing tool {tool_call.name}: {e}", exc_info=True)
-            
-            result = ToolCallResult(
+            logger.error(f"Tool execution error: {e}", exc_info=True)
+            return ToolCallResult(
                 call_id=tool_call.call_id,
                 success=False,
                 output="",
-                error=error_msg
-            )
-            
-            await self._emit_event("tool_call_end", {
-                "session_id": session.session_id,
-                "call_id": tool_call.call_id,
-                "tool_name": tool_call.name,
-                "success": False,
-                "error": error_msg
-            })
-            
-            return result
-    
-    def _extract_text_from_message(self, message: Message) -> str:
-        """Extract text content from a Message object."""
-        text_parts = []
-        for part in message.parts:
-            if hasattr(part, 'root') and hasattr(part.root, 'text'):
-                text_parts.append(part.root.text)
-            elif hasattr(part, 'text'):
-                text_parts.append(part.text)
-        return "\n".join(text_parts)
-    
-    async def cleanup(self) -> None:
-        """Cleanup the agent and all its resources."""
-        logger.debug("Cleaning up BaseAgent resources...")
-        
-        # Cleanup planner
-        if hasattr(self.planner, 'cleanup'):
-            try:
-                await self.planner.cleanup()
-                logger.debug("Cleaned up planner")
-            except Exception as e:
-                logger.warning(f"Error cleaning up planner: {e}")
-        
-        # Cleanup session manager (which cleans up all sessions)
-        try:
-            await self.session_manager.cleanup()
-            logger.debug("Cleaned up session manager")
-        except Exception as e:
-            logger.warning(f"Error cleaning up session manager: {e}")
-        
-        # Cleanup tool registry and tools
-        for toolset in self.tool_registry.get_toolsets():
-            try:
-                if hasattr(toolset, 'cleanup'):
-                    await toolset.cleanup()
-                elif hasattr(toolset, 'close'):
-                    await toolset.close()
-            except Exception as e:
-                logger.warning(f"Error cleaning up toolset {toolset.name}: {e}")
-        
-        logger.debug("BaseAgent cleanup completed") 
+                error=str(e)
+            ) 

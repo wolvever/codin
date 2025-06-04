@@ -1,0 +1,49 @@
+# Core settings
+model: "claude-3-5-sonnet-20241022"
+provider: "openai"
+approval_mode: "suggest"
+
+max_turns: 100
+
+# Provider configurations with custom base URLs
+providers:
+  openai:
+    name: "OpenAI"
+    base_url: "https://aiproxy.usw.sealos.io/v1"  # Custom proxy URL
+    env_key: "OPENAI_API_KEY"
+    models: ["claude-3-5-sonnet-20241022"]
+  
+  anthropic:
+    name: "Anthropic"
+    base_url: "https://api.anthropic.com"
+    env_key: "ANTHROPIC_API_KEY"
+    models: ["claude-3.5-sonnet", "claude-3-opus"]
+  
+  ollama:
+    name: "Ollama Local"
+    base_url: "http://localhost:11434/v1"
+    env_key: "OLLAMA_API_KEY"
+    models: ["llama2", "codellama", "mistral"]
+  
+  custom-endpoint:
+    name: "Custom OpenAI Compatible"
+    base_url: "https://your-api.example.com/v1"
+    env_key: "CUSTOM_API_KEY"
+    models: ["custom-model-1", "custom-model-2"]
+
+# MCP server configurations
+mcp_servers:
+  fetch:
+    command: "uvx"
+    args: ["mcp-server-fetch"]
+    description: "Fetch content from URLs and web pages"
+  
+  git:
+    command: "uvx"
+    args: ["mcp-server-git"]
+    description: "Git repository operations and version control"
+  
+# Other settings
+enable_project_docs: true
+verbose: true
+debug: true

@@ -1,0 +1,25 @@
+name: conversation_summary
+version: latest
+metadata:
+  description: "Template for summarizing conversation history for memory compression"
+  author: "codin"
+  created: "2024-01-01"
+
+variants:
+  - text: |
+      Please analyze this conversation and provide:
+      1. A concise summary of what was discussed and accomplished
+      2. Key entities mentioned (people, files, concepts, etc.)
+      3. Any ID mappings (file IDs to names, URLs, etc.)
+
+      Conversation:
+      {{ conversation_text }}
+
+      Please respond in JSON format:
+      {
+          "summary": "Brief summary of the conversation",
+          "entities": {"entity_name": "description"},
+          "id_mappings": {"id": "name"}
+      }
+
+    conditions: {} 

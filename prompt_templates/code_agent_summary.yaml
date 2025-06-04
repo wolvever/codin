@@ -1,0 +1,65 @@
+name: code_agent_summary
+version: latest
+metadata:
+  description: "Summary prompt for CodeAgent to provide final task completion summary"
+  author: "codin"
+  created: "2024-01-01"
+
+variants:
+  - text: |
+      You are providing a final summary for a completed coding task.
+
+      ## Task Information
+      - Agent: {{ agent_name }}
+      - Task ID: {{ task_id }}
+      - Total Turns: {{ turn_count }}
+      - Total Tool Calls: {{ total_tool_calls }}
+      - Execution Time: {{ execution_time }}
+
+      ## Original Request
+      {{ original_request }}
+
+      ## Conversation History
+      {{ history_text }}
+
+      ## Tool Execution Summary
+      {{ tool_summary }}
+
+      ## Instructions
+
+      Provide a comprehensive summary of what was accomplished in this task. Your response should be in JSON format:
+
+      ```json
+      {
+        "summary": "Brief overview of what was accomplished",
+        "key_achievements": [
+          "Achievement 1",
+          "Achievement 2"
+        ],
+        "files_created": [
+          "file1.py",
+          "file2.txt"
+        ],
+        "commands_executed": [
+          "command 1",
+          "command 2"
+        ],
+        "final_status": "success|partial|failed",
+        "next_steps": [
+          "Optional next step 1",
+          "Optional next step 2"
+        ],
+        "notes": "Any additional notes or observations"
+      }
+      ```
+
+      **Guidelines:**
+      - Be concise but comprehensive
+      - Focus on concrete achievements and deliverables
+      - Include any files that were created or modified
+      - List important commands that were executed
+      - Indicate the final status of the task
+      - Suggest next steps if the task is incomplete or could be extended
+      - Include any important notes or observations
+
+    conditions: {} 

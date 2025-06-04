@@ -1,0 +1,18 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Always use uv for venv, pip and pyproject.
+Code should not exceed 120 chars per line.
+Import typing as _t, do not from typing import every type.
+Use client/base.py to make HTTP request.
+DO NOT modify folders and files in reflib or add their dependencies to current pyproject.
+Test your code for major use case first, after all work is done, test them comprehensively.
+Make sure tests exist in tests/ for EVERY public method (using pytest).
+Run tests when code is updated.  When test against OpenAPI, JsonRPC, MCP, GRPC servcies, use existing service or implement a real one, try not use mock.
+Add doc/comments to public modules, classes and methods.
+Update files in docs/ and README.md when code is updated.
+
+No Agent should load config file itself.
+Prompts should be in prompt_templates folder, naming conversion {name}_{function}.

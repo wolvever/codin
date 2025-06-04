@@ -725,6 +725,8 @@ class CoreToolset(Toolset):
             FileSearchTool(sandbox),
             DeleteFileTool(sandbox),
             ReapplyTool(sandbox),
+            WebSearchTool(sandbox),
+            FetchTool(),  # FetchTool doesn't need sandbox
         ]
         
         super().__init__(

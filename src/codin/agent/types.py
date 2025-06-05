@@ -45,15 +45,16 @@ __all__ = [
     "EventType",
     "RunEvent",
     "Event",
+    
+    # Control and runner types for bidirectional mailbox
+    "ControlSignal",
+    "RunnerInput",
+    "RunnerControl",
 ]
 
 
-
-
 # =============================================================================
-# External
-#  
-# Agent.run(AgentRunInput) -> AgentRunOutput(Task|Message|Event)
+# External A2A Compatible Types
 # =============================================================================
 
 class Task(A2ATask):
@@ -116,6 +117,46 @@ class RunEvent:
 # Union type for all events
 Event = TaskStatusUpdateEvent | TaskArtifactUpdateEvent | RunEvent
 
+
+# =============================================================================
+# Control and Runner Types for Bidirectional Mailbox
+# =============================================================================
+
+class ControlSignal(str, Enum):
+    """Control signals that can be sent through mailbox."""
+    PAUSE = "pause"
+    RESUME = "resume" 
+    CANCEL = "cancel"
+    RESET = "reset"
+    STOP = "stop"
+
+
+@dataclass
+class RunnerControl:
+    """Control message for runner/agent management."""
+    signal: ControlSignal
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=datetime.now)
+
+
+@dataclass 
+class RunnerInput:
+    """Enhanced input for agents through bidirectional mailbox."""
+    message: Message | None = None
+    control: RunnerControl | None = None
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=datetime.now)
+    
+    @classmethod
+    def from_message(cls, message: Message) -> "RunnerInput":
+        """Create RunnerInput from a message."""
+        return cls(message=message)
+    
+    @classmethod
+    def from_control(cls, signal: ControlSignal, metadata: dict[str, _t.Any] | None = None) -> "RunnerInput":
+        """Create RunnerInput from a control signal."""
+        control = RunnerControl(signal=signal, metadata=metadata or {})
+        return cls(control=control)
 
 
 # =============================================================================
@@ -226,38 +267,37 @@ class Metrics:
         self.errors += 1
 
 
-
 # =============================================================================
-# Internal
-#  
-# Planner.next(State) -> Steps
+# Internal - Planner.next(State) -> Steps
 # =============================================================================
 
 @dataclass
 class State:
     """Comprehensive state containing all context for planning and execution."""
     
-    # Static states that are set once and never change duration the task
+    ## Static members that are set once and never change duration the task
     session_id: str
     agent_id: str = ""
     config: RunConfig = field(default_factory=RunConfig)
     tools: list["Tool"] = field(default_factory=list)  # Tool objects from base.py
     created_at: datetime = field(default_factory=datetime.now)
 
+    ## Dynamic updated members
+
     # Current task (A2A compatible)
     task: Task | None = None
     parent_task_id: str | None = None  
     iteration: int = 0
+    turn_count: int = 0  # Track number of planning turns
     
     # Memory references (readonly)
+    pending: list[Message] = field(default_factory=list)
     history: list[Message] = field(default_factory=list)
     artifact_ref: "ArtifactService | None" = None  # Readonly reference
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
     
     # Performance metrics
-    metrics: Metrics = field(default_factory=Metrics)
-
-    # Additional context
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    metrics: Metrics = field(default_factory=Metrics)    
 
 
 # =============================================================================
@@ -278,41 +318,14 @@ class Step:
     """Enhanced base class for all planner steps - supports both Message and Event content."""
     step_id: str
     step_type: StepType
-    timestamp: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default_factory=datetime.now)
     metadata: dict[str, _t.Any] = field(default_factory=dict)
     
     # Content fields - can contain multiple types
     message: Message | None = None              # A2A Message content
     event: Event | None = None                  # A2A Event or Internal Event content
     thinking: str | None = None                 # Internal reasoning
-    reason: str | None = None                   # Completion reason
-    success: bool = True
     
-    def has_message_content(self) -> bool:
-        """Check if step contains message content."""
-        return self.message is not None
-    
-    def has_event_content(self) -> bool:
-        """Check if step contains event content."""
-        return self.event is not None
-    
-    def has_tool_content(self) -> bool:
-        """Check if step contains tool call/result content (implemented by subclasses)."""
-        return False  # Base implementation, overridden by ToolCallStep
-    
-    def get_content_types(self) -> list[str]:
-        """Get list of content types present in this step."""
-        types = []
-        if self.has_message_content():
-            types.append("message")
-        if self.has_event_content():
-            types.append("event")
-        if self.has_tool_content():
-            types.append("tool")
-        if self.thinking:
-            types.append("thinking")
-        return types
-
 
 @dataclass
 class MessageStep(Step):
@@ -339,27 +352,6 @@ class MessageStep(Step):
                     yield text[i:i + chunk_size]
 
 
-@dataclass  
-class EventStep(Step):
-    """A2A compatible event step with support for both A2A and internal events."""
-    event_type: EventType = field(default=None)  # Will be set via constructor
-    step_type: StepType = StepType.EVENT
-    
-    def __post_init__(self):
-        if self.event is None:
-            raise ValueError("event is required for EventStep")
-        if self.event_type is None:
-            raise ValueError("event_type is required for EventStep")
-    
-    def is_a2a_event(self) -> bool:
-        """Check if this is an A2A standard event."""
-        return self.event_type in [EventType.TASK_STATUS_UPDATE, EventType.TASK_ARTIFACT_UPDATE]
-    
-    def is_internal_event(self) -> bool:
-        """Check if this is an internal (non-A2A) event."""
-        return not self.is_a2a_event()
-
-
 @dataclass
 class ToolCallStep(Step):
     """Step for executing a tool call with enhanced result handling."""
@@ -372,32 +364,18 @@ class ToolCallStep(Step):
             raise ValueError("tool_call (ToolUsePart type='call') is required for ToolCallStep")
         if self.tool_call.type != 'call':
             raise ValueError("ToolCallStep.tool_call must be a ToolUsePart with type='call'")
+
     
-    def has_tool_content(self) -> bool:
-        """Check if step contains tool call/result content."""
-        return self.tool_call is not None or self.tool_call_result is not None
+
+@dataclass
+class EventStep(Step):
+    """Step for handling A2A events with enhanced content support."""
+    step_type: StepType = StepType.EVENT
     
-    def add_result(self, result: ToolUsePart) -> None:
-        """Add tool call result (ToolUsePart type='result') to this step."""
-        if result.type != 'result':
-            raise ValueError("Result added to ToolCallStep must be a ToolUsePart with type='result'")
-        self.tool_call_result = result
-        # Extract success from metadata; default to False if not present or malformed
-        success_val = result.metadata.get('success', False) if result.metadata else False
-        self.success = bool(success_val)
+    def __post_init__(self):
+        if self.event is None:
+            raise ValueError("event is required for EventStep")
     
-    def to_message_parts(self) -> tuple[ToolUsePart, ToolUsePart | None]:
-        """Convert tool call and result to A2A message parts.
-        
-        Returns the tool_call part and tool_call_result part directly.
-        """
-        # self.tool_call is already a ToolUsePart (type='call')
-        # self.tool_call_result is already a ToolUsePart (type='result') or None
-        if self.tool_call is None:
-            # This case should ideally be prevented by __post_init__, but as a safeguard:
-            raise ValueError("ToolCallStep.tool_call cannot be None when generating message parts")
-            
-        return self.tool_call, self.tool_call_result
 
 
 @dataclass 
@@ -415,6 +393,8 @@ class FinishStep(Step):
     """Step indicating task completion with enhanced content support."""
     step_type: StepType = StepType.FINISH
     final_message: Message | None = None
+    reason: str | None = None
+    success: bool = True
     
     def __post_init__(self):
         if self.reason is None:
@@ -444,4 +424,10 @@ class FinishStep(Step):
             status=completion_status,
             final=True,
             metadata=self.metadata
-        ) 
+        )
+
+
+# Legacy type aliases for backward compatibility
+ToolCall = ToolUsePart
+ToolCallResult = ToolUsePart
+TaskStatus = TaskState

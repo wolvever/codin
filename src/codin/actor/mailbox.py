@@ -4,10 +4,11 @@ import asyncio
 import typing as _t
 from datetime import datetime
 from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
 
 from a2a.types import Message
 
-__all__ = ["Mailbox", "MailboxMessage"]
+__all__ = ["Mailbox", "AsyncMailbox", "LocalAsyncMailbox", "MailboxMessage"]
 
 
 @dataclass
@@ -20,8 +21,42 @@ class MailboxMessage:
     metadata: dict[str, _t.Any] = field(default_factory=dict)
 
 
-class Mailbox:
-    """Mailbox for inter-agent communication."""
+class Mailbox(ABC):
+    """Abstract bidirectional mailbox protocol from design document."""
+    
+    @abstractmethod
+    async def put_inbox(self, msg: Message) -> None:
+        """Put a message into the inbox (control/user feedback)."""
+        pass
+    
+    @abstractmethod
+    async def put_outbox(self, msg: Message) -> None:
+        """Put a message into the outbox (events/deltas).""" 
+        pass
+    
+    @abstractmethod
+    async def get_inbox(self, timeout: float | None = None) -> Message:
+        """Get a message from the inbox with optional timeout."""
+        pass
+    
+    @abstractmethod
+    async def get_outbox(self, timeout: float | None = None) -> Message:
+        """Get a message from the outbox with optional timeout."""
+        pass
+    
+    @abstractmethod
+    async def subscribe_inbox(self) -> _t.AsyncIterator[Message]:
+        """Subscribe to inbox messages."""
+        pass
+    
+    @abstractmethod
+    async def subscribe_outbox(self) -> _t.AsyncIterator[Message]:
+        """Subscribe to outbox messages."""
+        pass
+
+
+class AsyncMailbox:
+    """Legacy interface for backward compatibility."""
     
     def __init__(self, agent_id: str):
         self.agent_id = agent_id
@@ -84,4 +119,53 @@ class Mailbox:
     def unsubscribe(self, callback: _t.Callable[[MailboxMessage], _t.Awaitable[None]]) -> None:
         """Unsubscribe from outgoing messages."""
         if callback in self._subscribers:
-            self._subscribers.remove(callback) 
+            self._subscribers.remove(callback)
+
+
+class LocalAsyncMailbox(Mailbox):
+    """Local asyncio implementation of bidirectional mailbox."""
+    
+    def __init__(self, agent_id: str, maxsize: int = 100):
+        self.agent_id = agent_id
+        self._inbox: asyncio.Queue[Message] = asyncio.Queue(maxsize=maxsize)
+        self._outbox: asyncio.Queue[Message] = asyncio.Queue(maxsize=maxsize)
+        
+    async def put_inbox(self, msg: Message) -> None:
+        """Put a message into the inbox (control/user feedback)."""
+        await self._inbox.put(msg)
+    
+    async def put_outbox(self, msg: Message) -> None:
+        """Put a message into the outbox (events/deltas)."""
+        await self._outbox.put(msg)
+    
+    async def get_inbox(self, timeout: float | None = None) -> Message:
+        """Get a message from the inbox with optional timeout."""
+        try:
+            return await asyncio.wait_for(self._inbox.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            raise asyncio.TimeoutError("Inbox get operation timed out")
+    
+    async def get_outbox(self, timeout: float | None = None) -> Message:
+        """Get a message from the outbox with optional timeout."""
+        try:
+            return await asyncio.wait_for(self._outbox.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            raise asyncio.TimeoutError("Outbox get operation timed out")
+    
+    async def subscribe_inbox(self) -> _t.AsyncIterator[Message]:
+        """Subscribe to inbox messages."""
+        while True:
+            try:
+                message = await self._inbox.get()
+                yield message
+            except asyncio.CancelledError:
+                break
+    
+    async def subscribe_outbox(self) -> _t.AsyncIterator[Message]:
+        """Subscribe to outbox messages."""
+        while True:
+            try:
+                message = await self._outbox.get()
+                yield message
+            except asyncio.CancelledError:
+                break 

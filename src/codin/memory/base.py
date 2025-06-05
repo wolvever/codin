@@ -107,7 +107,7 @@ class MemoryChunk(BaseModel):
         )
 
 
-class MemoryService(abc.ABC):
+class Memory(abc.ABC):
     """Abstract chat/task memory backend with A2A Message support."""
 
     @abc.abstractmethod
@@ -118,14 +118,12 @@ class MemoryService(abc.ABC):
     @abc.abstractmethod
     async def get_history(
         self, 
-        session_id: str, 
         limit: int = 50,
         query: str | None = None
     ) -> list[Message]:
         """Get conversation history with optional search query.
         
         Args:
-            session_id: Session identifier
             limit: Maximum number of recent messages to return
             query: Optional search query to include relevant memory chunks
             
@@ -135,26 +133,36 @@ class MemoryService(abc.ABC):
         ...
 
     @abc.abstractmethod
-    async def create_memory_chunk(
+    async def set_chunk_builder(
         self,
-        session_id: str,
-        messages: list[Message],
-        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
-    ) -> list[MemoryChunk]:
-        """Create compressed memory chunks from a list of messages.
+        chunk_builder: _t.Callable[[list[Message]], _t.Awaitable[list[MemoryChunk]]]
+    ) -> None:
+        """Set a callable that creates memory chunks from a list of messages.
         
         Args:
-            session_id: Session identifier
-            messages: Messages to compress
-            llm_summarizer: Optional LLM function for intelligent summarization
-            
-        Returns:
-            List of MemoryChunks containing compressed information (summary, entities, mappings)
+            chunk_builder: Async function that takes a list of Messages and returns MemoryChunks
         """
         ...
 
     @abc.abstractmethod
-    async def search_memory_chunks(
+    async def build_chunk(
+        self,
+        start_index: int | None = None,
+        end_index: int | None = None
+    ) -> int:
+        """Compress messages into memory chunks with optional range.
+        
+        Args:
+            start_index: Optional start index of messages to compress
+            end_index: Optional end index of messages to compress
+            
+        Returns:
+            Number of chunk groups created
+        """
+        ...
+
+    @abc.abstractmethod
+    async def search_chunk(
         self,
         session_id: str,
         query: str,
@@ -173,47 +181,201 @@ class MemoryService(abc.ABC):
         ...
 
 
-class MemMemoryService(MemoryService):
-    """In-memory implementation of MemorySystem with A2A Message support."""
+class MemMemoryService(Memory):
+    """In-memory implementation of Memory with A2A Message support."""
     
     def __init__(self):
         self._messages: dict[str, list[Message]] = {}
         self._chunks: dict[str, list[MemoryChunk]] = {}
+        self._chunk_creator: _t.Callable[[list[Message]], _t.Awaitable[list[MemoryChunk]]] | None = None
+        self._current_session_id: str | None = None
+
+    def set_session_id(self, session_id: str) -> None:
+        """Set the current session ID for this memory instance."""
+        self._current_session_id = session_id
 
     async def add_message(self, message: Message) -> None:
         """Add a message to memory."""
-        session_id = message.contextId or "default"
+        session_id = message.contextId or self._current_session_id or "default"
         self._messages.setdefault(session_id, []).append(message)
 
     async def get_history(
         self, 
-        session_id: str, 
         limit: int = 50,
         query: str | None = None
     ) -> list[Message]:
         """Get conversation history with optional search query."""
+        session_id = self._current_session_id or "default"
         messages = self._messages.get(session_id, [])
         recent_messages = messages[-limit:]
         
         if query:
             # Search for relevant memory chunks
-            relevant_chunks = await self.search_memory_chunks(session_id, query, limit=3)
+            relevant_chunks = await self.search_chunk(session_id, query, limit=3)
             chunk_messages = [chunk.to_message() for chunk in relevant_chunks]
             # Insert chunks at the beginning to provide context
             return chunk_messages + recent_messages
         
         return recent_messages
 
-    async def create_memory_chunk(
+    async def set_chunk_builder(
+        self,
+        chunk_creator: _t.Callable[[list[Message]], _t.Awaitable[list[MemoryChunk]]]
+    ) -> None:
+        """Set a callable that creates memory chunks from a list of messages."""
+        self._chunk_creator = chunk_creator
+
+    async def build_chunk(
+        self,
+        start_index: int | None = None,
+        end_index: int | None = None
+    ) -> int:
+        """Compress messages into memory chunks with optional range."""
+        session_id = self._current_session_id or "default"
+        messages = self._messages.get(session_id, [])
+        
+        if not messages or not self._chunk_creator:
+            return 0
+        
+        # Determine the range of messages to compress
+        if start_index is None:
+            start_index = 0
+        if end_index is None:
+            end_index = len(messages)
+        
+        # Ensure indices are valid
+        start_index = max(0, start_index)
+        end_index = min(len(messages), end_index)
+        
+        if start_index >= end_index:
+            return 0
+        
+        # Get messages to compress
+        messages_to_compress = messages[start_index:end_index]
+        
+        if not messages_to_compress:
+            return 0
+        
+        try:
+            # Create chunks using the configured creator
+            chunks = await self._chunk_creator(messages_to_compress)
+            
+            # Store the chunks
+            for chunk in chunks:
+                self._chunks.setdefault(session_id, []).append(chunk)
+            
+            # Remove the compressed messages from the original list
+            self._messages[session_id] = messages[:start_index] + messages[end_index:]
+            
+            return len(chunks) if chunks else 0
+            
+        except Exception:
+            # If chunk creation fails, don't modify the messages
+            return 0
+
+    async def search_chunk(
+        self,
+        session_id: str,
+        query: str,
+        limit: int = 5
+    ) -> list[MemoryChunk]:
+        """Search memory chunks by query with title weighting."""
+        chunks = self._chunks.get(session_id, [])
+        if not chunks:
+            return []
+        
+        # Enhanced text-based search with title weighting
+        query_lower = query.lower()
+        scored_chunks = []
+        
+        for chunk in chunks:
+            score = 0
+            
+            # Search in title (highest weight)
+            if query_lower in chunk.title.lower():
+                score += 5
+            
+            # Search in content (medium weight)
+            if query_lower in chunk.content.lower():
+                score += 2
+            
+            # For dictionary content, also search in original structure
+            if chunk.get_content_dict():
+                content_dict = chunk.get_content_dict()
+                for key, value in content_dict.items():
+                    if query_lower in key.lower() or query_lower in str(value).lower():
+                        score += 1
+            
+            # Bonus for exact matches in title
+            if query_lower == chunk.title.lower():
+                score += 3
+            
+            # Bonus for chunk type relevance
+            if query_lower in chunk.chunk_type.value.lower():
+                score += 1
+            
+            if score > 0:
+                scored_chunks.append((score, chunk))
+        
+        # Sort by score (descending) and return top results
+        scored_chunks.sort(key=lambda x: x[0], reverse=True)
+        return [chunk for _, chunk in scored_chunks[:limit]]
+
+    def _simple_summarize(self, text: str) -> str:
+        """Simple text summarization fallback."""
+        lines = text.split('\n')
+        if len(lines) <= 3:
+            return text
+        
+        # Take first and last few lines
+        summary_lines = lines[:2] + ["..."] + lines[-2:]
+        return "\n".join(summary_lines)
+
+    async def compress_old_messages(
+        self,
+        session_id: str,
+        keep_recent: int = 20,
+        chunk_size: int = 10,
+        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
+    ) -> int:
+        """Compress old messages into memory chunks.
+        
+        Args:
+            session_id: Session to compress
+            keep_recent: Number of recent messages to keep uncompressed
+            chunk_size: Number of messages per chunk
+            llm_summarizer: Optional LLM summarizer function
+            
+        Returns:
+            Number of chunk groups created (each group may contain multiple chunks)
+        """
+        messages = self._messages.get(session_id, [])
+        if len(messages) <= keep_recent:
+            return 0
+        
+        # Messages to compress (all except the most recent)
+        to_compress = messages[:-keep_recent]
+        chunk_groups_created = 0
+        
+        # Create chunks using the legacy method for compatibility
+        for i in range(0, len(to_compress), chunk_size):
+            chunk_messages = to_compress[i:i + chunk_size]
+            if chunk_messages:
+                chunks = await self._create_memory_chunk_legacy(session_id, chunk_messages, llm_summarizer)
+                chunk_groups_created += 1
+        
+        # Remove compressed messages, keep only recent ones
+        self._messages[session_id] = messages[-keep_recent:]
+        
+        return chunk_groups_created
+
+    async def _create_memory_chunk_legacy(
         self,
         session_id: str,
         messages: list[Message],
         llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
     ) -> list[MemoryChunk]:
-        """Create compressed memory chunks from a list of messages.
-        
-        Returns multiple chunks: summary, entities, and ID mappings.
-        """
+        """Legacy method for creating memory chunks - kept for backward compatibility."""
         if not messages:
             raise ValueError("Cannot create memory chunk from empty message list")
         
@@ -305,100 +467,4 @@ class MemMemoryService(MemoryService):
             self._chunks.setdefault(session_id, []).append(chunk)
         
         return chunks
-
-    async def search_memory_chunks(
-        self,
-        session_id: str,
-        query: str,
-        limit: int = 5
-    ) -> list[MemoryChunk]:
-        """Search memory chunks by query with title weighting."""
-        chunks = self._chunks.get(session_id, [])
-        if not chunks:
-            return []
-        
-        # Enhanced text-based search with title weighting
-        query_lower = query.lower()
-        scored_chunks = []
-        
-        for chunk in chunks:
-            score = 0
-            
-            # Search in title (highest weight)
-            if query_lower in chunk.title.lower():
-                score += 5
-            
-            # Search in content (medium weight)
-            if query_lower in chunk.content.lower():
-                score += 2
-            
-            # For dictionary content, also search in original structure
-            if chunk.get_content_dict():
-                content_dict = chunk.get_content_dict()
-                for key, value in content_dict.items():
-                    if query_lower in key.lower() or query_lower in str(value).lower():
-                        score += 1
-            
-            # Bonus for exact matches in title
-            if query_lower == chunk.title.lower():
-                score += 3
-            
-            # Bonus for chunk type relevance
-            if query_lower in chunk.chunk_type.value.lower():
-                score += 1
-            
-            if score > 0:
-                scored_chunks.append((score, chunk))
-        
-        # Sort by score (descending) and return top results
-        scored_chunks.sort(key=lambda x: x[0], reverse=True)
-        return [chunk for _, chunk in scored_chunks[:limit]]
-
-    def _simple_summarize(self, text: str) -> str:
-        """Simple text summarization fallback."""
-        lines = text.split('\n')
-        if len(lines) <= 3:
-            return text
-        
-        # Take first and last few lines
-        summary_lines = lines[:2] + ["..."] + lines[-2:]
-        return "\n".join(summary_lines)
-
-    async def compress_old_messages(
-        self,
-        session_id: str,
-        keep_recent: int = 20,
-        chunk_size: int = 10,
-        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None
-    ) -> int:
-        """Compress old messages into memory chunks.
-        
-        Args:
-            session_id: Session to compress
-            keep_recent: Number of recent messages to keep uncompressed
-            chunk_size: Number of messages per chunk
-            llm_summarizer: Optional LLM summarizer function
-            
-        Returns:
-            Number of chunk groups created (each group may contain multiple chunks)
-        """
-        messages = self._messages.get(session_id, [])
-        if len(messages) <= keep_recent:
-            return 0
-        
-        # Messages to compress (all except the most recent)
-        to_compress = messages[:-keep_recent]
-        chunk_groups_created = 0
-        
-        # Create chunks
-        for i in range(0, len(to_compress), chunk_size):
-            chunk_messages = to_compress[i:i + chunk_size]
-            if chunk_messages:
-                chunks = await self.create_memory_chunk(session_id, chunk_messages, llm_summarizer)
-                chunk_groups_created += 1
-        
-        # Remove compressed messages, keep only recent ones
-        self._messages[session_id] = messages[-keep_recent:]
-        
-        return chunk_groups_created
 

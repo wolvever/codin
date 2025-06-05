@@ -1,8 +1,8 @@
 """Memory system subpackage."""
 
-from .base import MemoryService, MemMemoryService
+from .base import Memory, MemMemoryService
  
 __all__ = [
-    "MemoryService",
+    "Memory",
     "MemMemoryService"
 ] 

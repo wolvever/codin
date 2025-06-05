@@ -90,7 +90,7 @@ class CodePlanner(Planner):
                 yield ThinkStep(
                     step_id=str(uuid.uuid4()),
                     thinking=parsed_response["thinking"],
-                    timestamp=datetime.now(),
+                    created_at=datetime.now(),
                     metadata={"turn": state.turn_count}
                 )
                 step_count += 1
@@ -102,7 +102,7 @@ class CodePlanner(Planner):
                     yield ToolCallStep(
                         step_id=str(uuid.uuid4()),
                         tool_call=tool_call,
-                        timestamp=datetime.now(),
+                        created_at=datetime.now(),
                         metadata={"turn": state.turn_count}
                     )
                     step_count += 1
@@ -126,7 +126,7 @@ class CodePlanner(Planner):
                     step_id=str(uuid.uuid4()),
                     message=message,
                     is_streaming=self.config.streaming_enabled,
-                    timestamp=datetime.now(),
+                    created_at=datetime.now(),
                     metadata={"turn": state.turn_count}
                 )
                 step_count += 1
@@ -149,7 +149,7 @@ class CodePlanner(Planner):
                     step_id=str(uuid.uuid4()),
                     final_message=final_message,
                     reason="Task completed based on LLM decision",
-                    timestamp=datetime.now(),
+                    created_at=datetime.now(),
                     metadata={
                         "turn": state.turn_count,
                         "should_continue": should_continue,
@@ -172,7 +172,7 @@ class CodePlanner(Planner):
             yield MessageStep(
                 step_id=str(uuid.uuid4()),
                 message=error_message,
-                timestamp=datetime.now(),
+                created_at=datetime.now(),
                 metadata={"turn": state.turn_count, "error": str(e)}
             )
             
@@ -181,7 +181,7 @@ class CodePlanner(Planner):
                 step_id=str(uuid.uuid4()),
                 final_message=error_message,
                 reason=f"Planning error: {str(e)}",
-                timestamp=datetime.now(),
+                created_at=datetime.now(),
                 metadata={"turn": state.turn_count, "error": str(e)}
             )
     
@@ -412,6 +412,18 @@ class CodePlanner(Planner):
         }
     
     async def cleanup(self) -> None:
-        """Cleanup planner resources."""
-        # LLM cleanup is handled by the LLM factory/client
-        logger.debug("CodePlanner cleanup completed") 
+        """Clean up resources."""
+        if hasattr(self.llm, 'cleanup'):
+            await self.llm.cleanup()
+    
+    async def reset(self, state: State) -> None:
+        """Reset the planner to the initial state."""
+        # For CodePlanner, resetting means clearing any internal state
+        # Since CodePlanner is stateless (each call to next() is independent),
+        # we don't need to do anything specific here
+        if self.debug:
+            logger.debug(f"CodePlanner reset for session {state.session_id}")
+        
+        # If we had any internal state to clear, we would do it here
+        # For example, clearing conversation history, resetting counters, etc.
+        pass 

@@ -24,10 +24,13 @@ from .types import (
     Metrics,
     RunConfig,
     ToolUsePart,
+    ControlSignal,
+    RunnerInput,
+    RunnerControl,
 )
-from ..memory.base import MemoryService, MemMemoryService
+from ..memory.base import Memory, MemMemoryService
 from ..tool.base import Tool, ToolContext
-from ..actor.mailbox import Mailbox
+from ..actor.mailbox import Mailbox, LocalAsyncMailbox
 from ..model.base import BaseLLM
 
 __all__ = ["BaseAgent", "ContinueDecision"]
@@ -43,7 +46,7 @@ class BaseAgent(Agent):
     - prompt_run() for LLM interactions (via Planner)
     - Memory class for conversation history
     - Tools from tool system
-    - Mailbox for event communication
+    - Bidirectional mailbox for event communication and control
     - Sandbox through tools for file I/O
     """
     
@@ -54,7 +57,7 @@ class BaseAgent(Agent):
         description: str = "Agent using codin architecture",
         agent_id: str | None = None,
         planner: Planner,
-        memory: MemoryService | None = None,
+        memory: Memory | None = None,
         tools: list[Tool] | None = None,
         llm: BaseLLM | None = None,
         mailbox: Mailbox | None = None,
@@ -75,13 +78,17 @@ class BaseAgent(Agent):
         # Optional LLM for direct model calls (alternative to prompt_run)
         self.llm = llm
         
-        # Mailbox for events and inter-agent communication
-        self.mailbox = mailbox or Mailbox(self.agent_id)
+        # Bidirectional mailbox for events and inter-agent communication
+        self.mailbox = mailbox or LocalAsyncMailbox(self.agent_id)
         
         self.default_config = default_config or RunConfig(
             turn_budget=100, token_budget=100000, cost_budget=10.0, time_budget=300.0
         )
         self.debug = debug
+        
+        # State for control handling
+        self._paused = False
+        self._cancelled = False
         
         logger.info(f"Initialized {self.agent_id} with {len(self.tools)} tools")
 
@@ -91,6 +98,85 @@ class BaseAgent(Agent):
             if tool.name == tool_name:
                 return tool
         return None
+    
+    async def handle_control(self, control: RunnerControl) -> None:
+        """Handle control signals from dispatcher or other agents."""
+        logger.info(f"Agent {self.agent_id} received control signal: {control.signal}")
+        
+        if control.signal == ControlSignal.PAUSE:
+            self._paused = True
+            await self.mailbox.put_outbox(Message(
+                messageId=str(uuid.uuid4()),
+                role=Role.agent,
+                parts=[TextPart(text=f"Agent {self.agent_id} paused")],
+                contextId=self.agent_id,
+                kind="message",
+                metadata={"control_response": "paused"}
+            ))
+        
+        elif control.signal == ControlSignal.RESUME:
+            self._paused = False
+            await self.mailbox.put_outbox(Message(
+                messageId=str(uuid.uuid4()),
+                role=Role.agent,
+                parts=[TextPart(text=f"Agent {self.agent_id} resumed")],
+                contextId=self.agent_id,
+                kind="message",
+                metadata={"control_response": "resumed"}
+            ))
+        
+        elif control.signal in (ControlSignal.CANCEL, ControlSignal.STOP):
+            self._cancelled = True
+            await self.mailbox.put_outbox(Message(
+                messageId=str(uuid.uuid4()),
+                role=Role.agent,
+                parts=[TextPart(text=f"Agent {self.agent_id} cancelled")],
+                contextId=self.agent_id,
+                kind="message",
+                metadata={"control_response": "cancelled"}
+            ))
+        
+        elif control.signal == ControlSignal.RESET:
+            self._paused = False
+            self._cancelled = False
+            # Clear memory if possible
+            if hasattr(self.memory, 'clear_all'):
+                await self.memory.clear_all()
+            await self.mailbox.put_outbox(Message(
+                messageId=str(uuid.uuid4()),
+                role=Role.agent,
+                parts=[TextPart(text=f"Agent {self.agent_id} reset")],
+                contextId=self.agent_id,
+                kind="message",
+                metadata={"control_response": "reset"}
+            ))
+    
+    async def check_inbox_for_control(self) -> bool:
+        """Check inbox for control messages and handle them. Returns True if should continue."""
+        try:
+            # Non-blocking check for control messages
+            message = await self.mailbox.get_inbox(timeout=0.1)
+            
+            # Check if this is a control message
+            if message.metadata and message.metadata.get("control"):
+                control_signal = ControlSignal(message.metadata["control"])
+                control = RunnerControl(signal=control_signal, metadata=message.metadata)
+                await self.handle_control(control)
+            
+            return not self._cancelled
+            
+        except asyncio.TimeoutError:
+            # No messages, continue
+            return not self._cancelled
+        except Exception as e:
+            logger.warning(f"Error checking inbox: {e}")
+            return not self._cancelled
+    
+    async def wait_while_paused(self) -> None:
+        """Wait while paused, checking for control messages."""
+        while self._paused and not self._cancelled:
+            await asyncio.sleep(0.1)
+            await self.check_inbox_for_control()
     
     async def run(self, input_data: AgentRunInput) -> _t.AsyncGenerator[AgentRunOutput, None]:
         """Execute agent logic using simplified architecture."""
@@ -135,6 +221,10 @@ class BaseAgent(Agent):
     async def _build_state(self, session_id: str, input_data: AgentRunInput) -> State:
         """Build state using simple memory and components."""
         
+        # Set the session ID in memory if it's MemMemoryService
+        if isinstance(self.memory, MemMemoryService):
+            self.memory.set_session_id(session_id)
+        
         # Add input message to memory if provided
         if input_data.message:
             # Ensure message has correct contextId for this session
@@ -155,8 +245,8 @@ class BaseAgent(Agent):
             else:
                 await self.memory.add_message(input_data.message)
         
-        # Get conversation history from memory using session_id
-        history = await self.memory.get_history(session_id)
+        # Get conversation history from memory (no session_id parameter needed)
+        history = await self.memory.get_history()
         
         # Simple metrics tracking
         metrics = Metrics(
@@ -212,9 +302,21 @@ class BaseAgent(Agent):
         )
     
     async def _execute_planning_loop(self, state: State, session_id: str, start_time: float) -> _t.AsyncGenerator[AgentRunOutput, None]:
-        """Execute planning loop with budget constraints."""
+        """Execute planning loop with budget constraints and control handling."""
         
         while state.iteration < (state.config.turn_budget or 100):
+            # Check for control messages and handle pause/cancel states
+            should_continue = await self.check_inbox_for_control()
+            if not should_continue:
+                logger.info(f"Agent {self.agent_id} cancelled by control signal")
+                break
+            
+            # Wait while paused
+            if self._paused:
+                await self.wait_while_paused()
+                if self._cancelled:
+                    break
+            
             elapsed_time = time.time() - start_time
             state.metrics.time_used = elapsed_time
 
@@ -233,9 +335,12 @@ class BaseAgent(Agent):
                 finish_step = FinishStep(
                     step_id=str(uuid.uuid4()), 
                     reason=finish_reason, 
-                    success=False, 
                     final_message=finish_msg
                 )
+                
+                # Send output to mailbox as well as yielding
+                await self.mailbox.put_outbox(finish_msg)
+                
                 async for output in self._execute_step(finish_step, state, session_id): 
                     yield output
                 break 
@@ -252,6 +357,16 @@ class BaseAgent(Agent):
             try:
                 # Generate steps from planner
                 async for step in self.planner.next(state):
+                    # Check for control messages between steps
+                    should_continue = await self.check_inbox_for_control()
+                    if not should_continue:
+                        break
+                    
+                    if self._paused:
+                        await self.wait_while_paused()
+                        if self._cancelled:
+                            break
+                    
                     steps_executed += 1
                     if self.debug: 
                         logger.debug(f"Executing step {step.step_id}: {step.step_type.value if isinstance(step.step_type, Enum) else step.step_type}")
@@ -270,8 +385,7 @@ class BaseAgent(Agent):
                         await self._emit_event("task_complete", {
                             "session_id": session_id, 
                             "iteration": state.iteration, 
-                            "reason": step.reason if isinstance(step, FinishStep) and step.reason else "Finished", 
-                            "success": isinstance(step, FinishStep) and step.success
+                            "reason": step.reason if isinstance(step, FinishStep) and step.reason else "Finished"
                         })
                         break
                     
@@ -279,7 +393,7 @@ class BaseAgent(Agent):
                         logger.warning("Maximum steps per turn reached from planner")
                         break
                 
-                if task_finished_by_step: 
+                if task_finished_by_step or self._cancelled: 
                     break
                     
                 state.iteration += 1
@@ -306,6 +420,10 @@ class BaseAgent(Agent):
                     contextId=session_id, 
                     kind="message"
                 )
+                
+                # Send error to mailbox as well
+                await self.mailbox.put_outbox(error_msg)
+                
                 yield AgentRunOutput(
                     id=str(uuid.uuid4()), 
                     result=error_msg, 
@@ -314,13 +432,15 @@ class BaseAgent(Agent):
                 break
     
     async def _execute_step(self, step: Step, state: State, session_id: str) -> _t.AsyncGenerator[AgentRunOutput, None]:
-        """Execute step using codin components."""
+        """Execute step using codin components and send outputs to mailbox."""
         step_output_metadata_base = {"agent_id": self.agent_id, "step_id": step.step_id}
         
         try:
             if step.step_type == StepType.MESSAGE and isinstance(step, MessageStep) and step.message:
-                # Message step - add to memory and yield
+                # Message step - add to memory, send to outbox, and yield
                 await self.memory.add_message(step.message)
+                await self.mailbox.put_outbox(step.message)
+                
                 yield AgentRunOutput(
                     id=step.step_id, 
                     result=step.message, 
@@ -328,12 +448,24 @@ class BaseAgent(Agent):
                 )
             
             elif step.step_type == StepType.EVENT and isinstance(step, EventStep) and step.event:
-                # Event step - emit via mailbox
+                # Event step - emit via mailbox and internal event system
                 await self._emit_event("agent_event", {
                     "session_id": session_id,
                     "step_id": step.step_id,
                     "event": step.event
                 })
+                
+                # Create a message representation of the event for outbox
+                event_msg = Message(
+                    messageId=str(uuid.uuid4()),
+                    role=Role.agent,
+                    parts=[TextPart(text=f"Event: {step.event}")],
+                    contextId=session_id,
+                    kind="message",
+                    metadata={"event_type": "agent_event", "step_id": step.step_id}
+                )
+                await self.mailbox.put_outbox(event_msg)
+                
                 yield AgentRunOutput(
                     id=step.step_id, 
                     result=step.event, 
@@ -343,17 +475,14 @@ class BaseAgent(Agent):
             elif step.step_type == StepType.TOOL_CALL and isinstance(step, ToolCallStep) and step.tool_call:
                 # Tool call step - execute tool and create result message
                 result_tool_use_part = await self._execute_tool_call(step.tool_call, state)
-                step.add_result(result_tool_use_part)
+                step.tool_call_result = result_tool_use_part
                 state.metrics.increment_tool_calls()
                 
                 # Create tool interaction message
-                call_part, result_part = step.to_message_parts()
-                
-                tool_interaction_parts: _t.List[_t.Union[TextPart, ToolUsePart]] = []
-                if call_part: 
-                    tool_interaction_parts.append(call_part)
-                if result_part: 
-                    tool_interaction_parts.append(result_part)
+                tool_interaction_parts: list[TextPart | ToolUsePart] = []
+                tool_interaction_parts.append(step.tool_call)
+                if result_tool_use_part:
+                    tool_interaction_parts.append(result_tool_use_part)
 
                 tool_interaction_message = Message(
                     messageId=f"toolmsg_{step.tool_call.id if step.tool_call.id else str(uuid.uuid4())}", 
@@ -363,8 +492,10 @@ class BaseAgent(Agent):
                     kind="message" 
                 )
                 
-                # Add to memory and state
+                # Add to memory, send to outbox, and update state
                 await self.memory.add_message(tool_interaction_message)
+                await self.mailbox.put_outbox(tool_interaction_message)
+                
                 if not any(h.messageId == tool_interaction_message.messageId for h in state.history if h.messageId and tool_interaction_message.messageId):
                     state.history.append(tool_interaction_message)
 
@@ -492,12 +623,8 @@ class BaseAgent(Agent):
                 }
             )
             
-            # Send event via mailbox (for inter-agent communication)
-            await self.mailbox.send_message(
-                event_message,
-                recipient_id="system",  # System events
-                metadata={"event_type": event_type}
-            )
+            # Send event via outbox for streaming to clients/dispatcher
+            await self.mailbox.put_outbox(event_message)
             
         except Exception as e:
             if self.debug:

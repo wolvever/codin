@@ -29,7 +29,7 @@ from .types import (
 )
 
 # Import codin architecture components
-from ..memory.base import MemoryService, MemMemoryService
+from ..memory.base import Memory, MemMemoryService
 from ..model.base import BaseLLM
 from ..tool.base import Tool
 from ..actor.mailbox import Mailbox
@@ -81,7 +81,7 @@ __all__ = [
     "RunConfig",
     
     # Codin architecture components
-    "MemoryService",
+    "Memory",
     "MemMemoryService",
     "BaseLLM",
     "Tool",

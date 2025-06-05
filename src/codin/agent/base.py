@@ -1,10 +1,11 @@
 import abc
 import typing as _t
+from datetime import datetime
 
 from ..id import new_id
 from ..tool.base import Tool
 from ..model.base import BaseLLM
-from ..memory.base import MemoryService
+from ..memory.base import Memory
 from ..actor.mailbox import Mailbox
 from .types import (
     AgentRunInput, 
@@ -52,8 +53,8 @@ class Agent(abc.ABC):
     id: str
     name: str
     description: str
-    tools: list[Tool]
     version: str
+    tools: list[Tool]
 
     def __init__(
         self, 
@@ -91,14 +92,6 @@ class Planner(abc.ABC):
     The planner uses the codin prompt system for LLM interactions.
     It should use prompt_run(template_name, variables) to interact with LLMs.
     """
-    
-    def __init__(self, llm: BaseLLM | None = None):
-        """Initialize planner with optional LLM injection.
-        
-        Args:
-            llm: Optional LLM client for direct model calls (alternative to prompt_run)
-        """
-        self.llm = llm
     
     @abc.abstractmethod
     async def next(self, state: State) -> _t.AsyncGenerator[Step, None]:

@@ -361,7 +361,7 @@ class TestMemorySystemIntegration:
         memory._chunks["session1"] = [chunk1, chunk2]
         
         # Search for "Python" - should rank chunk1 higher due to title match
-        results = await memory.search_memory_chunks("session1", "python", limit=5)
+        results = await memory.search_chunk("session1", "python", limit=5)
         
         assert len(results) >= 1
         # First result should be chunk1 due to title match

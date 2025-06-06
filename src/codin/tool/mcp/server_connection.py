@@ -1,19 +1,17 @@
-from __future__ import annotations
+"""MCP server connection parameters for codin agents.
 
-"""Connection parameters for MCP servers.
-
-This module provides the parameter classes needed to establish connections
-to MCP servers using various protocols (HTTP, stdio, SSE).
+This module defines connection parameter classes for different MCP
+server connection types including HTTP, stdio, and SSE.
 """
 
-import typing as _t
 
 from pydantic import BaseModel, Field
 
+
 __all__ = [
-    "HttpServerParams",
-    "StdioServerParams",
-    "SseServerParams",
+    'HttpServerParams',
+    'SseServerParams',
+    'StdioServerParams',
 ]
 
 
@@ -42,7 +40,8 @@ class StdioServerParams(BaseModel):
     ----------
     command:
         The command to execute (e.g., "npx", "python").
-    args:
+
+    Args:
         Command line arguments for the command.
     env:
         Environment variables to set for the command.
@@ -71,4 +70,4 @@ class SseServerParams(BaseModel):
     url: str
     headers: dict[str, str] = Field(default_factory=dict)
     timeout: float = 5.0
-    sse_read_timeout: float = 300.0  # 5 minutes default 
+    sse_read_timeout: float = 300.0  # 5 minutes default

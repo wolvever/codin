@@ -1,12 +1,17 @@
-"""Runtime backends for executing workloads."""
+"""Runtime environments for codin agents.
 
-from .base import Runtime, Workload, WorkloadType, RuntimeResult
+This module provides runtime implementations for executing agent code
+in different environments including local and remote runtimes.
+"""
+
+from .base import Runtime, RuntimeResult, Workload, WorkloadType
 from .local import LocalRuntime
 
+
 __all__ = [
-    "Runtime",
-    "Workload",
-    "WorkloadType",
-    "RuntimeResult",
-    "LocalRuntime",
-] 
+    'LocalRuntime',
+    'Runtime',
+    'RuntimeResult',
+    'Workload',
+    'WorkloadType',
+]

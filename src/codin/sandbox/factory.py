@@ -1,30 +1,30 @@
-"""Sandbox factory for creating sandbox instances.
+"""Sandbox factory for codin agents.
 
-This module provides a factory function to create sandbox instances by backend name.
+This module provides factory functions for creating sandbox instances
+based on configuration and environment settings.
 """
 
 from __future__ import annotations
 
-import typing as _t
-
 from .base import Sandbox
-from .local import LocalSandbox
-from .e2b import E2BSandbox
-from .daytona import DaytonaSandbox
 from .codex import CodexSandbox
+from .daytona import DaytonaSandbox
+from .e2b import E2BSandbox
+from .local import LocalSandbox
 
-__all__ = ["create_sandbox"]
+
+__all__ = ['create_sandbox']
 
 # Registry of available sandbox backends
-_SANDBOXES: _t.Dict[str, _t.Type[Sandbox]] = {
-    "local": LocalSandbox,
-    "e2b": E2BSandbox,
-    "daytona": DaytonaSandbox,
-    "codex": CodexSandbox,
+_SANDBOXES: dict[str, type[Sandbox]] = {
+    'local': LocalSandbox,
+    'e2b': E2BSandbox,
+    'daytona': DaytonaSandbox,
+    'codex': CodexSandbox,
 }
 
 
-async def create_sandbox(backend: str = "local", **kwargs) -> Sandbox:
+async def create_sandbox(backend: str = 'local', **kwargs) -> Sandbox:
     """Instantiate and initialize a sandbox by backend keyword.
 
     Args:
@@ -39,8 +39,8 @@ async def create_sandbox(backend: str = "local", **kwargs) -> Sandbox:
         RuntimeError: If the sandbox fails to initialize
 
     Example:
-        >>> sandbox = await create_sandbox("local", workdir="/tmp/sandbox")
-        >>> result = await sandbox.run_cmd("echo hello")
+        >>> sandbox = await create_sandbox('local', workdir='/tmp/sandbox')
+        >>> result = await sandbox.run_cmd('echo hello')
         >>> print(result.stdout)
         hello
         >>> await sandbox.down()
@@ -48,8 +48,8 @@ async def create_sandbox(backend: str = "local", **kwargs) -> Sandbox:
     try:
         cls = _SANDBOXES[backend]
     except KeyError as e:
-        raise ValueError(f"Unknown sandbox backend: {backend!r}. Available: {list(_SANDBOXES.keys())}") from e
-    
+        raise ValueError(f'Unknown sandbox backend: {backend!r}. Available: {list(_SANDBOXES.keys())}') from e
+
     sandbox = cls(**kwargs)
     await sandbox.up()  # Initialize the sandbox
-    return sandbox 
+    return sandbox

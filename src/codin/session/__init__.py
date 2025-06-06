@@ -1,9 +1,14 @@
-"""Session service subpackage."""
+"""Session management for codin agents.
 
-from .base import SessionService, Session, SessionManager
+This module provides session services for managing agent execution sessions,
+tracking state, and coordinating multi-agent conversations.
+"""
+
+from .base import Session, SessionManager, SessionService
+
 
 __all__ = [
-    "SessionService",
-    "Session",
-    "SessionManager",
-] 
+    'Session',
+    'SessionManager',
+    'SessionService',
+]

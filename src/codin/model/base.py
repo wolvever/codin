@@ -1,30 +1,30 @@
-"""Base model interfaces and abstractions.
+"""Base LLM interfaces and abstractions.
 
-This module defines the core model interfaces for LLMs, embeddings, and rerankers.
-It provides the foundation for implementing different model providers with
-consistent APIs and type safety.
+This module provides the core language model infrastructure including
+base classes, response types, and common functionality for integrating
+various LLM providers in the codin framework.
 """
-
-from __future__ import annotations
 
 import abc
 import typing as _t
+
 from enum import Enum
 
 __all__ = [
-    "ModelType",
-    "BaseModel",
-    "BaseLLM",
-    "BaseEmbedding",
-    "BaseReranker",
+    'BaseEmbedding',
+    'BaseLLM',
+    'BaseModel',
+    'BaseReranker',
+    'ModelType',
 ]
 
 
 class ModelType(str, Enum):
     """Type of model."""
-    LLM = "llm"
-    EMBEDDING = "embedding"
-    RERANKER = "reranker"
+
+    LLM = 'llm'
+    EMBEDDING = 'embedding'
+    RERANKER = 'reranker'
 
 
 class BaseModel(abc.ABC):
@@ -34,7 +34,7 @@ class BaseModel(abc.ABC):
 
     def __init__(self, model: str):
         """Initialize the model and prepare it for use.
-        
+
         Args:
             model: The model name or identifier
         """
@@ -45,7 +45,6 @@ class BaseModel(abc.ABC):
     @abc.abstractmethod
     def supported_models(cls) -> list[str]:
         """Returns a list of regex patterns for supported model names."""
-        pass
 
 
 class BaseLLM(BaseModel):
@@ -54,50 +53,50 @@ class BaseLLM(BaseModel):
     model_type = ModelType.LLM
 
     @abc.abstractmethod
-    async def generate(self, 
-                      prompt: str | list[dict[str, str]], 
-                      *, 
-                      stream: bool = False,
-                      temperature: float | None = None,
-                      max_tokens: int | None = None,
-                      stop_sequences: list[str] | None = None,
-                      ) -> _t.AsyncIterator[str] | str:
+    async def generate(
+        self,
+        prompt: str | list[dict[str, str]],
+        *,
+        stream: bool = False,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        stop_sequences: list[str] | None = None,
+    ) -> _t.AsyncIterator[str] | str:
         """Generate text from the model.
-        
+
         Args:
             prompt: Either a string prompt or a list of messages with 'role' and 'content' keys
             stream: Whether to stream the response
             temperature: Temperature for sampling, higher is more random
             max_tokens: Maximum tokens to generate
             stop_sequences: Sequences that will stop generation
-            
+
         Returns:
             An async iterator of strings if stream=True, otherwise a complete string
         """
-        pass
 
     @abc.abstractmethod
-    async def generate_with_tools(self,
-                                prompt: str | list[dict[str, str]],
-                                tools: list[dict],
-                                *,
-                                stream: bool = False,
-                                temperature: float | None = None,
-                                max_tokens: int | None = None,
-                                ) -> dict | _t.AsyncIterator[dict]:
+    async def generate_with_tools(
+        self,
+        prompt: str | list[dict[str, str]],
+        tools: list[dict],
+        *,
+        stream: bool = False,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> dict | _t.AsyncIterator[dict]:
         """Generate text with function/tool calling capabilities.
-        
+
         Args:
             prompt: Either a string prompt or a list of messages
             tools: List of tool definitions in OpenAI format
             stream: Whether to stream the response
             temperature: Temperature for sampling
             max_tokens: Maximum tokens to generate
-            
+
         Returns:
             Dict with 'content' and/or 'tool_calls', or async iterator of such dicts
         """
-        pass
 
 
 class BaseEmbedding(BaseModel):
@@ -106,18 +105,18 @@ class BaseEmbedding(BaseModel):
     model_type = ModelType.EMBEDDING
 
     @abc.abstractmethod
-    async def embed(self, 
-                   texts: list[str],
-                   ) -> list[list[float]]:
+    async def embed(
+        self,
+        texts: list[str],
+    ) -> list[list[float]]:
         """Embed texts into vectors.
-        
+
         Args:
             texts: List of strings to embed
-            
+
         Returns:
             List of embedding vectors
         """
-        pass
 
 
 class BaseReranker(BaseModel):
@@ -126,20 +125,20 @@ class BaseReranker(BaseModel):
     model_type = ModelType.RERANKER
 
     @abc.abstractmethod
-    async def rerank(self,
-                    query: str,
-                    documents: list[str],
-                    *,
-                    top_k: int | None = None,
-                    ) -> list[tuple[int, float]]:
+    async def rerank(
+        self,
+        query: str,
+        documents: list[str],
+        *,
+        top_k: int | None = None,
+    ) -> list[tuple[int, float]]:
         """Rerank documents given a query.
-        
+
         Args:
             query: Query string
             documents: List of document strings to rerank
             top_k: Number of top results to return
-            
+
         Returns:
             List of tuples (document_index, score) in ranked order
         """
-        pass 

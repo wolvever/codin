@@ -4,7 +4,7 @@ globs:
 alwaysApply: true
 ---
 Always use uv for venv, pip and pyproject.
-Code should not exceed 120 chars per line.
+Code should not exceed 120 chars per line, use ruff to lint and fix.
 Import typing as _t, do not from typing import every type.
 Use client/base.py to make HTTP request.
 DO NOT modify folders and files in reflib or add their dependencies to current pyproject.

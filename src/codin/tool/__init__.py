@@ -1,84 +1,85 @@
-from __future__ import annotations
+"""Tool system for codin agents.
 
-"""Tool system subpackage - public re-exports."""
+This module provides the core tool infrastructure including tool definitions,
+execution, registry, and MCP (Model Context Protocol) integration.
+"""
 
-from .base import Tool, Toolset, ToolContext, ToolSpec  # type: ignore F401 – re-export
-from .registry import ToolRegistry, ToolRegistryConfig, ToolEndpoint
+import typing as _t
+
+from .base import Tool, ToolContext, ToolSpec, Toolset  # type: ignore F401 – re-export
+from .core_tools import (
+    # All core tools
+    CodebaseSearchTool,
+    CoreToolset,
+    DeleteFileTool,
+    EditFileTool,
+    FetchTool,
+    FileSearchTool,
+    GrepSearchTool,
+    ListDirTool,
+    ReadFileTool,
+    ReapplyTool,
+    RunShellTool,
+    SearchReplaceTool,
+    WebSearchTool,
+)
+from .decorators import ToolDecorator, tool
 from .executor import ToolExecutor
 from .generic import GenericTool, create_tool_from_function
-from .decorators import tool, ToolDecorator
+
+# Import MCP utilities so that callers can do `from codin.tool import MCPTool`.
+from .mcp import (
+    HttpServerParams,
+    MCPSessionManager,
+    MCPTool,
+    MCPToolset,
+    SseServerParams,
+    StdioServerParams,
+)
+from .registry import ToolEndpoint, ToolRegistry, ToolRegistryConfig
 from .sandbox import (
     SandboxTool,
     SandboxToolset,
 )
-from .core_tools import (
-    # All core tools
-    CodebaseSearchTool,
-    ReadFileTool,
-    RunShellTool,
-    ListDirTool,
-    GrepSearchTool,
-    EditFileTool,
-    SearchReplaceTool,
-    FileSearchTool,
-    DeleteFileTool,
-    ReapplyTool,
-    WebSearchTool,
-    FetchTool,
-    CoreToolset,
-)
 
-# Import MCP utilities so that callers can do `from codin.tool import MCPTool`.
-from .mcp import (  # noqa: F401 (lazy import)
-    MCPTool,
-    MCPToolset,
-    MCPSessionManager,
-    HttpServerParams,
-    StdioServerParams, 
-    SseServerParams,
-)
 
 __all__ = [
     # Core tool system
-    "Tool",
-    "Toolset",
-    "ToolContext",
-    "ToolSpec",
-    "ToolRegistry",
-    "ToolRegistryConfig",
-    "ToolEndpoint",
-    "ToolExecutor",
-    
+    'Tool',
+    'Toolset',
+    'ToolContext',
+    'ToolSpec',
+    'ToolRegistry',
+    'ToolRegistryConfig',
+    'ToolEndpoint',
+    'ToolExecutor',
     # Generic tool support
-    "GenericTool",
-    "create_tool_from_function",
-    "tool",
-    "ToolDecorator",
-    
+    'GenericTool',
+    'create_tool_from_function',
+    'tool',
+    'ToolDecorator',
     # All core tools
-    "CodebaseSearchTool",
-    "ReadFileTool",
-    "RunShellTool",
-    "ListDirTool",
-    "GrepSearchTool",
-    "EditFileTool",
-    "SearchReplaceTool",
-    "FileSearchTool",
-    "DeleteFileTool",
-    "ReapplyTool",
-    "WebSearchTool",
-    "FetchTool",
-    "CoreToolset",
-    
+    'CodebaseSearchTool',
+    'ReadFileTool',
+    'RunShellTool',
+    'ListDirTool',
+    'GrepSearchTool',
+    'EditFileTool',
+    'SearchReplaceTool',
+    'FileSearchTool',
+    'DeleteFileTool',
+    'ReapplyTool',
+    'WebSearchTool',
+    'FetchTool',
+    'CoreToolset',
     # Sandbox tools
-    "SandboxTool",
-    "SandboxToolset",
-    
+    'SandboxTool',
+    'SandboxToolset',
     # MCP tool support
-    "MCPTool",
-    "MCPToolset",
-    "MCPSessionManager",
-    "HttpServerParams",
-    "StdioServerParams",
-    "SseServerParams",
-] 
+    'MCPTool',
+    'MCPToolset',
+    'MCPSessionManager',
+    'HttpServerParams',
+    'StdioServerParams',
+    'SseServerParams',
+]

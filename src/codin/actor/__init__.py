@@ -1,24 +1,28 @@
-"""Actor module for inter-agent communication."""
+"""Actor system for inter-agent communication.
 
-from .mailbox import Mailbox, AsyncMailbox, LocalAsyncMailbox, MailboxMessage
-from .scheduler import ActorScheduler, LocalActorManager, ActorInfo
-from .dispatcher import Dispatcher, LocalDispatcher, DispatchRequest, DispatchResult
+This module provides the actor model infrastructure for codin agents,
+including mailboxes for message passing, schedulers for task coordination,
+and dispatchers for routing requests between agents.
+"""
+
+from .dispatcher import DispatchRequest, DispatchResult, Dispatcher, LocalDispatcher
+from .mailbox import AsyncMailbox, LocalAsyncMailbox, Mailbox, MailboxMessage
+from .scheduler import ActorInfo, ActorScheduler, LocalActorManager
+
 
 __all__ = [
     # Mailbox types
-    "Mailbox", 
-    "AsyncMailbox", 
-    "LocalAsyncMailbox", 
-    "MailboxMessage",
-    
+    'Mailbox',
+    'AsyncMailbox',
+    'LocalAsyncMailbox',
+    'MailboxMessage',
     # Actor manager types
-    "ActorScheduler",
-    "LocalActorManager", 
-    "ActorInfo",
-    
+    'ActorScheduler',
+    'LocalActorManager',
+    'ActorInfo',
     # Dispatcher types
-    "Dispatcher",
-    "LocalDispatcher",
-    "DispatchRequest", 
-    "DispatchResult",
-] 
+    'Dispatcher',
+    'LocalDispatcher',
+    'DispatchRequest',
+    'DispatchResult',
+]

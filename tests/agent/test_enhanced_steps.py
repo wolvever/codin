@@ -199,7 +199,10 @@ class TestEnhancedSteps:
             role="agent",
             parts=[]
         )
-        message.add_text_part("This is a longer text that will be streamed in chunks to demonstrate the streaming functionality.")
+        message.add_text_part(
+            "This is a longer text that will be streamed in chunks to demonstrate " +
+            "the streaming functionality."
+        )
         
         step = MessageStep(
             step_id="stream-step-1",

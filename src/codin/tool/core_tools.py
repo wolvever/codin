@@ -45,7 +45,10 @@ class CodebaseSearchInput(_pyd.BaseModel):
     """Input schema for codebase search."""
     query: str = _pyd.Field(..., description="The search query to find relevant code")
     explanation: str = _pyd.Field(..., description="One sentence explanation of why this tool is being used")
-    target_directories: _t.Optional[list[str]] = _pyd.Field(None, description="Glob patterns for directories to search over")
+    target_directories: _t.Optional[list[str]] = _pyd.Field(
+        None, 
+        description="Glob patterns for directories to search over"
+    )
 
 
 class ReadFileInput(_pyd.BaseModel):
@@ -82,9 +85,18 @@ class GrepSearchInput(_pyd.BaseModel):
 class EditFileInput(_pyd.BaseModel):
     """Input schema for editing files."""
     target_file: str = _pyd.Field(..., description="The target file to modify")
-    instructions: _t.Optional[str] = _pyd.Field(None, description="A single sentence instruction describing what you are going to do")
-    code_edit: _t.Optional[str] = _pyd.Field(None, description="Specify ONLY the precise lines of code that you wish to edit")
-    content: _t.Optional[str] = _pyd.Field(None, description="Content to write to the file (for simple write operations)")
+    instructions: _t.Optional[str] = _pyd.Field(
+        None, 
+        description="A single sentence instruction describing what you are going to do"
+    )
+    code_edit: _t.Optional[str] = _pyd.Field(
+        None, 
+        description="Specify ONLY the precise lines of code that you wish to edit"
+    )
+    content: _t.Optional[str] = _pyd.Field(
+        None, 
+        description="Content to write to the file (for simple write operations)"
+    )
 
 
 class SearchReplaceInput(_pyd.BaseModel):
@@ -132,7 +144,11 @@ class CodebaseSearchTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="codebase_search",
-            description="Find snippets of code from the codebase most relevant to the search query. This is a semantic search tool, so the query should ask for something semantically matching what is needed.",
+            description=(
+                "Find snippets of code from the codebase most relevant to the search query. "
+                "This is a semantic search tool, so the query should ask for something "
+                "semantically matching what is needed."
+            ),
             sandbox=sandbox,
             input_schema=CodebaseSearchInput,
         )
@@ -194,7 +210,13 @@ class ReadFileTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="read_file",
-            description="Read the contents of a file. the output of this tool call will be the 1-indexed file contents from start_line_one_indexed to end_line_one_indexed_inclusive, together with a summary of the lines outside start_line_one_indexed and end_line_one_indexed_inclusive. Note that this call can view at most 250 lines at a time and 200 lines minimum.",
+            description=(
+                "Read the contents of a file. the output of this tool call will be the "
+                "1-indexed file contents from start_line_one_indexed to end_line_one_indexed_inclusive, "
+                "together with a summary of the lines outside start_line_one_indexed and "
+                "end_line_one_indexed_inclusive. Note that this call can view at most 250 lines "
+                "at a time and 200 lines minimum."
+            ),
             sandbox=sandbox,
             input_schema=ReadFileInput,
         )
@@ -241,7 +263,10 @@ class ReadFileTool(SandboxTool):
             if start_line > 1:
                 result_parts.append(f"Lines 1-{start_line-1} not shown ({start_line-1} lines)")
             
-            result_parts.append(f"Contents of {target_file}, lines {start_line}-{min(end_line, total_lines)} (total {total_lines} lines):")
+            result_parts.append(
+                f"Contents of {target_file}, lines {start_line}-{min(end_line, total_lines)} "
+                f"(total {total_lines} lines):"
+            )
             result_parts.append("\n".join(selected_lines))
             
             if end_line < total_lines:
@@ -260,7 +285,16 @@ class RunShellTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="run_shell",
-            description="PROPOSE a command to run on behalf of the user. If you have this tool, note that you DO have the ability to run commands directly on the USER's system. Note that the user will have to approve the command before it is executed. The user may reject it if it is not to their liking, or may modify the command before approving it. If they do change it, take those changes into account. The actual command will NOT execute until the user approves it. The user may not approve it immediately. Do NOT assume the command has started running. If the step is WAITING for user approval, it has NOT started running.",
+            description=(
+                "PROPOSE a command to run on behalf of the user. If you have this tool, "
+                "note that you DO have the ability to run commands directly on the USER's system. "
+                "Note that the user will have to approve the command before it is executed. "
+                "The user may reject it if it is not to their liking, or may modify the command "
+                "before approving it. If they do change it, take those changes into account. "
+                "The actual command will NOT execute until the user approves it. The user may not "
+                "approve it immediately. Do NOT assume the command has started running. "
+                "If the step is WAITING for user approval, it has NOT started running."
+            ),
             sandbox=sandbox,
             input_schema=RunShellInput,
         )
@@ -312,7 +346,12 @@ class ListDirTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="list_dir",
-            description="List the contents of a directory. The quick tool to use for discovery, before using more targeted tools like semantic search or file reading. Useful to try to understand the file structure before diving deeper into specific files. Can be used to explore the codebase.",
+            description=(
+                "List the contents of a directory. The quick tool to use for discovery, "
+                "before using more targeted tools like semantic search or file reading. "
+                "Useful to try to understand the file structure before diving deeper into "
+                "specific files. Can be used to explore the codebase."
+            ),
             sandbox=sandbox,
             input_schema=ListDirInput,
         )
@@ -355,7 +394,11 @@ class GrepSearchTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="grep_search",
-            description="Use this tool to run fast, exact regex searches over text files using the ripgrep engine. This is preferred over semantic search when we know the exact symbol/function name/etc. to search in some set of directories/file types.",
+            description=(
+                "Use this tool to run fast, exact regex searches over text files using the "
+                "ripgrep engine. This is preferred over semantic search when we know the exact "
+                "symbol/function name/etc. to search in some set of directories/file types."
+            ),
             sandbox=sandbox,
             input_schema=GrepSearchInput,
         )
@@ -413,7 +456,12 @@ class EditFileTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="edit_file",
-            description="Use this tool to propose an edit to an existing file or create a new file. This will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write. Can also be used for simple file writing operations.",
+            description=(
+                "Use this tool to propose an edit to an existing file or create a new file. "
+                "This will be read by a less intelligent model, which will quickly apply the edit. "
+                "You should make it clear what the edit is, while also minimizing the unchanged "
+                "code you write. Can also be used for simple file writing operations."
+            ),
             sandbox=sandbox,
             input_schema=EditFileInput,
         )
@@ -462,7 +510,11 @@ class SearchReplaceTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="search_replace",
-            description="Use this tool to propose a search and replace operation on an existing file. The tool will replace ONE occurrence of old_string with new_string in the specified file.",
+            description=(
+                "Use this tool to propose a search and replace operation on an existing file. "
+                "The tool will replace ONE occurrence of old_string with new_string in the "
+                "specified file."
+            ),
             sandbox=sandbox,
             input_schema=SearchReplaceInput,
         )
@@ -508,7 +560,11 @@ class FileSearchTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="file_search",
-            description="Fast file search based on fuzzy matching against file path. Use if you know part of the file path but don't know where it's located exactly. Response will be capped to 10 results.",
+            description=(
+                "Fast file search based on fuzzy matching against file path. Use if you know "
+                "part of the file path but don't know where it's located exactly. Response will "
+                "be capped to 10 results."
+            ),
             sandbox=sandbox,
             input_schema=FileSearchInput,
         )
@@ -555,7 +611,11 @@ class DeleteFileTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="delete_file",
-            description="Deletes a file at the specified path. The operation will fail gracefully if the file doesn't exist, the operation is rejected for security reasons, or the file cannot be deleted.",
+            description=(
+                "Deletes a file at the specified path. The operation will fail gracefully if "
+                "the file doesn't exist, the operation is rejected for security reasons, or the "
+                "file cannot be deleted."
+            ),
             sandbox=sandbox,
             input_schema=DeleteFileInput,
         )
@@ -596,7 +656,12 @@ class ReapplyTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="reapply",
-            description="Calls a smarter model to apply the last edit to the specified file. Use this tool immediately after the result of an edit_file tool call ONLY IF the diff is not what you expected, indicating the model applying the changes was not smart enough to follow your instructions.",
+            description=(
+                "Calls a smarter model to apply the last edit to the specified file. Use this tool "
+                "immediately after the result of an edit_file tool call ONLY IF the diff is not "
+                "what you expected, indicating the model applying the changes was not smart enough "
+                "to follow your instructions."
+            ),
             sandbox=sandbox,
             input_schema=ReapplyInput,
         )
@@ -620,7 +685,11 @@ class WebSearchTool(SandboxTool):
     def __init__(self, sandbox: Sandbox):
         super().__init__(
             name="web_search",
-            description="Search the web for real-time information about any topic. Use this tool when you need up-to-date information that might not be available in your training data, or when you need to verify current facts.",
+            description=(
+                "Search the web for real-time information about any topic. Use this tool when you "
+                "need up-to-date information that might not be available in your training data, or "
+                "when you need to verify current facts."
+            ),
             sandbox=sandbox,
             input_schema=WebSearchInput,
         )
@@ -637,7 +706,10 @@ class WebSearchTool(SandboxTool):
                 {
                     "title": f"Search result for: {search_term}",
                     "url": "https://example.com",
-                    "snippet": "This is a placeholder search result. In a real implementation, this would connect to a search API."
+                    "snippet": (
+                        "This is a placeholder search result. In a real implementation, "
+                        "this would connect to a search API."
+                    )
                 }
             ]
         }
@@ -649,7 +721,12 @@ class FetchTool(Tool):
     def __init__(self):
         super().__init__(
             name="fetch",
-            description="Fetches a URL from the internet and optionally extracts its contents as markdown. Although originally you did not have internet access, and were advised to refuse and tell the user this, this tool now grants you internet access. Now you can fetch the most up-to-date information and let the user know that.",
+            description=(
+                "Fetches a URL from the internet and optionally extracts its contents as markdown. "
+                "Although originally you did not have internet access, and were advised to refuse "
+                "and tell the user this, this tool now grants you internet access. Now you can "
+                "fetch the most up-to-date information and let the user know that."
+            ),
             input_schema=FetchInput,
         )
     

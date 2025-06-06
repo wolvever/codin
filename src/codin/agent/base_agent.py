@@ -75,7 +75,14 @@ class BaseAgent(Agent):
         debug: bool = False,
         **kwargs
     ):
-        super().__init__(id=agent_id, name=name, description=description, version=version or "1.0.0", tools=tools or [], **kwargs)
+        super().__init__(
+            id=agent_id, 
+            name=name, 
+            description=description, 
+            version=version or "1.0.0", 
+            tools=tools or [], 
+            **kwargs
+        )
         self.planner = planner
         self.memory = memory or MemMemoryService()
         self.tools = tools or []
@@ -304,7 +311,12 @@ class BaseAgent(Agent):
             }
         )
     
-    async def _execute_planning_loop(self, state: State, session_id: str, start_time: float) -> _t.AsyncGenerator[AgentRunOutput, None]:
+    async def _execute_planning_loop(
+        self, 
+        state: State, 
+        session_id: str, 
+        start_time: float
+    ) -> _t.AsyncGenerator[AgentRunOutput, None]:
         """Execute planning loop with budget constraints and control handling."""
         
         while state.iteration < (state.config.turn_budget or 100):
@@ -372,11 +384,16 @@ class BaseAgent(Agent):
                     
                     steps_executed += 1
                     if self.debug: 
-                        logger.debug(f"Executing step {step.step_id}: {step.step_type.value if isinstance(step.step_type, Enum) else step.step_type}")
+                        logger.debug(
+                            f"Executing step {step.step_id}: "
+                            f"{step.step_type.value if isinstance(step.step_type, Enum) else step.step_type}"
+                        )
                     
                     # If planner yields a message, add it to memory
-                    if step.step_type == StepType.MESSAGE and isinstance(step, MessageStep) and step.message:
-                        if not any(h.messageId == step.message.messageId for h in state.history if h.messageId and step.message.messageId):
+                    if (step.step_type == StepType.MESSAGE and isinstance(step, MessageStep) and 
+                        step.message):
+                        if not any(h.messageId == step.message.messageId for h in state.history 
+                                 if h.messageId and step.message.messageId):
                             await self.memory.add_message(step.message)
                             state.history.append(step.message)
 
@@ -499,10 +516,14 @@ class BaseAgent(Agent):
                 await self.memory.add_message(tool_interaction_message)
                 await self.mailbox.put_outbox(tool_interaction_message)
                 
-                if not any(h.messageId == tool_interaction_message.messageId for h in state.history if h.messageId and tool_interaction_message.messageId):
+                if not any(h.messageId == tool_interaction_message.messageId for h in state.history 
+                         if h.messageId and tool_interaction_message.messageId):
                     state.history.append(tool_interaction_message)
 
-                success_from_meta = result_tool_use_part.metadata.get('success', False) if result_tool_use_part.metadata else False
+                success_from_meta = (
+                    result_tool_use_part.metadata.get('success', False) 
+                    if result_tool_use_part.metadata else False
+                )
                 yield AgentRunOutput(
                     id=step.step_id, 
                     result=tool_interaction_message, 
@@ -524,7 +545,8 @@ class BaseAgent(Agent):
             
             elif step.step_type == StepType.FINISH and isinstance(step, FinishStep) and step.final_message:
                 # Finish step - add final message to memory
-                if not any(h.messageId == step.final_message.messageId for h in state.history if h.messageId and step.final_message.messageId):
+                if not any(h.messageId == step.final_message.messageId for h in state.history 
+                         if h.messageId and step.final_message.messageId):
                     await self.memory.add_message(step.final_message)
                     state.history.append(step.final_message)
                     

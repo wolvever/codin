@@ -372,7 +372,9 @@ class CodeAgent(Agent):
         
         for tool_name, args_str in thinking_matches:
             # Avoid duplicates from single_pattern
-            if not any(call.name == tool_name and json.dumps(call.arguments, sort_keys=True) == json.dumps(json.loads(args_str), sort_keys=True) for call in tool_calls):
+            if not any(call.name == tool_name and 
+                      json.dumps(call.arguments, sort_keys=True) == json.dumps(json.loads(args_str), sort_keys=True) 
+                      for call in tool_calls):
                 try:
                     call_id = str(uuid.uuid4())
                     arguments = json.loads(args_str)
@@ -583,7 +585,11 @@ class CodeAgent(Agent):
         
         return True
 
-    async def _run_turn(self, turn_input: list[Message], run_context: dict[str, _t.Any]) -> tuple[list[Message], list[ToolCallResult]]:
+    async def _run_turn(
+        self, 
+        turn_input: list[Message], 
+        run_context: dict[str, _t.Any]
+    ) -> tuple[list[Message], list[ToolCallResult]]:
         """Run a single turn of the conversation using prompt_run."""
         self._turn_count += 1
         
@@ -668,7 +674,10 @@ class CodeAgent(Agent):
                 
                 print(f"\n🔧 Available Tools:")
                 for i, tool_def in enumerate(tool_definitions):
-                    print(f"  {i+1}. {tool_def.get('name', 'unknown')}: {tool_def.get('description', 'no description')}")
+                    print(
+                        f"  {i+1}. {tool_def.get('name', 'unknown')}: "
+                        f"{tool_def.get('description', 'no description')}"
+                    )
                 
                 print(f"\n📊 Context Summary:")
                 print(f"  - Turn: {self._turn_count}/{self.max_turns}")
@@ -692,7 +701,8 @@ class CodeAgent(Agent):
             except asyncio.TimeoutError:
                 logger.error("LLM request timed out after 2 minutes")
                 error_message = self._create_agent_message(
-                    "I'm sorry, but my request to the language model timed out. This might be due to network issues or high server load. Please try again.",
+                    "I'm sorry, but my request to the language model timed out. This might be due to "
+                    "network issues or high server load. Please try again.",
                     task_id
                 )
                 return [error_message], []
@@ -705,12 +715,16 @@ class CodeAgent(Agent):
                     for tool in self.tool_registry.get_tools():
                         tools_list.append(f"- {tool.name}: {tool.description}")
                     
-                    fallback_content = f"I have access to {len(self.tool_registry.get_tools())} tools:\n\n" + "\n".join(tools_list)
+                    fallback_content = (
+                        f"I have access to {len(self.tool_registry.get_tools())} tools:\n\n" + 
+                        "\n".join(tools_list)
+                    )
                     fallback_message = self._create_agent_message(fallback_content, task_id)
                     return [fallback_message], []
                 else:
                     error_message = self._create_agent_message(
-                        f"I encountered an error while processing your request: {str(e)}. Please try rephrasing your request or try again later.",
+                        f"I encountered an error while processing your request: {str(e)}. "
+                        f"Please try rephrasing your request or try again later.",
                         task_id
                     )
                     return [error_message], []
@@ -767,7 +781,10 @@ class CodeAgent(Agent):
             # Update task list in run_context from response
             if parsed_response["task_list"]["completed"] or parsed_response["task_list"]["pending"]:
                 run_context["task_list"] = parsed_response["task_list"]
-                logger.info(f"Updated task list: completed={len(parsed_response['task_list']['completed'])}, pending={len(parsed_response['task_list']['pending'])}")
+                logger.info(
+                    f"Updated task list: completed={len(parsed_response['task_list']['completed'])}, "
+                    f"pending={len(parsed_response['task_list']['pending'])}"
+                )
             
             # Emit the LLM response with structured data
             await self._emit_event("llm_response", {
@@ -870,7 +887,10 @@ class CodeAgent(Agent):
             if tool_results:
                 # Create a tool results message
                 tool_results_text = self._format_tool_results_for_conversation(tool_results)
-                tool_results_message = self._create_agent_message(f"Tool execution results:\n{tool_results_text}", task_id)
+                tool_results_message = self._create_agent_message(
+                    f"Tool execution results:\n{tool_results_text}", 
+                    task_id
+                )
                 return [response_message, tool_results_message], tool_results
             else:
                 return [response_message], tool_results
@@ -1100,7 +1120,12 @@ class CodeAgent(Agent):
                 }
             )
     
-    def _is_task_complete(self, response_messages: list[Message], tool_results: list[ToolCallResult], run_context: dict[str, _t.Any]) -> bool:
+    def _is_task_complete(
+        self, 
+        response_messages: list[Message], 
+        tool_results: list[ToolCallResult], 
+        run_context: dict[str, _t.Any]
+    ) -> bool:
         """Determine if the task is complete based on the response."""
         # Check if we have the should_continue flag from the structured response
         if "should_continue" in run_context:
@@ -1249,7 +1274,10 @@ class CodeAgent(Agent):
             "user_messages": len([msg for msg in self._conversation_history if msg.role == Role.user]),
             "agent_messages": len([msg for msg in self._conversation_history if msg.role == Role.agent]),
             "approved_commands": len(self._approved_commands),
-            "last_activity": self._conversation_history[-1].metadata.get("timestamp") if self._conversation_history else None
+            "last_activity": (
+                self._conversation_history[-1].metadata.get("timestamp") 
+                if self._conversation_history else None
+            )
         }
 
     def add_tool(self, tool) -> None:
@@ -1327,7 +1355,11 @@ class CodeAgent(Agent):
             "content": content_str,
         } 
 
-    def _detect_and_intervene_loop(self, original_user_input: str, tool_calls: list[ToolCall]) -> tuple[str | None, list[ToolCall]]:
+    def _detect_and_intervene_loop(
+        self, 
+        original_user_input: str, 
+        tool_calls: list[ToolCall]
+    ) -> tuple[str | None, list[ToolCall]]:
         """Detect if the agent is stuck in a loop and intervene by modifying tool calls.
         
         Returns:
@@ -1349,11 +1381,18 @@ class CodeAgent(Agent):
                 if len(set(file_paths)) == 1:  # Same file being written multiple times
                     file_path = file_paths[0]
                     if f"sandbox_write_file:{file_path}" in self._completed_actions:
-                        return self._generate_intervention_and_fix(f"sandbox_write_file:{file_path}", original_user_input, tool_calls)
+                        return self._generate_intervention_and_fix(
+                            f"sandbox_write_file:{file_path}", original_user_input, tool_calls
+                        )
         
         return None, tool_calls
     
-    def _generate_intervention_and_fix(self, repeated_call: str, original_user_input: str, tool_calls: list[ToolCall]) -> tuple[str, list[ToolCall]]:
+    def _generate_intervention_and_fix(
+        self, 
+        repeated_call: str, 
+        original_user_input: str, 
+        tool_calls: list[ToolCall]
+    ) -> tuple[str, list[ToolCall]]:
         """Generate intervention message and modify tool calls to force progression."""
         if repeated_call.startswith("sandbox_write_file:"):
             # Extract the file path
@@ -1361,7 +1400,10 @@ class CodeAgent(Agent):
             
             # Check if this is a "create and run" scenario
             if any(keyword in original_user_input.lower() for keyword in ["run", "execute", "and run"]):
-                intervention_msg = f"SYSTEM INTERVENTION: The file {file_path} has been successfully created multiple times. Proceeding to execute it instead of recreating it."
+                intervention_msg = (
+                    f"SYSTEM INTERVENTION: The file {file_path} has been successfully created multiple times. "
+                    f"Proceeding to execute it instead of recreating it."
+                )
                 
                 # Force the correct tool call - replace any sandbox_write_file calls with sandbox_exec
                 modified_calls = []
@@ -1402,10 +1444,17 @@ class CodeAgent(Agent):
                 
                 return intervention_msg, modified_calls
             else:
-                intervention_msg = f"SYSTEM INTERVENTION: The file {file_path} has been successfully created. Task is complete."
+                intervention_msg = (
+                    f"SYSTEM INTERVENTION: The file {file_path} has been successfully created. "
+                    f"Task is complete."
+                )
                 return intervention_msg, []  # No more tool calls needed
         
-        return "SYSTEM INTERVENTION: You appear to be repeating the same action. Please proceed to the next step.", tool_calls 
+        return (
+            "SYSTEM INTERVENTION: You appear to be repeating the same action. "
+            "Please proceed to the next step.", 
+            tool_calls
+        )
 
     def _clean_parameters(self, parameters: dict) -> dict:
         """Clean parameters to remove Undefined values and make them JSON serializable."""
@@ -1416,9 +1465,15 @@ class CodeAgent(Agent):
             if hasattr(value, '__class__') and value.__class__.__name__ == 'Undefined':
                 return None
             elif isinstance(value, dict):
-                return {k: clean_value(v) for k, v in value.items() if not (hasattr(v, '__class__') and v.__class__.__name__ == 'Undefined')}
+                return {
+                    k: clean_value(v) for k, v in value.items() 
+                    if not (hasattr(v, '__class__') and v.__class__.__name__ == 'Undefined')
+                }
             elif isinstance(value, (list, tuple)):
-                return [clean_value(item) for item in value if not (hasattr(item, '__class__') and item.__class__.__name__ == 'Undefined')]
+                return [
+                    clean_value(item) for item in value 
+                    if not (hasattr(item, '__class__') and item.__class__.__name__ == 'Undefined')
+                ]
             elif isinstance(value, (str, int, float, bool, type(None))):
                 return value
             else:

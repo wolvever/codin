@@ -45,7 +45,10 @@ class AnthropicLLM(BaseLLM):
         
         # Try new environment variables first, fall back to legacy ones
         self.api_key = os.environ.get("LLM_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-        self.api_base = os.environ.get("LLM_BASE_URL") or os.environ.get("ANTHROPIC_API_BASE", "https://api.anthropic.com")
+        self.api_base = (
+            os.environ.get("LLM_BASE_URL") or 
+            os.environ.get("ANTHROPIC_API_BASE", "https://api.anthropic.com")
+        )
         self.api_version = os.environ.get("ANTHROPIC_API_VERSION", "2023-06-01")
         
         # Remove trailing slash if present

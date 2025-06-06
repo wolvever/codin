@@ -105,7 +105,13 @@ class ToolExecutionHook:
         """Called before tool execution."""
         pass
     
-    async def after_execution(self, tool: Tool, args: _t.Dict[str, _t.Any], result: _t.Any, context: "ToolContext") -> None:
+    async def after_execution(
+        self, 
+        tool: Tool, 
+        args: _t.Dict[str, _t.Any], 
+        result: _t.Any, 
+        context: "ToolContext"
+    ) -> None:
         """Called after successful tool execution."""
         pass
     

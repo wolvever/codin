@@ -139,7 +139,10 @@ async def run_quiet_mode(
                     print(f"🔄 Should continue: {debug_info['should_continue']}")
                     
                     task_list = debug_info['task_list']
-                    print(f"📋 Task list - Completed: {task_list['completed_count']}, Pending: {task_list['pending_count']}")
+                    print(
+                        f"📋 Task list - Completed: {task_list['completed_count']}, "
+                        f"Pending: {task_list['pending_count']}"
+                    )
                     
                     tool_calls = debug_info.get('tool_calls', [])
                     if tool_calls:

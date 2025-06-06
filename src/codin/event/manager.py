@@ -186,12 +186,18 @@ class TaskManager:
                     
                     # Calculate duration and record metrics
                     duration = (datetime.utcnow() - start_time).total_seconds()
-                    task_duration.record(duration, {"agent_id": agent.id or "unknown", "status": updated_task.status.state})
+                    task_duration.record(
+                        duration, 
+                        {"agent_id": agent.id or "unknown", "status": updated_task.status.state}
+                    )
                     prom_task_duration.labels(agent_id=agent.id or "unknown").observe(duration)
                     
                     # Log completion
                     logger.info(f"Task {task.id} completed with state={updated_task.status.state} in {duration:.2f}s")
-                    task_complete_counter.add(1, {"agent_id": agent.id or "unknown", "status": updated_task.status.state})
+                    task_complete_counter.add(
+                        1, 
+                        {"agent_id": agent.id or "unknown", "status": updated_task.status.state}
+                    )
                     prom_tasks_completed.labels(agent_id=agent.id or "unknown", status=updated_task.status.state).inc()
                     
                     # Store completed task

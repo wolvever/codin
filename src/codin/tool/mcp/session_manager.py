@@ -350,7 +350,9 @@ class StdioSessionManager(MCPSessionManager):
                                 exit_stack_to_close._exit_callbacks.clear()
                     
                     # Run with shield to prevent cancellation, but also suppress task warnings
-                    cleanup_task = asyncio.create_task(asyncio.shield(asyncio.wait_for(protected_cleanup(), timeout=1.0)))
+                    cleanup_task = asyncio.create_task(
+                        asyncio.shield(asyncio.wait_for(protected_cleanup(), timeout=1.0))
+                    )
                     
                     # Add a done callback to suppress any remaining exceptions
                     def suppress_task_exception(task):

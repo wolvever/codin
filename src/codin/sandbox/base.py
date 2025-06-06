@@ -251,7 +251,10 @@ class Sandbox(LifecycleMixin, ABC):
             if start_line > 1:
                 result_parts.append(f"Lines 1-{start_line-1} not shown ({start_line-1} lines)")
             
-            result_parts.append(f"Contents of {target_file}, lines {start_line}-{min(end_line, total_lines)} (total {total_lines} lines):")
+            result_parts.append(
+                f"Contents of {target_file}, lines {start_line}-{min(end_line, total_lines)} "
+                f"(total {total_lines} lines):"
+            )
             result_parts.append("\n".join(selected_lines))
             
             if end_line < total_lines:
@@ -572,15 +575,16 @@ class Sandbox(LifecycleMixin, ABC):
         Use this tool when you need up-to-date information that might not be 
         available in your training data, or when you need to verify current facts.
         """
-        # This is a placeholder implementation
-        # In a real system, this would integrate with a web search API
         return {
             "search_term": search_term,
             "results": [
                 {
                     "title": f"Search result for: {search_term}",
                     "url": "https://example.com",
-                    "snippet": "This is a placeholder search result. In a real implementation, this would connect to a search API."
+                    "snippet": (
+                        "This is a placeholder search result. In a real implementation, "
+                        "this would connect to a search API."
+                    )
                 }
             ]
         }

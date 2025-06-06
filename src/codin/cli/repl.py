@@ -287,9 +287,17 @@ class ReplSession:
                     if num_tools > 0:
                         click.echo()
                         if failed == 0:
-                            click.echo(click.style(f"✨ All {num_tools} tools completed successfully", bold=True, fg="green"))
+                            click.echo(
+                                click.style(f"✨ All {num_tools} tools completed successfully", bold=True, fg="green")
+                            )
                         else:
-                            click.echo(click.style(f"⚠️  Tools: {successful} successful, {failed} failed", bold=True, fg="yellow"))
+                            click.echo(
+                                click.style(
+                                    f"⚠️  Tools: {successful} successful, {failed} failed", 
+                                    bold=True, 
+                                    fg="yellow"
+                                )
+                            )
                             
                 elif event.event_type == "approval_requested":
                     tool_name = event.data.get("tool_name", "unknown")
@@ -321,7 +329,10 @@ class ReplSession:
                     click.echo(f"🔄 Should continue: {debug_info['should_continue']}")
                     
                     task_list = debug_info['task_list']
-                    click.echo(f"📋 Task list - Completed: {task_list['completed_count']}, Pending: {task_list['pending_count']}")
+                    click.echo(
+                        f"📋 Task list - Completed: {task_list['completed_count']}, "
+                        f"Pending: {task_list['pending_count']}"
+                    )
                     
                     tool_calls = debug_info.get('tool_calls', [])
                     if tool_calls:
@@ -763,7 +774,9 @@ class ReplSession:
                     # Prepend instructions to the user message instead of creating a separate system message
                     # since a2a doesn't have a system role
                     original_text = user_message.parts[0].text
-                    user_message.parts[0] = TextPart(text=f"Project Instructions:\n{instructions}\n\nUser Request: {original_text}")
+                    user_message.parts[0] = TextPart(
+                        text=f"Project Instructions:\n{instructions}\n\nUser Request: {original_text}"
+                    )
             
             # Run agent with timeout
             agent_input = AgentRunInput(message=user_message)
@@ -778,7 +791,10 @@ class ReplSession:
                     timeout=300.0  # 5 minute timeout for entire conversation turn
                 )
             except asyncio.TimeoutError:
-                click.echo(f"\n[WARN] Request timed out after 5 minutes. This might be due to network issues or complex processing.")
+                click.echo(
+                    f"\n[WARN] Request timed out after 5 minutes. This might be due to network issues "
+                    f"or complex processing."
+                )
                 click.echo("You can try:")
                 click.echo("  - Simplifying your request")
                 click.echo("  - Checking your internet connection")

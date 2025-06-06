@@ -198,7 +198,14 @@ class TestPromptRegistry:
                 original_instance.run_mode = original_mode
     
     @pytest.mark.asyncio
-    @patch("builtins.open", new_callable=lambda: mock_open(read_data="name: greeting\nversion: latest\nvariants:\n  - text: 'Hello, {{ name }}!'"))
+    @patch(
+        "builtins.open", 
+        new_callable=lambda: mock_open(
+            read_data=(
+                "name: greeting\nversion: latest\nvariants:\n  - text: 'Hello, {{ name }}!'"
+            )
+        )
+    )
     @patch("pathlib.Path.exists")
     async def test_lazy_load_local(self, mock_exists, mock_file_open, clean_registry, monkeypatch):
         """Test lazy loading templates from local files."""

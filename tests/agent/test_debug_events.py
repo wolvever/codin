@@ -32,7 +32,10 @@ class TestDebugEvents:
         
         # Mock the LLM to return a structured response
         mock_response = MagicMock()
-        mock_response.content = '{"thinking": "Test thinking", "message": "Test message", "should_continue": false, "task_list": {"completed": [], "pending": []}, "tool_calls": []}'
+        mock_response.content = (
+            '{"thinking": "Test thinking", "message": "Test message", "should_continue": false, '
+            '"task_list": {"completed": [], "pending": []}, "tool_calls": []}'
+        )
         
         # Mock the model's run method
         agent._model = MagicMock()
@@ -60,7 +63,10 @@ class TestDebugEvents:
         
         # Mock the LLM to return a structured response
         mock_response = MagicMock()
-        mock_response.content = '{"thinking": "Test thinking", "message": "Test message", "should_continue": false, "task_list": {"completed": [], "pending": []}, "tool_calls": []}'
+        mock_response.content = (
+            '{"thinking": "Test thinking", "message": "Test message", "should_continue": false, '
+            '"task_list": {"completed": [], "pending": []}, "tool_calls": []}'
+        )
         
         # Mock the model's run method
         agent._model = MagicMock()
@@ -94,7 +100,9 @@ class TestDebugEvents:
         
         # Check that debug events were emitted
         debug_events = [e for e in received_events if e.event_type == "debug_llm_response"]
-        assert len(debug_events) > 0, "Debug events should be emitted when debug mode is enabled"
+        assert len(debug_events) > 0, (
+            "Debug events should be emitted when debug mode is enabled"
+        )
         
         # Verify the debug event structure
         debug_event = debug_events[0]
@@ -130,7 +138,9 @@ class TestDebugEvents:
         
         # Check that no debug events were emitted
         debug_events = [e for e in received_events if e.event_type == "debug_llm_response"]
-        assert len(debug_events) == 0, "Debug events should not be emitted when debug mode is disabled"
+        assert len(debug_events) == 0, (
+            "Debug events should not be emitted when debug mode is disabled"
+        )
 
     @pytest.mark.asyncio
     async def test_debug_event_data_structure(self, agent_with_debug):

@@ -307,7 +307,10 @@ class RayAgentHost:
                 prom_ray_agent_run_duration.labels(agent_id=agent_id).observe(duration)
                 prom_ray_agent_runs.labels(agent_id=agent_id, status=ray_result["status"]).inc()
                 
-                logger.info(f"Ray task completed for agent {agent_id} in {duration:.2f}s with status {ray_result['status']}")
+                logger.info(
+                    f"Ray task completed for agent {agent_id} in {duration:.2f}s "
+                    f"with status {ray_result['status']}"
+                )
                 
                 # Reconstruct output from result
                 from ..protocol.types import AgentRunOutput

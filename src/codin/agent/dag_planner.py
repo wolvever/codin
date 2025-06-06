@@ -288,7 +288,8 @@ class DAGExecutor(Agent):
                 
                 # First look for DataPart with plan data
                 for part in message_parts:
-                    if part.type == "data" and hasattr(part, "data") and isinstance(part.data, dict) and "plan" in part.data:
+                    if (part.type == "data" and hasattr(part, "data") and 
+                        isinstance(part.data, dict) and "plan" in part.data):
                         plan_data = part.data["plan"]
                         break
                 
@@ -459,7 +460,10 @@ class DAGExecutor(Agent):
                     blocked_tasks = [t for t in plan.tasks.values() if t.status == TaskStatus.BLOCKED]
                     if blocked_tasks:
                         blocked_ids = [t.id for t in blocked_tasks]
-                        error_message = f"Plan execution blocked. The following tasks are blocked: {', '.join(blocked_ids)}"
+                        error_message = (
+                            f"Plan execution blocked. The following tasks are blocked: "
+                            f"{', '.join(blocked_ids)}"
+                        )
                         logger.error(error_message)
                         
                         # Mark blocked tasks as failed

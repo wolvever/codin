@@ -109,7 +109,10 @@ class MockLLM(BaseLLM):
         "pending": []
     },
     "tool_calls": [],
-    "message": "Perfect! I've successfully created and executed the Python hello world script. The output 'Hello, World!' confirms it's working correctly.",
+    "message": (
+        "Perfect! I've successfully created and executed the Python hello world script. "
+        "The output 'Hello, World!' confirms it's working correctly."
+    ),
     "should_continue": false
 }```"""
         

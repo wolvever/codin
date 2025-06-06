@@ -302,6 +302,9 @@ class State(BaseModel):
     
     # Last tool results for context
     last_tool_results: list[_t.Any] = Field(default_factory=list)
+    
+    # Task list for structured planning (matches code_agent.py format)
+    task_list: dict[str, list[str]] = Field(default_factory=lambda: {"completed": [], "pending": []})
 
 
 class StepType(Enum):

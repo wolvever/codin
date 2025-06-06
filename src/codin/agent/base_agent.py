@@ -6,7 +6,8 @@ import typing as _t
 from datetime import datetime
 from enum import Enum
 
-from a2a.types import Message, Role, TextPart
+# Import a2a types that we need
+from a2a.types import Role, TextPart
 
 from .base import Agent, Planner
 from .types import (
@@ -27,6 +28,7 @@ from .types import (
     ControlSignal,
     RunnerInput,
     RunnerControl,
+    Message,  # Use Message from codin.agent.types
 )
 from ..memory.base import Memory, MemMemoryService
 from ..tool.base import Tool, ToolContext
@@ -66,12 +68,12 @@ class BaseAgent(Agent):
         debug: bool = False,
         **kwargs
     ):
-        super().__init__(id=agent_id, name=name, description=description, version=version, tools=tools or [], **kwargs)
+        super().__init__(id=agent_id, name=name, description=description, version=version or "1.0.0", tools=tools or [], **kwargs)
         self.planner = planner
         self.memory = memory or MemMemoryService()
         self.tools = tools or []
         self.llm = llm
-        self.mailbox = mailbox or LocalAsyncMailbox(self.agent_id)
+        self.mailbox = mailbox or LocalAsyncMailbox(self.id)
         self.default_config = default_config
         self.debug = debug
         
@@ -79,7 +81,12 @@ class BaseAgent(Agent):
         self._paused = False
         self._cancelled = False
         
-        logger.info(f"Initialized {self.agent_id} with {len(self.tools)} tools")
+        logger.info(f"Initialized {self.id} with {len(self.tools)} tools")
+
+    @property
+    def agent_id(self) -> str:
+        """Compatibility property for agent_id."""
+        return self.id
 
     def get_tool_by_name(self, tool_name: str) -> Tool | None:
         """Get a tool by name from the tools list."""
@@ -90,15 +97,15 @@ class BaseAgent(Agent):
     
     async def handle_control(self, control: RunnerControl) -> None:
         """Handle control signals from dispatcher or other agents."""
-        logger.info(f"Agent {self.agent_id} received control signal: {control.signal}")
+        logger.info(f"Agent {self.id} received control signal: {control.signal}")
         
         if control.signal == ControlSignal.PAUSE:
             self._paused = True
             await self.mailbox.put_outbox(Message(
                 messageId=str(uuid.uuid4()),
                 role=Role.agent,
-                parts=[TextPart(text=f"Agent {self.agent_id} paused")],
-                contextId=self.agent_id,
+                parts=[TextPart(text=f"Agent {self.id} paused")],
+                contextId=self.id,
                 kind="message",
                 metadata={"control_response": "paused"}
             ))
@@ -108,8 +115,8 @@ class BaseAgent(Agent):
             await self.mailbox.put_outbox(Message(
                 messageId=str(uuid.uuid4()),
                 role=Role.agent,
-                parts=[TextPart(text=f"Agent {self.agent_id} resumed")],
-                contextId=self.agent_id,
+                parts=[TextPart(text=f"Agent {self.id} resumed")],
+                contextId=self.id,
                 kind="message",
                 metadata={"control_response": "resumed"}
             ))
@@ -119,8 +126,8 @@ class BaseAgent(Agent):
             await self.mailbox.put_outbox(Message(
                 messageId=str(uuid.uuid4()),
                 role=Role.agent,
-                parts=[TextPart(text=f"Agent {self.agent_id} cancelled")],
-                contextId=self.agent_id,
+                parts=[TextPart(text=f"Agent {self.id} cancelled")],
+                contextId=self.id,
                 kind="message",
                 metadata={"control_response": "cancelled"}
             ))
@@ -134,8 +141,8 @@ class BaseAgent(Agent):
             await self.mailbox.put_outbox(Message(
                 messageId=str(uuid.uuid4()),
                 role=Role.agent,
-                parts=[TextPart(text=f"Agent {self.agent_id} reset")],
-                contextId=self.agent_id,
+                parts=[TextPart(text=f"Agent {self.id} reset")],
+                contextId=self.id,
                 kind="message",
                 metadata={"control_response": "reset"}
             ))
@@ -178,7 +185,7 @@ class BaseAgent(Agent):
             
             # Emit start event via mailbox
             await self._emit_event("run_start", {
-                "agent_id": self.agent_id, 
+                "agent_id": self.id, 
                 "session_id": session_id,
                 "input_message_id": input_data.message.messageId if input_data.message else "N/A"
             })
@@ -189,7 +196,7 @@ class BaseAgent(Agent):
         except Exception as e:
             logger.error(f"Error in agent run: {e}", exc_info=True)
             await self._emit_event("run_error", {
-                "agent_id": self.agent_id, 
+                "agent_id": self.id, 
                 "session_id": session_id, 
                 "error": str(e)
             })
@@ -204,7 +211,7 @@ class BaseAgent(Agent):
             yield AgentRunOutput(
                 id=str(uuid.uuid4()), 
                 result=error_message, 
-                metadata={"error": str(e), "agent_id": self.agent_id}
+                metadata={"error": str(e), "agent_id": self.id}
             )
     
     async def _build_state(self, session_id: str, input_data: AgentRunInput) -> State:
@@ -267,13 +274,13 @@ class BaseAgent(Agent):
                 task = Task(
                     id=input_data.message.messageId or str(uuid.uuid4()),
                     query=query,
-                    metadata={"session_id": session_id, "agent_id": self.agent_id},
+                    metadata={"session_id": session_id, "agent_id": self.id},
                     parts=[]
                 )
 
         return State(
             session_id=session_id, 
-            agent_id=self.agent_id, 
+            agent_id=self.id, 
             created_at=datetime.now(),
             iteration=0, 
             history=list(history),
@@ -283,7 +290,7 @@ class BaseAgent(Agent):
             config=current_config, 
             task=task,
             metadata={
-                "agent_id": self.agent_id, 
+                "agent_id": self.id, 
                 "input_options": input_data.options or {},
                 "memory": self.memory,  # Provide memory access to planner
                 "mailbox": self.mailbox  # Provide mailbox access to planner
@@ -297,7 +304,7 @@ class BaseAgent(Agent):
             # Check for control messages and handle pause/cancel states
             should_continue = await self.check_inbox_for_control()
             if not should_continue:
-                logger.info(f"Agent {self.agent_id} cancelled by control signal")
+                logger.info(f"Agent {self.id} cancelled by control signal")
                 break
             
             # Wait while paused
@@ -416,13 +423,13 @@ class BaseAgent(Agent):
                 yield AgentRunOutput(
                     id=str(uuid.uuid4()), 
                     result=error_msg, 
-                    metadata={"error": str(e), "agent_id": self.agent_id}
+                    metadata={"error": str(e), "agent_id": self.id}
                 )
                 break
     
     async def _execute_step(self, step: Step, state: State, session_id: str) -> _t.AsyncGenerator[AgentRunOutput, None]:
         """Execute step using codin components and send outputs to mailbox."""
-        step_output_metadata_base = {"agent_id": self.agent_id, "step_id": step.step_id}
+        step_output_metadata_base = {"agent_id": self.id, "step_id": step.step_id}
         
         try:
             if step.step_type == StepType.MESSAGE and isinstance(step, MessageStep) and step.message:
@@ -547,7 +554,7 @@ class BaseAgent(Agent):
             yield AgentRunOutput(
                 id=step.step_id, 
                 result=error_msg, 
-                metadata={**step_output_metadata_base, "error": str(e), "agent_id": self.agent_id}
+                metadata={**step_output_metadata_base, "error": str(e), "agent_id": self.id}
             )
 
     async def _execute_tool_call(self, tool_call_part: ToolUsePart, state: State) -> ToolUsePart:
@@ -573,7 +580,7 @@ class BaseAgent(Agent):
                 raise ValueError(f"Tool not found: {tool_name}")
             
             context = ToolContext(
-                agent_id=self.agent_id, 
+                agent_id=self.id, 
                 session_id=state.session_id,
                 tool_name=tool_name, 
                 arguments=arguments 
@@ -617,4 +624,19 @@ class BaseAgent(Agent):
             
         except Exception as e:
             if self.debug:
-                logger.warning(f"Failed to emit event {event_type}: {e}") 
+                logger.warning(f"Failed to emit event {event_type}: {e}")
+    
+    async def cleanup(self) -> None:
+        """Clean up resources."""
+        try:
+            if hasattr(self.planner, 'cleanup'):
+                await self.planner.cleanup()
+            if hasattr(self.llm, 'cleanup'):
+                await self.llm.cleanup()
+            if hasattr(self.memory, 'cleanup'):
+                await self.memory.cleanup()
+            if hasattr(self.mailbox, 'cleanup'):
+                await self.mailbox.cleanup()
+        except Exception as e:
+            if self.debug:
+                logger.warning(f"Error during cleanup: {e}") 

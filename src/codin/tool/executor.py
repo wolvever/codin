@@ -13,6 +13,7 @@ import types
 import typing as _t
 
 from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 # Prometheus imports
 import prometheus_client as prom
@@ -163,7 +164,7 @@ class ToolExecutor:
         self.hooks.append(hook)
 
     @asynccontextmanager
-    async def _concurrency_limit(self):
+    async def _concurrency_limit(self) -> AsyncIterator[None]:
         """Context manager for limiting concurrency."""
         async with self.semaphore:
             yield

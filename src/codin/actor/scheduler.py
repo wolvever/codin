@@ -2,28 +2,29 @@
 
 import typing as _t
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
 
-__all__ = ["ActorManager", "LocalActorManager", "ActorInfo"]
+__all__ = ["ActorScheduler", "LocalActorManager", "ActorInfo"]
 
 
-@dataclass
-class ActorInfo:
+class ActorInfo(BaseModel):
     """Information about a managed actor/agent."""
     actor_id: str
     actor_type: str
-    key: str
     agent: "Agent"
-    created_at: datetime = field(default_factory=datetime.now)
-    last_accessed: datetime = field(default_factory=datetime.now)
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.now)
+    last_accessed: datetime = Field(default_factory=datetime.now)
+    
+    class Config:
+        arbitrary_types_allowed = True
 
-
-class ActorManager(ABC):
+class ActorScheduler(ABC):
     """Abstract actor manager protocol from design document."""
     
     @abstractmethod
@@ -47,7 +48,7 @@ class ActorManager(ABC):
         pass
 
 
-class LocalActorManager(ActorManager):
+class LocalActorManager(ActorScheduler):
     """Local implementation of actor manager using in-memory storage."""
     
     def __init__(self, agent_factory: _t.Callable[[str, str], _t.Awaitable["Agent"]] | None = None):
@@ -87,7 +88,6 @@ class LocalActorManager(ActorManager):
         actor_info = ActorInfo(
             actor_id=actor_id,
             actor_type=actor_type,
-            key=key,
             agent=agent
         )
         self._actors[actor_id] = actor_info

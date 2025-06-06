@@ -7,7 +7,8 @@ to MCP servers using various protocols (HTTP, stdio, SSE).
 """
 
 import typing as _t
-from dataclasses import dataclass, field
+
+from pydantic import BaseModel, Field
 
 __all__ = [
     "HttpServerParams",
@@ -16,8 +17,7 @@ __all__ = [
 ]
 
 
-@dataclass(slots=True)
-class HttpServerParams:
+class HttpServerParams(BaseModel):
     """Parameters for HTTP connections to an MCP server.
 
     Parameters
@@ -31,12 +31,11 @@ class HttpServerParams:
     """
 
     base_url: str
-    headers: dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
     timeout: float = 30.0
 
 
-@dataclass(slots=True)
-class StdioServerParams:
+class StdioServerParams(BaseModel):
     """Parameters for stdio connections to an MCP server.
 
     Parameters
@@ -50,12 +49,11 @@ class StdioServerParams:
     """
 
     command: str
-    args: list[str] = field(default_factory=list)
-    env: dict[str, str] = field(default_factory=dict)
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
 
 
-@dataclass(slots=True)
-class SseServerParams:
+class SseServerParams(BaseModel):
     """Parameters for Server-Sent Events (SSE) connections to an MCP server.
 
     Parameters
@@ -71,6 +69,6 @@ class SseServerParams:
     """
 
     url: str
-    headers: dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
     timeout: float = 5.0
     sse_read_timeout: float = 300.0  # 5 minutes default 

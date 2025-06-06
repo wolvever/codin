@@ -12,13 +12,14 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
-from dataclasses import dataclass
 from datetime import datetime
 import typing as _t
 
+from pydantic import BaseModel, Field, ConfigDict
+
 # A2A SDK imports
 from a2a.types import (
-    Message,
+    Message as A2AMessage,
     Role as A2ARole,
     TextPart as A2ATextPart,
     FilePart as A2AFilePart,
@@ -30,6 +31,7 @@ try:
     _HAS_JINJA = True
 except ImportError:  # pragma: no cover
     _HAS_JINJA = False
+    _JinjaTemplate = None
 
 __all__ = [
     "PromptTemplate",
@@ -51,24 +53,26 @@ __all__ = [
 # -----------------------------------------------------------------------------
 
 # Re-export a2a types for backward compatibility
-A2AMessage = Message
+A2AMessage = A2AMessage
 
 # Union type for all part types
 A2APart = A2ATextPart | A2AFilePart | A2ADataPart
 
 
-@dataclass
-class PromptResponse:
+class PromptResponse(BaseModel):
     """A2A protocol response structure."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     message: A2AMessage | None = None
     streaming: bool = False
     content: str | _t.AsyncIterator[str] | None = None
     error: dict[str, _t.Any] | None = None
 
 
-@dataclass(frozen=True)
-class ToolDefinition:
+class ToolDefinition(BaseModel):
     """Tool definition for LLM function calling."""
+    model_config = ConfigDict(frozen=True)
+    
     name: str
     description: str
     parameters: dict[str, _t.Any]
@@ -88,8 +92,7 @@ def _default_version(text: str) -> str:
     return _make_hash(text)
 
 
-@dataclass
-class ModelOptions:
+class ModelOptions(BaseModel):
     """Model-specific options for LLM generation."""
     temperature: float | None = None
     top_p: float | None = None
@@ -100,12 +103,13 @@ class ModelOptions:
     
     def to_dict(self) -> dict[str, _t.Any]:
         """Convert to dictionary, excluding None values."""
-        return {k: v for k, v in self.__dict__.items() if v is not None}
+        return {k: v for k, v in self.dict().items() if v is not None}
 
 
-@dataclass
-class PromptVariant:
+class PromptVariant(BaseModel):
     """A single template variant with simple dict-based conditions."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     text: str
     conditions: dict[str, _t.Any] | None = None
     model: str | None = None
@@ -114,8 +118,12 @@ class PromptVariant:
     system_prompt: str | None = None
     messages: list[dict[str, _t.Any]] | None = None
     
-    def __post_init__(self):
-        """Compile template for performance."""
+    # Private field for compiled template
+    _compiled: _t.Any = None
+    
+    def __init__(self, **data):
+        """Initialize and compile template for performance."""
+        super().__init__(**data)
         if _HAS_JINJA:
             self._compiled = _JinjaTemplate(self.text, autoescape=False)
         else:
@@ -261,33 +269,34 @@ class PromptTemplate:
         """Render the template with the best matching variant."""
         variant = self.get_best_variant(conditions)
         if not variant:
-            raise ValueError(f"No variants available for template {self.name}")
+            raise ValueError(f"No variants available for template '{self.name}'")
         
         rendered_text = variant.render(**variables)
-        system_prompt = variant.render_system_prompt(**variables)
-        messages = variant.render_messages(**variables)
+        rendered_system = variant.render_system_prompt(**variables)
+        rendered_messages = variant.render_messages(**variables)
         
         return RenderedPrompt(
             text=rendered_text,
             template=self,
             variant=variant,
             variables=variables,
-            rendered_at=datetime.utcnow(),
-            system_prompt=system_prompt,
-            messages=messages
+            rendered_at=datetime.now(),
+            system_prompt=rendered_system,
+            messages=rendered_messages
         )
     
     @property
     def text(self) -> str:
-        """Get the text from the first variant for backward compatibility."""
+        """Get the text of the first variant (for backward compatibility)."""
         if self.variants:
             return self.variants[0].text
         return ""
 
 
-@dataclass
-class RenderedPrompt:
+class RenderedPrompt(BaseModel):
     """A rendered prompt ready for LLM execution."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     text: str
     template: PromptTemplate
     variant: PromptVariant

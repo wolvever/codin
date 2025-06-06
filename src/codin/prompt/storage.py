@@ -13,10 +13,11 @@ import time
 import typing as _t
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse
-from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 import yaml
+from pydantic import BaseModel, ConfigDict
 
 from .base import PromptTemplate, PromptVariant, ModelOptions
 
@@ -28,9 +29,10 @@ __all__ = [
 ]
 
 
-@dataclass
-class CacheEntry:
+class CacheEntry(BaseModel):
     """Cache entry for remote templates."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     template: PromptTemplate
     timestamp: float
     etag: str | None = None

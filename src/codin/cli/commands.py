@@ -27,7 +27,8 @@ from ..model.factory import LLMFactory
 from a2a.types import Message, Role, TextPart
 from ..agent.base import AgentRunInput
 from ..sandbox import LocalSandbox
-from ..tool.base import ApprovalMode, Toolset
+from ..tool.base import Toolset
+from ..config import ApprovalMode
 from ..tool.mcp import MCPToolset, StdioServerParams, SseServerParams, HttpServerParams
 from ..tool.sandbox import SandboxToolset
 from ..tool.core_tools import RunShellTool

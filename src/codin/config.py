@@ -12,10 +12,15 @@ import json
 import yaml
 import typing as _t
 from pathlib import Path
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field
 from enum import Enum
 
-from .tool.base import ApprovalMode
+# Define ApprovalMode locally to avoid circular import
+class ApprovalMode(str, Enum):
+    """Unified approval mode for tool execution and CLI."""
+    ALWAYS = "always"           # Always ask for approval (same as SUGGEST)
+    UNSAFE_ONLY = "unsafe_only" # Only ask for potentially unsafe operations (same as AUTO_EDIT)
+    NEVER = "never"             # Never ask, auto-approve everything (same as FULL_AUTO)
 
 __all__ = [
     "CodinConfig",
@@ -30,35 +35,31 @@ __all__ = [
 ]
 
 
-@dataclass
-class ProviderConfig:
+class ProviderConfig(BaseModel):
     """Configuration for an AI provider."""
     name: str
     base_url: str
     env_key: str
-    models: list[str] = field(default_factory=list)
+    models: list[str] = Field(default_factory=list)
 
 
-@dataclass 
-class HistoryConfig:
+class HistoryConfig(BaseModel):
     """Configuration for conversation history."""
     max_size: int = 1000
     save_history: bool = True
-    sensitive_patterns: list[str] = field(default_factory=list)
+    sensitive_patterns: list[str] = Field(default_factory=list)
 
 
-@dataclass
-class MCPServerConfig:
+class MCPServerConfig(BaseModel):
     """Configuration for an MCP server."""
     command: str
-    args: list[str] = field(default_factory=list)
-    env: dict[str, str] = field(default_factory=dict)
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
     url: str | None = None  # For SSE servers
     description: str = ""
 
 
-@dataclass
-class CodinConfig:
+class CodinConfig(BaseModel):
     """Main configuration class for codin."""
     
     # Core settings
@@ -79,16 +80,16 @@ class CodinConfig:
     prevent_duplicate_tools: bool = False  # Prevent duplicate tool calls in same turn
     
     # Provider configurations
-    providers: dict[str, ProviderConfig] = field(default_factory=dict)
+    providers: dict[str, ProviderConfig] = Field(default_factory=dict)
     
     # History settings
-    history: HistoryConfig = field(default_factory=HistoryConfig)
+    history: HistoryConfig = Field(default_factory=HistoryConfig)
     
     # MCP server configurations
-    mcp_servers: dict[str, MCPServerConfig] = field(default_factory=dict)
+    mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
     
     # Project documentation settings
-    agents_files: list[str] = field(default_factory=list)
+    agents_files: list[str] = Field(default_factory=list)
 
 
 def get_default_providers() -> dict[str, ProviderConfig]:

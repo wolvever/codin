@@ -16,8 +16,9 @@ from opentelemetry.metrics import Counter, UpDownCounter, Histogram
 import prometheus_client as prom
 
 from a2a.types import TextPart, Message
-from .base import Tool, ToolContext, ApprovalMode
+from .base import Tool, ToolContext
 from .registry import ToolRegistry
+from ..config import ApprovalMode
 
 __all__ = [
     "ToolExecutor",

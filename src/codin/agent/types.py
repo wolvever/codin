@@ -1,68 +1,72 @@
+"""Type definitions for agent system."""
+
 import typing as _t
-import abc
-from enum import Enum
-from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 
+from pydantic import BaseModel, Field, ConfigDict
 import pydantic as _pyd
-from a2a.types import Message as A2AMessage, Task as A2ATask, TaskStatusUpdateEvent, TaskArtifactUpdateEvent, TaskState, TextPart, Role
 
-# Import ArtifactService and Memory from new locations - using TYPE_CHECKING to avoid circular imports
+# Re-export core A2A types for compatibility  
+from a2a.types import (
+    Task as A2ATask,
+    Message as A2AMessage, 
+    Role,
+    TextPart,
+    TaskStatusUpdateEvent,
+    TaskArtifactUpdateEvent,
+)
+
 if _t.TYPE_CHECKING:
-    from ..artifact.base import ArtifactService
-    from ..memory.base import Memory, MemoryWriter
     from ..tool.base import Tool
+    from ..artifact.base import ArtifactService
+
 
 __all__ = [
-    # Agent types from base.py
-    "AgentRunInput",
-    "AgentRunOutput", 
-    "ToolCall",
-    "ToolCallResult",
+    # Core types (A2A compatible)
+    "Task", "Message", "ToolUsePart", "ToolCall", "ToolCallResult",
     
-    # Core architecture types
-    "State",
-    "Step",
-    "StepType",
-    "MessageStep",
-    "EventStep", 
-    "ToolCallStep",
-    "ThinkStep",
-    "FinishStep",
+    # Enhanced types for internal use
+    "RunEvent", "Event", "ControlSignal", "RunnerControl", "RunnerInput",
     
-    # A2A Compatible types
-    "Message",
-    "Task",
-    "TaskStatus",
-    "TextPart",
-    "ToolUsePart",
+    # Agent types
+    "AgentRunInput", "AgentRunOutput", "RunConfig", "Metrics", "State", 
     
-    # Services and configuration
-    "Metrics",
-    "RunConfig",
+    # Planning types  
+    "StepType", "Step", "MessageStep", "ToolCallStep", "EventStep", "ThinkStep", "FinishStep",
     
-    # Event types
-    "EventType",
-    "RunEvent",
-    "Event",
-    
-    # Control and runner types for bidirectional mailbox
-    "ControlSignal",
-    "RunnerInput",
-    "RunnerControl",
+    # Base interfaces
+    "Planner", "EventType",
 ]
 
 
 # =============================================================================
-# External A2A Compatible Types
+# Core A2A-compatible types
 # =============================================================================
 
+# Alias A2A types for convenience while maintaining compatibility
 class Task(A2ATask):
-    """Extended A2A Task with additional functionality."""
-
+    """A2A-compatible task with additional codin features."""
+    pass
 
 class Message(A2AMessage):
-    """Extended A2A Message with additional functionality."""
+    """A2A-compatible message with additional codin features."""
+    pass
+
+
+class ToolCall(_pyd.BaseModel):
+    """Represents a tool call request."""
+    call_id: str
+    name: str
+    arguments: dict[str, _t.Any]
+
+
+class ToolCallResult(_pyd.BaseModel):
+    """Represents the result of a tool call."""
+    call_id: str
+    success: bool
+    output: _t.Any = None
+    error: str | None = None
 
 
 class ToolUsePart(_pyd.BaseModel):
@@ -87,8 +91,12 @@ class ToolUsePart(_pyd.BaseModel):
     """Tool output/result (for results) - can be string, dict, or any serializable type"""
     
     metadata: dict[str, _t.Any] | None = None
-    """Optional metadata associated with the part."""
+    """Additional metadata for this tool use"""
 
+
+# =============================================================================
+# Internal events and control types
+# =============================================================================
 
 class EventType(str, Enum):
     """Types of events for EventStep."""
@@ -106,13 +114,12 @@ class EventType(str, Enum):
     ERROR = "error"
 
 
-@dataclass
-class RunEvent:
+class RunEvent(BaseModel):
     """Internal event type for non-A2A events."""
     event_type: str
     data: dict[str, _t.Any]
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.now)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)
 
 # Union type for all events
 Event = TaskStatusUpdateEvent | TaskArtifactUpdateEvent | RunEvent
@@ -131,21 +138,19 @@ class ControlSignal(str, Enum):
     STOP = "stop"
 
 
-@dataclass
-class RunnerControl:
+class RunnerControl(BaseModel):
     """Control message for runner/agent management."""
     signal: ControlSignal
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.now)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)
 
 
-@dataclass 
-class RunnerInput:
+class RunnerInput(BaseModel):
     """Enhanced input for agents through bidirectional mailbox."""
     message: Message | None = None
     control: RunnerControl | None = None
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.now)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)
     
     @classmethod
     def from_message(cls, message: Message) -> "RunnerInput":
@@ -165,29 +170,26 @@ class RunnerInput:
 
 class AgentRunInput(_pyd.BaseModel):
     """Input for agent execution."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     id: str | int | None = None
     message: Message
     metadata: dict[str, _t.Any] | None = None
     options: dict[str, _t.Any] | None = None
     session_id: str | None = None
     task_id: str | None = None  # Optional task ID for continuing existing task
-        
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class AgentRunOutput(_pyd.BaseModel):
     """Output from agent execution."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     id: str | int | None = None
     result: Task | Message | Event
     metadata: dict[str, _t.Any] | None = None
-    
-    class Config:
-        arbitrary_types_allowed = True
 
 
-@dataclass
-class RunConfig:
+class RunConfig(BaseModel):
     """Budget constraints and agent configuration."""
     turn_budget: int | None = None         # Maximum planning turns
     token_budget: int | None = None        # Maximum tokens
@@ -215,8 +217,7 @@ class RunConfig:
         return False, ""
 
 
-@dataclass
-class Metrics:
+class Metrics(BaseModel):
     """Performance and usage metrics."""
     iterations: int = 0
     input_token_used: int = 0
@@ -271,16 +272,16 @@ class Metrics:
 # Internal - Planner.next(State) -> Steps
 # =============================================================================
 
-@dataclass
-class State:
+class State(BaseModel):
     """Comprehensive state containing all context for planning and execution."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     ## Static members that are set once and never change duration the task
     session_id: str
     agent_id: str = ""
-    config: RunConfig = field(default_factory=RunConfig)
-    tools: list["Tool"] = field(default_factory=list)  # Tool objects from base.py
-    created_at: datetime = field(default_factory=datetime.now)
+    config: RunConfig = Field(default_factory=RunConfig)
+    tools: list["Tool"] = Field(default_factory=list)  # Tool objects from base.py
+    created_at: datetime = Field(default_factory=datetime.now)
 
     ## Dynamic updated members
 
@@ -291,18 +292,17 @@ class State:
     turn_count: int = 0  # Track number of planning turns
     
     # Memory references (readonly)
-    pending: list[Message] = field(default_factory=list)
-    history: list[Message] = field(default_factory=list)
+    pending: list[Message] = Field(default_factory=list)
+    history: list[Message] = Field(default_factory=list)
     artifact_ref: "ArtifactService | None" = None  # Readonly reference
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
     
     # Performance metrics
-    metrics: Metrics = field(default_factory=Metrics)    
+    metrics: Metrics = Field(default_factory=Metrics)
+    
+    # Last tool results for context
+    last_tool_results: list[_t.Any] = Field(default_factory=list)
 
-
-# =============================================================================
-# Enhanced Step Types (A2A Compatible)
-# =============================================================================
 
 class StepType(Enum):
     """Types of steps a planner can emit."""
@@ -313,21 +313,21 @@ class StepType(Enum):
     FINISH = "finish"        # Task completion
 
 
-@dataclass
-class Step:
+class Step(BaseModel):
     """Enhanced base class for all planner steps - supports both Message and Event content."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     step_id: str
     step_type: StepType
-    created_at: datetime = field(default_factory=datetime.now)
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.now)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
     
     # Content fields - can contain multiple types
     message: Message | None = None              # A2A Message content
     event: Event | None = None                  # A2A Event or Internal Event content
     thinking: str | None = None                 # Internal reasoning
-    
 
-@dataclass
+
 class MessageStep(Step):
     """A2A compatible message step with enhanced support for mixed content."""
     is_streaming: bool = False
@@ -352,7 +352,6 @@ class MessageStep(Step):
                     yield text[i:i + chunk_size]
 
 
-@dataclass
 class ToolCallStep(Step):
     """Step for executing a tool call with enhanced result handling."""
     step_type: StepType = StepType.TOOL_CALL
@@ -365,9 +364,7 @@ class ToolCallStep(Step):
         if self.tool_call.type != 'call':
             raise ValueError("ToolCallStep.tool_call must be a ToolUsePart with type='call'")
 
-    
 
-@dataclass
 class EventStep(Step):
     """Step for handling A2A events with enhanced content support."""
     step_type: StepType = StepType.EVENT
@@ -375,10 +372,8 @@ class EventStep(Step):
     def __post_init__(self):
         if self.event is None:
             raise ValueError("event is required for EventStep")
-    
 
 
-@dataclass 
 class ThinkStep(Step):
     """Step for internal agent thinking/reasoning."""
     step_type: StepType = StepType.THINK
@@ -388,7 +383,6 @@ class ThinkStep(Step):
             self.thinking = ""
 
 
-@dataclass
 class FinishStep(Step):
     """Step indicating task completion with enhanced content support."""
     step_type: StepType = StepType.FINISH
@@ -427,7 +421,13 @@ class FinishStep(Step):
         )
 
 
-# Legacy type aliases for backward compatibility
-ToolCall = ToolUsePart
-ToolCallResult = ToolUsePart
-TaskStatus = TaskState
+# =============================================================================
+# Base Planner interface
+# =============================================================================
+
+class Planner:
+    """Base planner interface."""
+    
+    async def next(self, state: State) -> _t.AsyncGenerator[Step, None]:
+        """Generate next steps based on current state."""
+        raise NotImplementedError("Subclasses must implement next method")

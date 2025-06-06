@@ -5,11 +5,11 @@ import asyncio
 import logging
 import time
 import typing as _t
-from dataclasses import dataclass, field
 from functools import wraps
 from urllib.parse import urlparse
 
 import httpx
+from pydantic import BaseModel, Field, ConfigDict
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 __all__ = [
@@ -54,9 +54,9 @@ class RequestTracer(abc.ABC):
         pass
 
 
-@dataclass
-class ClientConfig:
+class ClientConfig(BaseModel):
     """Configuration for the HTTP client."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     # Connection settings
     base_url: str = ""
@@ -71,14 +71,14 @@ class ClientConfig:
     max_retries: int = 3
     retry_min_wait: float = 1.0
     retry_max_wait: float = 10.0
-    retry_on_status_codes: list[int] = field(default_factory=lambda: [429, 500, 502, 503, 504])
+    retry_on_status_codes: list[int] = Field(default_factory=lambda: [429, 500, 502, 503, 504])
     
     # Logging and tracing
     log_level: int = logging.INFO
-    tracers: list[RequestTracer] = field(default_factory=list)
+    tracers: list[RequestTracer] = Field(default_factory=list)
     
     # Request settings
-    default_headers: dict[str, str] = field(default_factory=dict)
+    default_headers: dict[str, str] = Field(default_factory=dict)
     
     # Mode (local or remote)
     run_mode: str = "local"

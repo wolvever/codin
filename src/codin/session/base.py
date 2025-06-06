@@ -3,7 +3,9 @@
 import asyncio
 import typing as _t
 from datetime import datetime
-from dataclasses import dataclass, field
+
+from pydantic import BaseModel, Field, ConfigDict
+
 from ..agent.types import State
 
 
@@ -61,25 +63,25 @@ from ..memory.base import MemoryService, MemMemoryService
 from codin.replay.base import ReplayService
 
 
-@dataclass
-class Session:
+class Session(BaseModel):
     """Data-oriented session that holds conversation state and manages recording."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     session_id: str
-    created_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.now)
     
     # Core conversation data
-    messages: list[Message] = field(default_factory=list)
+    messages: list[dict] = Field(default_factory=list)  # Changed from Message to dict for now
     turn_count: int = 0
-    task_list: dict[str, list[str]] = field(default_factory=lambda: {"completed": [], "pending": []})
+    task_list: dict[str, list[str]] = Field(default_factory=lambda: {"completed": [], "pending": []})
     
     # Execution metrics
-    metrics: dict[str, _t.Any] = field(default_factory=dict)
-    context: dict[str, _t.Any] = field(default_factory=dict)
+    metrics: dict[str, _t.Any] = Field(default_factory=dict)
+    context: dict[str, _t.Any] = Field(default_factory=dict)
     
     # Optional external systems
-    memory_system: MemoryService | None = None
-    rollout_recorder: _t.Any = None  # For audit trail - type depends on implementation
+    memory_system: _t.Any | None = None  # Changed to Any to avoid import issues
+    rollout_recorder: _t.Any | None = None  # For audit trail - type depends on implementation
     
     def __post_init__(self):
         """Initialize default metrics."""
@@ -93,7 +95,7 @@ class Session:
                 "last_activity": self.created_at.timestamp()
             }
     
-    async def record(self, message: Message) -> None:
+    async def record(self, message: dict) -> None:  # Changed from Message to dict
         """Record a message to both internal state and external systems (Codex-inspired)."""
         # Update internal state
         self.messages.append(message)

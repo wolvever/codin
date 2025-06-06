@@ -23,7 +23,8 @@ from ..agent.code_agent import CodeAgent
 from ..model.factory import LLMFactory
 from ..agent.base import AgentRunInput
 from ..sandbox import LocalSandbox
-from ..tool.base import ApprovalMode, Toolset
+from ..tool.base import Toolset
+from ..config import ApprovalMode
 from .utils import create_mcp_toolsets_from_config
 
 # Use a2a types instead of internal protocol types

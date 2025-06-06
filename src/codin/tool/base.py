@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import typing as _t
 import pydantic as _pyd
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 import enum
 import json
 
@@ -15,21 +15,14 @@ __all__ = [
     "Toolset",
     "ToolSpec",
     "ToolDefinition",
-    "ApprovalMode",
     "LifecycleState",
 ]
 
 
-class ApprovalMode(str, enum.Enum):
-    """Unified approval mode for tool execution and CLI."""
-    ALWAYS = "always"           # Always ask for approval (same as SUGGEST)
-    UNSAFE_ONLY = "unsafe_only" # Only ask for potentially unsafe operations (same as AUTO_EDIT)
-    NEVER = "never"             # Never ask, auto-approve everything (same as FULL_AUTO)
-
-
-@dataclass(frozen=True)
-class ToolDefinition:
+class ToolDefinition(BaseModel):
     """Tool definition for LLM function calling."""
+    model_config = ConfigDict(frozen=True)
+    
     name: str
     description: str
     parameters: dict[str, _t.Any]

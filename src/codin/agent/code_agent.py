@@ -35,12 +35,14 @@ from pydantic import BaseModel
 # Use a2a types directly
 from a2a.types import Role
 from .types import Message, TextPart
-from ..agent.base import Agent, AgentRunInput, AgentRunOutput, ToolCall, ToolCallResult
+from ..agent.base import Agent, AgentRunInput, AgentRunOutput
+from ..agent.types import ToolCall, ToolCallResult
 from ..model.base import BaseLLM
 from ..model.factory import LLMFactory
 from ..sandbox.base import Sandbox
 from ..sandbox.local import LocalSandbox
-from ..tool.base import ToolContext, Tool, ToolDefinition, ApprovalMode, to_tool_definitions, Toolset
+from ..tool.base import ToolContext, Tool, ToolDefinition, to_tool_definitions, Toolset
+from ..config import ApprovalMode
 from ..tool.registry import ToolRegistry
 from ..tool.executor import ToolExecutor
 from ..tool.core_tools import RunShellTool, CoreToolset

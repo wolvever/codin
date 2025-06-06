@@ -3,22 +3,24 @@
 import asyncio
 import typing as _t
 from datetime import datetime
-from dataclasses import dataclass, field
+
 from abc import ABC, abstractmethod
+from pydantic import BaseModel, Field, ConfigDict
 
 from a2a.types import Message
 
 __all__ = ["Mailbox", "AsyncMailbox", "LocalAsyncMailbox", "MailboxMessage"]
 
 
-@dataclass
-class MailboxMessage:
+class MailboxMessage(BaseModel):
     """Message wrapper for mailbox delivery."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     message: Message
     sender_id: str
     recipient_id: str
-    timestamp: datetime = field(default_factory=datetime.now)
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
 
 
 class Mailbox(ABC):

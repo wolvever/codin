@@ -5,12 +5,13 @@ import uuid
 import asyncio
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 from a2a.types import Message, Role, TextPart
 
-from .actor_mngr import ActorManager
+from .scheduler import ActorScheduler
 from .mailbox import Mailbox
 
 if _t.TYPE_CHECKING:
@@ -20,24 +21,22 @@ if _t.TYPE_CHECKING:
 __all__ = ["Dispatcher", "LocalDispatcher", "DispatchRequest", "DispatchResult"]
 
 
-@dataclass
-class DispatchRequest:
+class DispatchRequest(BaseModel):
     """Request for dispatching work to agents."""
     request_id: str
     a2a_request: dict[str, _t.Any]
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.now)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.now)
 
 
-@dataclass 
-class DispatchResult:
+class DispatchResult(BaseModel):
     """Result from dispatching work to agents."""
     runner_id: str
     request_id: str
     status: str  # "started", "completed", "failed"
-    agents: list[str] = field(default_factory=list)  # Agent IDs involved
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.now)
+    agents: list[str] = Field(default_factory=list)  # Agent IDs involved
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.now)
 
 
 class Dispatcher(ABC):
@@ -67,7 +66,7 @@ class Dispatcher(ABC):
 class LocalDispatcher(Dispatcher):
     """Local implementation of dispatcher using asyncio."""
     
-    def __init__(self, actor_manager: ActorManager):
+    def __init__(self, actor_manager: ActorScheduler):
         self.actor_manager = actor_manager
         self._active_runs: dict[str, DispatchResult] = {}
         self._run_tasks: dict[str, asyncio.Task] = {}

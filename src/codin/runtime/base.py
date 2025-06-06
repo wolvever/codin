@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import enum
 import typing as _t
 from abc import ABC, abstractmethod
+
+from pydantic import BaseModel, ConfigDict
 
 __all__ = [
     "WorkloadType",
@@ -24,8 +25,7 @@ class WorkloadType(str, enum.Enum):
     ENDPOINT = "endpoint"
 
 
-@dataclasses.dataclass(slots=True)
-class Workload:
+class Workload(BaseModel):
     """Description of an executable workload.
 
     Depending on *kind*, one of the following fields must be provided:
@@ -34,6 +34,7 @@ class Workload:
       • CONTAINER: ``image``
       • ENDPOINT: ``url``
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     kind: WorkloadType
     callable: _t.Callable | None = None
@@ -46,9 +47,9 @@ class Workload:
     working_dir: str | None = None
 
 
-@dataclasses.dataclass(slots=True)
-class RuntimeResult:
+class RuntimeResult(BaseModel):
     """Return payload from a Runtime execution."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     success: bool
     output: str | bytes | _t.Any = ""

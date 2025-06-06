@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import typing as _t
-from dataclasses import dataclass
 
 from .base import PromptTemplate, PromptVariant
 from .storage import StorageBackend, get_storage_backend

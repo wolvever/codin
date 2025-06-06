@@ -1,7 +1,7 @@
 """Actor module for inter-agent communication."""
 
 from .mailbox import Mailbox, AsyncMailbox, LocalAsyncMailbox, MailboxMessage
-from .actor_mngr import ActorManager, LocalActorManager, ActorInfo
+from .scheduler import ActorScheduler, LocalActorManager, ActorInfo
 from .dispatcher import Dispatcher, LocalDispatcher, DispatchRequest, DispatchResult
 
 __all__ = [
@@ -12,7 +12,7 @@ __all__ = [
     "MailboxMessage",
     
     # Actor manager types
-    "ActorManager",
+    "ActorScheduler",
     "LocalActorManager", 
     "ActorInfo",
     

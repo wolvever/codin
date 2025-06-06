@@ -1,20 +1,19 @@
-"""Types for DAG-based planning and execution.
+"""DAG-based task planning types."""
 
-This module defines the core data types used by the DAG-based planning and execution system,
-which represents coding tasks as directed acyclic graphs (DAGs) of subtasks.
-"""
-
-from __future__ import annotations
-
-import json
-import uuid
-from dataclasses import dataclass, field
-from enum import Enum
 import typing as _t
 from datetime import datetime
+from enum import Enum
 
-# from ..protocol import Artifact  # TODO: Define Artifact in protocol
+from pydantic import BaseModel, Field, ConfigDict
+
 from ..id import new_id
+
+__all__ = [
+    "TaskStatus",
+    "Task", 
+    "Plan",
+    "PlanResult",
+]
 
 
 class TaskStatus(str, Enum):
@@ -27,8 +26,7 @@ class TaskStatus(str, Enum):
     SKIPPED = "skipped"
 
 
-@dataclass
-class Task:
+class Task(BaseModel):
     """
     A task in a DAG plan.
     
@@ -40,31 +38,34 @@ class Task:
     - Dependencies on other tasks (stored in requires)
     - Status tracking
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     id: str
     name: str
     description: str
     tool: str = ""
-    parameters: _t.Dict[str, _t.Any] = field(default_factory=dict)
-    requires: _t.List[str] = field(default_factory=list)  # Task dependencies
+    parameters: _t.Dict[str, _t.Any] = Field(default_factory=dict)
+    requires: _t.List[str] = Field(default_factory=list)  # Task dependencies
     status: TaskStatus = TaskStatus.PENDING
     result: _t.Any = None
     error_message: str | None = None
     error: _t.Optional[str] = None  # For backwards compatibility
-    _plan: _t.Optional['Plan'] = field(default=None, repr=False, compare=False)
+    plan_ref: _t.Optional['Plan'] = Field(default=None, repr=False, exclude=True)
     depends_on_results: bool = False  # Whether this task needs results from dependencies
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: datetime | None = None
     completed_at: datetime | None = None
-    input_data: dict[str, _t.Any] = field(default_factory=dict)
-    output_data: dict[str, _t.Any] = field(default_factory=dict)
-    artifacts: list[dict] = field(default_factory=list)  # TODO: Use Artifact type
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    input_data: dict[str, _t.Any] = Field(default_factory=dict)
+    output_data: dict[str, _t.Any] = Field(default_factory=dict)
+    artifacts: list[dict] = Field(default_factory=list)  # TODO: Use Artifact type
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
     
-    def __post_init__(self) -> None:
+    def __init__(self, **data):
         """Initialize task with proper defaults."""
-        if not self.id:
-            self.id = new_id(prefix="task")
+        if not data.get('id'):
+            data['id'] = new_id(prefix="task")
+        
+        super().__init__(**data)
         
         # Sync error fields
         if self.error and not self.error_message:
@@ -145,11 +146,11 @@ class Task:
             return False
             
         # Check dependencies
-        if not self._plan:
+        if not self.plan_ref:
             return len(self.requires) == 0
             
         for dep_id in self.requires:
-            dep_task = self._plan.get_task(dep_id)
+            dep_task = self.plan_ref.get_task(dep_id)
             if not dep_task or dep_task.status != TaskStatus.COMPLETED:
                 return False
                 
@@ -183,7 +184,7 @@ class Task:
         }
     
     @classmethod
-    def from_dict(cls, data: dict[str, _t.Any]) -> Task:
+    def from_dict(cls, data: dict[str, _t.Any]) -> "Task":
         """Create from dictionary after deserialization."""
         task_data = data.copy()
         
@@ -214,30 +215,31 @@ class Task:
         return cls(**task_data)
 
 
-@dataclass
-class Plan:
+class Plan(BaseModel):
     """
     A DAG plan consisting of multiple tasks with dependencies.
     
     The plan stores tasks and manages their relationships and execution state.
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
-    id: str = field(default_factory=lambda: new_id(prefix="plan"))
+    id: str = Field(default_factory=lambda: new_id(prefix="plan"))
     name: str = "DAG Plan"
     description: str = "A directed acyclic graph task plan"
-    tasks: dict[str, Task] = field(default_factory=dict)
+    tasks: dict[str, Task] = Field(default_factory=dict)
     status: TaskStatus = TaskStatus.PENDING
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: datetime | None = None
     completed_at: datetime | None = None
-    artifacts: list[Artifact] = field(default_factory=list)
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    artifacts: list[dict] = Field(default_factory=list)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
     
-    def __post_init__(self) -> None:
+    def __init__(self, **data):
         """Initialize plan with proper defaults and back-references."""
+        super().__init__(**data)
         # Set back reference to plan in each task
         for _, task in self.tasks.items():
-            task._plan = self
+            task.plan_ref = self
     
     def add_task(self, task: Task) -> None:
         """
@@ -246,7 +248,7 @@ class Plan:
         Args:
             task: The task to add
         """
-        task._plan = self
+        task.plan_ref = self
         self.tasks[task.id] = task
     
     def get_task(self, task_id: str) -> _t.Optional[Task]:
@@ -400,7 +402,7 @@ class Plan:
         }
     
     @classmethod
-    def from_dict(cls, data: dict[str, _t.Any]) -> Plan:
+    def from_dict(cls, data: dict[str, _t.Any]) -> "Plan":
         """Create from dictionary after deserialization."""
         plan_data = data.copy()
         
@@ -423,8 +425,7 @@ class Plan:
         return cls(**plan_data)
 
 
-@dataclass
-class PlanResult:
+class PlanResult(BaseModel):
     """Result of plan execution."""
     
     plan: Plan

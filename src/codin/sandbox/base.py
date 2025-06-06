@@ -16,8 +16,9 @@ from __future__ import annotations
 import typing as _t
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
+
+from pydantic import BaseModel
 
 from ..lifecycle import LifecycleMixin
 
@@ -32,8 +33,7 @@ logger = logging.getLogger(__name__)
 # Common data-structures
 # ---------------------------------------------------------------------------
 
-@dataclass
-class ExecResult:
+class ExecResult(BaseModel):
     """Result of executing a command in a sandbox."""
 
     stdout: str

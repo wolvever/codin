@@ -8,7 +8,7 @@ from a2a.types import Message, Role, TextPart
 
 from codin.actor import (
     Mailbox, LocalAsyncMailbox, MailboxMessage,
-    ActorManager, LocalActorManager, ActorInfo,
+    ActorScheduler, LocalActorManager, ActorInfo,
     Dispatcher, LocalDispatcher
 )
 from codin.agent.types import ControlSignal, RunnerControl, RunnerInput

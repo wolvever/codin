@@ -53,9 +53,10 @@ class BaseAgent(Agent):
     def __init__(
         self,
         *,
+        agent_id: str | None = None,
         name: str = "BaseAgent",
         description: str = "Agent using codin architecture",
-        agent_id: str | None = None,
+        version: str | None = None,
         planner: Planner,
         memory: Memory | None = None,
         tools: list[Tool] | None = None,
@@ -65,25 +66,13 @@ class BaseAgent(Agent):
         debug: bool = False,
         **kwargs
     ):
-        super().__init__(name=name, description=description, tools=tools or [], **kwargs)
-        self.agent_id = agent_id or f"agent_{uuid.uuid4().hex[:8]}"
+        super().__init__(id=agent_id, name=name, description=description, version=version, tools=tools or [], **kwargs)
         self.planner = planner
-        
-        # Simple memory - default to in-memory implementation
         self.memory = memory or MemMemoryService()
-        
-        # Tools from tool system
         self.tools = tools or []
-        
-        # Optional LLM for direct model calls (alternative to prompt_run)
         self.llm = llm
-        
-        # Bidirectional mailbox for events and inter-agent communication
         self.mailbox = mailbox or LocalAsyncMailbox(self.agent_id)
-        
-        self.default_config = default_config or RunConfig(
-            turn_budget=100, token_budget=100000, cost_budget=10.0, time_budget=300.0
-        )
+        self.default_config = default_config
         self.debug = debug
         
         # State for control handling

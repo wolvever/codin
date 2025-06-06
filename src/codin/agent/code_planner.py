@@ -1,21 +1,20 @@
 import asyncio
 import json
 import logging
+import re
 import uuid
 import typing as _t
 from datetime import datetime
-from dataclasses import dataclass
+
+from pydantic import BaseModel
 
 from a2a.types import Message, Role, TextPart
 
-from .types import ToolCall
-from .base import Planner
-from .types import Step, StepType, ThinkStep, MessageStep, ToolCallStep, FinishStep, State
-from ..model.base import BaseLLM
-from ..model.factory import LLMFactory
+from .types import Planner, State, Step, ThinkStep, ToolCallStep, MessageStep, FinishStep, ToolCall
+from ..model.factory import LLMFactory, BaseLLM
+from ..prompt.run import prompt_run
 from ..tool.base import to_tool_definitions
 from ..tool.registry import ToolRegistry
-from ..prompt import prompt_run
 
 __all__ = [
     "CodePlanner",
@@ -25,8 +24,7 @@ __all__ = [
 logger = logging.getLogger("codin.agent.code_planner")
 
 
-@dataclass
-class CodePlannerConfig:
+class CodePlannerConfig(BaseModel):
     """Configuration for CodePlanner."""
     model: str = "gpt-4"
     max_tokens: int = 4000
@@ -258,7 +256,6 @@ class CodePlanner(Planner):
         }
         
         # Try to extract JSON from markdown code blocks first
-        import re
         json_pattern = r'```json\s*(\{.*?\})\s*```'
         json_matches = re.findall(json_pattern, content, re.DOTALL)
         
@@ -312,7 +309,6 @@ class CodePlanner(Planner):
         tool_calls = []
         
         # Pattern for function call tags
-        import re
         pattern = r'<function_call name="([^"]+)">\s*(\{.*?\})\s*</function_call>'
         matches = re.findall(pattern, content, re.DOTALL)
         

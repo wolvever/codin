@@ -7,6 +7,13 @@ from enum import Enum
 
 from a2a.types import Message, TextPart, Role
 
+__all__ = [
+    "ChunkType",
+    "MemoryChunk", 
+    "Memory",
+    "MemoryService",  # Alias for backward compatibility
+    "MemMemoryService",
+]
 
 class ChunkType(str, Enum):
     """Types of memory chunks for different content categories."""
@@ -467,4 +474,8 @@ class MemMemoryService(Memory):
             self._chunks.setdefault(session_id, []).append(chunk)
         
         return chunks
+
+
+# Backward compatibility alias
+MemoryService = Memory
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import time
 import typing as _t
-from dataclasses import dataclass, field
+
+from pydantic import BaseModel, Field
 
 from .base import RequestTracer
 
@@ -33,8 +34,7 @@ class LoggingTracer(RequestTracer):
         logger.log(logging.ERROR, f"Failed {method} request to {url} after {elapsed:.3f}s: {str(error)}")
 
 
-@dataclass
-class RequestMetrics:
+class RequestMetrics(BaseModel):
     """Metrics for HTTP requests."""
     
     total_requests: int = 0
@@ -43,7 +43,7 @@ class RequestMetrics:
     total_time: float = 0.0
     
     # Status code counters
-    status_codes: dict[int, int] = field(default_factory=dict)
+    status_codes: dict[int, int] = Field(default_factory=dict)
     
     # Timing stats
     min_time: float = float('inf')
@@ -105,8 +105,7 @@ class MetricsTracer(RequestTracer):
         self.metrics = RequestMetrics()
 
 
-@dataclass
-class RequestRecord:
+class RequestRecord(BaseModel):
     """Record of a single HTTP request."""
     
     method: str

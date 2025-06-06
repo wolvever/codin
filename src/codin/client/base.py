@@ -1,3 +1,10 @@
+"""HTTP client with retry, logging, and tracing support.
+
+This module provides a robust HTTP client built on httpx with features including
+automatic retries with exponential backoff, request/response logging, tracing
+for metrics and debugging, and configurable timeouts and authentication.
+"""
+
 from __future__ import annotations
 
 import abc

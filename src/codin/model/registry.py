@@ -1,3 +1,10 @@
+"""Model registry for automatic model resolution and instantiation.
+
+This module provides a registry system that allows automatic resolution
+of model names to their implementing classes using pattern matching.
+It supports LLMs, embedding models, and rerankers.
+"""
+
 from __future__ import annotations
 
 import functools

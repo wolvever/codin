@@ -1,3 +1,10 @@
+"""Base tool interfaces and abstractions.
+
+This module defines the core Tool and Toolset interfaces that all
+tool implementations must follow. It provides the foundation for
+tool execution with lifecycle management and schema validation.
+"""
+
 from __future__ import annotations
 
 import abc
@@ -41,6 +48,16 @@ class ToolContext:
         tool_call_id: str | None = None,
         metadata: dict[str, _t.Any] | None = None,
     ):
+        """Initialize tool execution context.
+        
+        Args:
+            tool_name: Name of the tool being executed
+            arguments: Arguments passed to the tool
+            session_id: Session identifier
+            fileids: List of file IDs associated with the execution
+            tool_call_id: Unique identifier for this tool call
+            metadata: Additional metadata for the execution
+        """
         self.tool_name = tool_name
         self.arguments = arguments or {}
         self.session_id = session_id
@@ -60,6 +77,15 @@ class Tool(LifecycleMixin):
         input_schema: _t.Optional[_t.Type[_pyd.BaseModel]] = None,
         is_generative: bool = False,
     ):
+        """Initialize a tool.
+        
+        Args:
+            name: Name of the tool
+            description: Description of what the tool does
+            version: Version of the tool
+            input_schema: Pydantic model for input validation
+            is_generative: Whether the tool generates streaming output
+        """
         super().__init__()
         self.name = name
         self.description = description
@@ -164,6 +190,13 @@ class Toolset(LifecycleMixin):
         description: str,
         tools: _t.Optional[_t.List[Tool]] = None,
     ):
+        """Initialize a toolset.
+        
+        Args:
+            name: Name of the toolset
+            description: Description of the toolset
+            tools: List of tools in this toolset
+        """
         super().__init__()
         self.name = name
         self.description = description

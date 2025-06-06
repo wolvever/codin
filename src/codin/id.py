@@ -1,3 +1,9 @@
+"""ID generation utilities for the codin framework.
+
+This module provides functions for generating unique identifiers
+with customizable prefixes and lengths.
+"""
+
 def new_id(prefix: str, length: int = 8) -> str:
     """Create a random prefix of specified length using alphanumeric characters.
     

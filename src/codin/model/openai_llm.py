@@ -1,3 +1,10 @@
+"""OpenAI LLM implementation with streaming and tool calling support.
+
+This module provides an OpenAI-compatible LLM implementation that supports
+both streaming and non-streaming generation, function/tool calling, and
+works with OpenAI API and compatible services like Azure OpenAI.
+"""
+
 from __future__ import annotations
 
 import asyncio

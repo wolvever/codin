@@ -1,3 +1,10 @@
+"""Memory system interfaces and implementations.
+
+This module provides the core memory abstractions for storing and retrieving
+conversation history, memory chunks, and contextual information. It supports
+A2A Message format and provides both abstract interfaces and in-memory implementations.
+"""
+
 import abc
 import typing as _t
 import uuid
@@ -39,6 +46,11 @@ class MemoryChunk(BaseModel):
     content: str
 
     def __init__(self, **data):
+        """Initialize a memory chunk with content processing.
+        
+        Args:
+            **data: Keyword arguments including content and other chunk fields
+        """
         content = data.pop('content', None)
         super().__init__(**data)
         
@@ -192,6 +204,7 @@ class MemMemoryService(Memory):
     """In-memory implementation of Memory with A2A Message support."""
     
     def __init__(self):
+        """Initialize an in-memory memory service."""
         self._messages: dict[str, list[Message]] = {}
         self._chunks: dict[str, list[MemoryChunk]] = {}
         self._chunk_creator: _t.Callable[[list[Message]], _t.Awaitable[list[MemoryChunk]]] | None = None

@@ -1,3 +1,10 @@
+"""Base agent implementation using codin architecture components.
+
+This module provides a simplified agent implementation that uses the codin
+architecture including prompt_run() for LLM interactions, Memory for conversation
+history, Tools for capabilities, and bidirectional mailbox for communication.
+"""
+
 import asyncio
 import logging
 import time

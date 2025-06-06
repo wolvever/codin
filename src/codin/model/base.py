@@ -1,3 +1,10 @@
+"""Base model interfaces and abstractions.
+
+This module defines the core model interfaces for LLMs, embeddings, and rerankers.
+It provides the foundation for implementing different model providers with
+consistent APIs and type safety.
+"""
+
 from __future__ import annotations
 
 import abc

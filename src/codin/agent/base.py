@@ -1,3 +1,10 @@
+"""Base agent interfaces and abstractions.
+
+This module defines the core Agent and Planner interfaces that all
+agent implementations must follow. It provides the foundation for
+A2A-compatible agents with structured execution patterns.
+"""
+
 import abc
 import typing as _t
 from datetime import datetime

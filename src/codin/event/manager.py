@@ -1,3 +1,10 @@
+"""Task management and event processing system.
+
+This module provides a task manager that handles task submission, scheduling,
+and execution with observability features including OpenTelemetry and Prometheus
+metrics. It supports FIFO task processing and agent coordination.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -108,6 +115,7 @@ class TaskManager:
     """Simple FIFO task scheduler & event bus for agents (MVP)."""
 
     def __init__(self):
+        """Initialize a task manager with empty queues and metrics."""
         self._queue: deque[tuple[Task, Agent]] = deque()
         self._lock = asyncio.Lock()
         self._running_tasks: dict[str, tuple[Task, Agent, datetime]] = {}

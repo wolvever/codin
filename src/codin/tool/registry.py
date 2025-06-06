@@ -1,3 +1,10 @@
+"""Tool registry for managing and discovering tools.
+
+This module provides a centralized registry for tools and toolsets,
+supporting loading from various sources including filesystem and HTTP endpoints.
+It handles tool name resolution, conflict detection, and lifecycle management.
+"""
+
 import logging
 import typing as _t
 import asyncio

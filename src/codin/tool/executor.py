@@ -1,3 +1,10 @@
+"""Tool execution engine with observability and lifecycle management.
+
+This module provides a robust tool executor that handles tool execution
+with cross-cutting concerns including metrics, tracing, retries, concurrency
+control, and approval workflows.
+"""
+
 from __future__ import annotations
 
 import typing as _t

@@ -81,9 +81,9 @@ class LocalActorManager(ActorScheduler):
         else:
             # Default agent creation - import here to avoid circular import
             from ..agent.base_agent import BaseAgent
-            from ..agent.code_planner import CodePlanner
+            from ..agent.base_planner import BasePlanner
 
-            planner = CodePlanner()
+            planner = BasePlanner()
             agent = BaseAgent(name=f'{actor_type}-{key}', agent_id=actor_id, planner=planner)
 
         # Store actor info

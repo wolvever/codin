@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Prompt registry for codin agents.
 
 This module provides a registry system for managing and discovering

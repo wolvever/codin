@@ -47,11 +47,11 @@ def get_base_agent():
     return BaseAgent
 
 
-def get_code_planner():
-    """Lazy import CodePlanner to avoid circular imports."""
-    from .code_planner import CodePlanner, CodePlannerConfig
+def get_base_planner():
+    """Lazy import BasePlanner to avoid circular imports."""
+    from .base_planner import BasePlanner, BasePlannerConfig
 
-    return CodePlanner, CodePlannerConfig
+    return BasePlanner, BasePlannerConfig
 
 
 def get_code_agent():
@@ -94,6 +94,6 @@ __all__ = [
     'Mailbox',
     # Lazy access functions
     'get_base_agent',
-    'get_code_planner',
+    'get_base_planner',
     'get_code_agent',
 ]

@@ -54,8 +54,8 @@ cd codin
 # Install with uv (recommended)
 uv sync
 
-# Or install with pip
-pip install -e .
+# Or install with pip (development mode)
+pip install -e .[dev]
 ```
 
 ## Environment Setup

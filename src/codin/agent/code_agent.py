@@ -958,7 +958,14 @@ class CodeAgent(Agent):
         iteration = 0
 
         await self._emit_event(
-            'task_start', {'task_id': task_id, 'user_input': self._extract_text_from_message(input_data.message)}
+            'task_start',
+            {
+                'task_id': task_id,
+                'session_id': self._context_id,
+                'iteration': 0,
+                'elapsed_time': 0.0,
+                'user_input': self._extract_text_from_message(input_data.message),
+            },
         )
 
         try:
@@ -1041,6 +1048,16 @@ class CodeAgent(Agent):
                 except Exception as e:
                     logger.warning(f'Failed to store conversation in memory: {e}')
 
+            await self._emit_event(
+                'task_end',
+                {
+                    'task_id': task_id,
+                    'session_id': self._context_id,
+                    'iteration': iteration,
+                    'elapsed_time': time.time() - self._start_time,
+                },
+            )
+
             return AgentRunOutput(
                 result=final_response,
                 metadata={
@@ -1058,6 +1075,15 @@ class CodeAgent(Agent):
 
             # Return error response
             error_response = self._create_agent_message(f'I encountered an error: {e!s}', task_id)
+            await self._emit_event(
+                'task_end',
+                {
+                    'task_id': task_id,
+                    'session_id': self._context_id,
+                    'iteration': iteration,
+                    'elapsed_time': time.time() - self._start_time,
+                },
+            )
             return AgentRunOutput(
                 result=error_response,
                 metadata={

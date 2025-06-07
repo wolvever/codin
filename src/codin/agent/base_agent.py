@@ -311,6 +311,15 @@ class BaseAgent(Agent):
         self, state: State, session_id: str, start_time: float
     ) -> _t.AsyncGenerator[AgentRunOutput]:
         """Execute planning loop with budget constraints and control handling."""
+
+        await self._emit_event(
+            'task_start',
+            {
+                'session_id': session_id,
+                'iteration': state.iteration,
+                'elapsed_time': 0.0,
+            },
+        )
         while state.iteration < (state.config.turn_budget or 100):
             # Check for control messages and handle pause/cancel states
             should_continue = await self.check_inbox_for_control()
@@ -437,6 +446,15 @@ class BaseAgent(Agent):
                     id=str(uuid.uuid4()), result=error_msg, metadata={'error': str(e), 'agent_id': self.id}
                 )
                 break
+
+        await self._emit_event(
+            'task_end',
+            {
+                'session_id': session_id,
+                'iteration': state.iteration,
+                'elapsed_time': time.time() - start_time,
+            },
+        )
 
     async def _execute_step(self, step: Step, state: State, session_id: str) -> _t.AsyncGenerator[AgentRunOutput]:
         """Execute step using codin components and send outputs to mailbox."""

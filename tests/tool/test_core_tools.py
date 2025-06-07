@@ -198,7 +198,7 @@ async def test_edit_file_tool(sandbox_toolset, sandbox, tool_context):
 
 
 @pytest.mark.asyncio
-async def test_search_replace_tool(sandbox, tool_context):
+async def test_search_replace_tool(sandbox_toolset, sandbox, tool_context):
     """Test SearchReplaceTool functionality."""
     # Create a test file
     await sandbox.write_file("test_replace.txt", "Line 1\nLine 2\nLine 3")

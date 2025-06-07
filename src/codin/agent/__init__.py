@@ -11,6 +11,7 @@ from ..model.base import BaseLLM
 from ..tool.base import Tool
 from .base import Agent, Planner
 from .runner import AgentRunner
+from .concurrent_runner import ConcurrentRunner
 
 # Import new architecture types
 from .types import (
@@ -90,8 +91,10 @@ __all__ = [
     'BaseLLM',
     'Tool',
     'AgentRunner',
+    'ConcurrentRunner',
     # Lazy access functions
     'get_base_agent',
     'get_base_planner',
     'get_code_agent',
 ]
+

@@ -95,8 +95,16 @@ class MemMemoryService(Memory):
         session_id = message.contextId or self._current_session_id or "default"
         self._messages.setdefault(session_id, []).append(message)
 
-    async def get_history(self, limit: int = 50, query: str | None = None) -> list[Message]:
-        session_id = self._current_session_id or "default"
+    async def get_history(
+        self, session_id: str | None = None, *, limit: int = 50, query: str | None = None
+    ) -> list[Message]:
+        """Return conversation history for *session_id*.
+
+        ``session_id`` is optional for backward compatibility. When omitted,
+        the currently active session is used.
+        """
+
+        session_id = session_id or self._current_session_id or "default"
         messages = self._messages.get(session_id, [])
         recent_messages = messages[-limit:]
         if query:
@@ -137,6 +145,26 @@ class MemMemoryService(Memory):
             return len(chunks) if chunks else 0
         except Exception:
             return 0
+
+    # ------------------------------------------------------------------
+    # Convenience wrappers used in tests
+    # ------------------------------------------------------------------
+    async def create_memory_chunk(
+        self,
+        session_id: str,
+        messages: list[Message],
+        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None,
+    ) -> list[MemoryChunk]:
+        """Public wrapper for legacy chunk creation."""
+
+        return await self._create_memory_chunk_legacy(session_id, messages, llm_summarizer)
+
+    async def search_memory_chunks(
+        self, session_id: str, query: str, limit: int = 5
+    ) -> list[MemoryChunk]:
+        """Alias for :meth:`search_chunk` for backward compatibility."""
+
+        return await self.search_chunk(session_id, query, limit)
 
     async def search_chunk(self, session_id: str, query: str, limit: int = 5) -> list[MemoryChunk]:
         if self._index:

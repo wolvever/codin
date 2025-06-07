@@ -123,7 +123,7 @@ class LocalSandbox(Sandbox):
     async def _install_dependencies(self, dependencies: list[str], language: str) -> ExecResult:
         """Install dependencies for the given language."""
         if not dependencies:
-            return ExecResult('', '', 0)
+            return ExecResult(stdout='', stderr='', exit_code=0)
 
         language = language.lower()
 
@@ -138,9 +138,9 @@ class LocalSandbox(Sandbox):
             cmd = ['go', 'get'] + dependencies
         elif language == 'rust':
             # For Rust, dependencies should be in Cargo.toml
-            return ExecResult('', 'Rust dependencies should be specified in Cargo.toml', 1)
+            return ExecResult(stdout='', stderr='Rust dependencies should be specified in Cargo.toml', exit_code=1)
         else:
-            return ExecResult('', f'Dependency installation not supported for {language}', 1)
+            return ExecResult(stdout='', stderr=f'Dependency installation not supported for {language}', exit_code=1)
 
         return await self.run_cmd(cmd)
 
@@ -202,11 +202,11 @@ class LocalSandbox(Sandbox):
                 )
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
-                return ExecResult(stdout, stderr, exit_code=proc.returncode)
+                return ExecResult(stdout=stdout, stderr=stderr, exit_code=proc.returncode)
             except subprocess.TimeoutExpired:
                 proc.kill()
                 stdout, stderr = proc.communicate()
-                return ExecResult(stdout, stderr, exit_code=-1)
+                return ExecResult(stdout=stdout, stderr=stderr, exit_code=-1)
 
         # Run the blocking operation in a thread pool
         return await loop.run_in_executor(None, _run_subprocess)
@@ -223,17 +223,19 @@ class LocalSandbox(Sandbox):
     ) -> ExecResult:
         """Execute code in the sandbox."""
         if not code and not file_path:
-            return ExecResult('', 'Either code or file_path must be provided', 1)
+            return ExecResult(stdout='', stderr='Either code or file_path must be provided', exit_code=1)
 
         if code and file_path:
-            return ExecResult('', 'Cannot provide both code and file_path', 1)
+            return ExecResult(stdout='', stderr='Cannot provide both code and file_path', exit_code=1)
 
         # Install dependencies first if provided
         if dependencies:
             dep_result = await self._install_dependencies(dependencies, language)
             if dep_result.exit_code != 0:
                 return ExecResult(
-                    dep_result.stdout, f'Failed to install dependencies: {dep_result.stderr}', dep_result.exit_code
+                    stdout=dep_result.stdout,
+                    stderr=f'Failed to install dependencies: {dep_result.stderr}',
+                    exit_code=dep_result.exit_code,
                 )
 
         # Handle direct code execution
@@ -279,14 +281,14 @@ class LocalSandbox(Sandbox):
                 return await self.run_cmd(cmd, timeout=timeout, env=env)
 
             except (ValueError, NotImplementedError) as e:
-                return ExecResult('', str(e), 1)
+                return ExecResult(stdout='', stderr=str(e), exit_code=1)
 
         # Handle file path execution
         if file_path:
             file_path = Path(file_path)
 
             if not file_path.exists():
-                return ExecResult('', f'File not found: {file_path}', 1)
+                return ExecResult(stdout='', stderr=f'File not found: {file_path}', exit_code=1)
 
             # Create a temporary directory for execution
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -308,11 +310,15 @@ class LocalSandbox(Sandbox):
 
                             main_file = self._get_main_file_for_language(language, all_files)
                             if not main_file:
-                                return ExecResult('', f'No main file found for language {language}', 1)
+                                return ExecResult(
+                                    stdout='',
+                                    stderr=f'No main file found for language {language}',
+                                    exit_code=1,
+                                )
 
                             exec_path = temp_path / main_file
                         except zipfile.BadZipFile:
-                            return ExecResult('', f'Invalid zip file: {file_path}', 1)
+                            return ExecResult(stdout='', stderr=f'Invalid zip file: {file_path}', exit_code=1)
                     else:
                         # Copy single file
                         exec_path = temp_path / file_path.name
@@ -334,12 +340,12 @@ class LocalSandbox(Sandbox):
 
                     main_file = self._get_main_file_for_language(language, all_files)
                     if not main_file:
-                        return ExecResult('', f'No main file found for language {language}', 1)
+                        return ExecResult(stdout='', stderr=f'No main file found for language {language}', exit_code=1)
 
                     exec_path = search_path / main_file
 
                 else:
-                    return ExecResult('', f'Invalid file path: {file_path}', 1)
+                    return ExecResult(stdout='', stderr=f'Invalid file path: {file_path}', exit_code=1)
 
                 # Execute the file
                 try:
@@ -347,7 +353,7 @@ class LocalSandbox(Sandbox):
                     cmd = executor + [str(exec_path)]
                     return await self.run_cmd(cmd, cwd=str(exec_path.parent), timeout=timeout, env=env)
                 except (ValueError, NotImplementedError) as e:
-                    return ExecResult('', str(e), 1)
+                    return ExecResult(stdout='', stderr=str(e), exit_code=1)
 
     # Filesystem -----------------------------------------------------------
     def _abs(self, path: str) -> str:

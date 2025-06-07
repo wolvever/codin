@@ -147,19 +147,25 @@ class LocalDispatcher(Dispatcher):
             # Create message from A2A data
             message = self._create_message_from_a2a(message_data, context_id)
 
-            # Determine which agents to create (for now, create a single main agent)
+            # Determine which agents to create (allows override via attribute for tests)
             # In the future, this could parse the request to determine multiple agents
-            agents_to_create = [
-                ('main_agent', context_id),
-                # Could add: ("planner_agent", context_id), ("executor_agent", context_id)
-            ]
+            agents_to_create = getattr(
+                self,
+                'agents_to_create',
+                [
+                    ('main_agent', context_id),
+                    # Could add: ("planner_agent", context_id), ("executor_agent", context_id)
+                ],
+            )
 
             # Create agents through actor manager
             agents: list[Agent] = []
             for agent_type, key in agents_to_create:
                 agent = await self.actor_manager.acquire(agent_type, key)
                 agents.append(agent)
-                result.agents.append(agent.agent_id if hasattr(agent, 'agent_id') else f'{agent_type}:{key}')
+                result.agents.append(
+                    agent.agent_id if hasattr(agent, 'agent_id') else f'{agent_type}:{key}'
+                )
 
             # Create agent run input
             from ..agent.types import AgentRunInput
@@ -168,26 +174,30 @@ class LocalDispatcher(Dispatcher):
                 id=request.request_id, message=message, session_id=context_id, metadata=request.metadata
             )
 
-            # Run the main agent (could be extended to orchestrate multiple agents)
-            main_agent = agents[0]
-            async for output in main_agent.run(run_input):
-                # enqueue output for subscribers
-                await stream_queue.put(
-                    output.dict() if hasattr(output, 'dict') else str(output)
-                )
+            # Start runners for all agents and run them concurrently
+            from ..agent.runner import AgentRunner
+            from ..agent.concurrent_runner import ConcurrentRunner
 
-                # also keep history in metadata
-                if 'outputs' not in result.metadata:
-                    result.metadata['outputs'] = []
-                result.metadata['outputs'].append(
-                    {
-                        'timestamp': datetime.now().isoformat(),
-                        'output': output.dict() if hasattr(output, 'dict') else str(output),
-                    }
-                )
+            runner_group = ConcurrentRunner()
+            for agent in agents:
+                runner_group.add_runner(AgentRunner(agent))
 
-            # Mark as completed
-            result.status = 'completed'
+            await runner_group.start_all()
+
+            tasks = [
+                asyncio.create_task(self._run_agent(a, run_input, stream_queue, result))
+                for a in agents
+            ]
+            errors = await asyncio.gather(*tasks, return_exceptions=True)
+
+            await runner_group.stop_all()
+
+            exceptions = [e for e in errors if isinstance(e, Exception)]
+            if exceptions:
+                result.status = 'failed'
+                result.metadata['errors'] = [str(e) for e in exceptions]
+            else:
+                result.status = 'completed'
 
         except Exception as e:
             # Mark as failed
@@ -204,6 +214,28 @@ class LocalDispatcher(Dispatcher):
                 del self._run_tasks[result.runner_id]
             if result.runner_id in self._run_streams:
                 del self._run_streams[result.runner_id]
+
+    async def _run_agent(
+        self,
+        agent: 'Agent',
+        run_input: 'AgentRunInput',
+        stream_queue: asyncio.Queue,
+        result: DispatchResult,
+    ) -> None:
+        """Iterate over agent.run and enqueue outputs."""
+        async for output in agent.run(run_input):
+            await stream_queue.put(
+                output.dict() if hasattr(output, 'dict') else str(output)
+            )
+
+            if 'outputs' not in result.metadata:
+                result.metadata['outputs'] = []
+            result.metadata['outputs'].append(
+                {
+                    'timestamp': datetime.now().isoformat(),
+                    'output': output.dict() if hasattr(output, 'dict') else str(output),
+                }
+            )
 
     def _create_message_from_a2a(self, message_data: dict, context_id: str) -> Message:
         """Create a Message object from A2A message data."""

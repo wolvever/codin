@@ -64,9 +64,8 @@ class AgentRunner:
                 continue
 
             session_id = msg.contextId or f"session_{uuid.uuid4().hex[:8]}"
-            await self.session_manager.get_or_create_session(session_id)
-
-            agent_input = AgentRunInput(message=msg, session_id=session_id)
-            async for _ in self.agent.run(agent_input):
-                pass
-            await asyncio.sleep(0)
+            async with self.session_manager.session(session_id):
+                agent_input = AgentRunInput(message=msg, session_id=session_id)
+                async for _ in self.agent.run(agent_input):
+                    pass
+                await asyncio.sleep(0)

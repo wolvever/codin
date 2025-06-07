@@ -29,7 +29,13 @@ class DaytonaSandbox(Sandbox):
 
     BASE_URL = 'https://runner.api.daytona.io'  # TODO: make configurable
 
-    def __init__(self, workspace_id: str | None = None, api_key: str | None = None, *, env_policy: ShellEnvironmentPolicy | None = None):
+    def __init__(
+        self,
+        workspace_id: str | None = None,
+        api_key: str | None = None,
+        *,
+        env_policy: ShellEnvironmentPolicy | None = None,
+    ):
         super().__init__(env_policy=env_policy)
         import os
 

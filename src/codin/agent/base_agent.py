@@ -485,7 +485,11 @@ class BaseAgent(Agent):
                     yield AgentRunOutput(
                         id=step.step_id,
                         result=step.message,
-                        metadata={**step_output_metadata_base, 'step_type': 'message', 'is_streaming': step.is_streaming},
+                        metadata={
+                            **step_output_metadata_base,
+                            'step_type': 'message',
+                            'is_streaming': step.is_streaming,
+                        },
                     )
 
             elif step.step_type == StepType.EVENT and isinstance(step, EventStep) and step.event:

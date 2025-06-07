@@ -232,6 +232,17 @@ class BaseAgent(Agent):
                 id=str(uuid.uuid4()), result=error_message, metadata={'error': str(e), 'agent_id': self.id}
             )
 
+        finally:
+            await self.cleanup()
+            await self._emit_event(
+                'run_end',
+                {
+                    'agent_id': self.id,
+                    'session_id': session_id,
+                    'elapsed_time': time.time() - start_time,
+                },
+            )
+
     async def _build_state(self, session_id: str, input_data: AgentRunInput) -> State:
         """Build state using simple memory and components."""
         # Set the session ID in memory if it's MemMemoryService

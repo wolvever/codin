@@ -4,6 +4,7 @@ import pytest
 import codin.actor.supervisor as scheduler
 
 from codin.actor.dispatcher import LocalDispatcher
+from codin.actor.utils import make_message
 from codin.actor.supervisor import LocalActorManager, ActorInfo
 from codin.agent.base_agent import BaseAgent
 from codin.agent.base import Planner
@@ -38,14 +39,6 @@ async def factory(agent_type: str, key: str) -> BaseAgent:
     return SleepAgent(agent_id=f"{agent_type}:{key}", name=agent_type, description="d", planner=DummyPlanner())
 
 
-def message_converter(self, data: dict, ctx: str) -> Message:
-    return Message(
-        messageId=data.get("messageId"),
-        role=Role(data.get("role", "user")),
-        parts=[TextPart(text=data.get("parts", [{"text": ""}])[0]["text"])],
-        contextId=ctx,
-        kind="message",
-    )
 
 
 @pytest.mark.asyncio
@@ -54,7 +47,14 @@ async def test_multiple_agents_concurrent():
     ActorInfo.model_rebuild()
     manager = LocalActorManager(agent_factory=factory)
     dispatcher = LocalDispatcher(manager)
-    dispatcher._create_message_from_a2a = message_converter.__get__(dispatcher, LocalDispatcher)
+    msg_data = {
+        "messageId": "u1",
+        "role": "user",
+        "parts": [{"kind": "text", "text": "hi"}],
+        "kind": "message",
+    }
+    msg = make_message(msg_data, "ctx")
+    assert msg.messageId == "u1"
     dispatcher.agents_to_create = [("a1", "ctx"), ("a2", "ctx")]
 
     a2a_request = {

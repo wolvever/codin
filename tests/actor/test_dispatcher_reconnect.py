@@ -2,6 +2,7 @@ import asyncio
 import pytest
 
 from codin.actor.dispatcher import LocalDispatcher
+from codin.actor.utils import make_message
 from codin.actor.supervisor import LocalActorManager, ActorInfo
 import codin.actor.supervisor as scheduler
 from codin.agent.base_agent import BaseAgent
@@ -104,15 +105,6 @@ async def agent_factory(agent_type: str, key: str) -> BaseAgent:
     )
 
 
-def message_converter(self, data: dict, ctx: str) -> Message:
-    return Message(
-        messageId=data.get("messageId"),
-        role=Role(data.get("role", "user")),
-        parts=[TextPart(text=data.get("parts", [{"text": ""}])[0]["text"])],
-        contextId=ctx,
-        kind="message",
-    )
-
 
 @pytest.mark.asyncio
 async def test_dispatcher_reconnect():
@@ -120,7 +112,14 @@ async def test_dispatcher_reconnect():
     ActorInfo.model_rebuild()
     manager = LocalActorManager(agent_factory=agent_factory)
     dispatcher = LocalDispatcher(manager)
-    dispatcher._create_message_from_a2a = message_converter.__get__(dispatcher, LocalDispatcher)
+    msg_data = {
+        "messageId": "u1",
+        "role": "user",
+        "parts": [{"kind": "text", "text": "hi"}],
+        "kind": "message",
+    }
+    msg = make_message(msg_data, "c1")
+    assert msg.contextId == "c1"
 
     a2a_request = {
         "contextId": "c1",

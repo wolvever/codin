@@ -116,9 +116,9 @@ async def run_quiet_mode(
             async def debug_event_callback(event):
                 if event.event_type == "debug_llm_response":
                     debug_info = event.data
-                    print(f'🤖 LLM Response (Turn {debug_info["turn_count"]}):')
+                    print(f"🤖 LLM Response (Turn {debug_info['turn_count']}):")
                     print("-" * 60)
-                    print(f'📄 Raw content length: {debug_info["raw_content_length"]} characters')
+                    print(f"📄 Raw content length: {debug_info['raw_content_length']} characters")
 
                     thinking = debug_info.get("thinking")
                     if thinking:
@@ -132,12 +132,12 @@ async def run_quiet_mode(
                     else:
                         print("💬 Message: None")
 
-                    print(f'🔄 Should continue: {debug_info["should_continue"]}')
+                    print(f"🔄 Should continue: {debug_info['should_continue']}")
 
                     task_list = debug_info["task_list"]
                     print(
-                        f'📋 Task list - Completed: {task_list["completed_count"]}, '
-                        f'Pending: {task_list["pending_count"]}'
+                        f"📋 Task list - Completed: {task_list['completed_count']}, "
+                        f"Pending: {task_list['pending_count']}"
                     )
 
                     tool_calls = debug_info.get("tool_calls", [])
@@ -145,7 +145,7 @@ async def run_quiet_mode(
                         print(f"🔧 Tool calls: {len(tool_calls)}")
                         for i, tool_call in enumerate(tool_calls):
                             args_keys = tool_call.get("arguments_keys", [])
-                            print(f'  {i + 1}. {tool_call["name"]}({args_keys})')
+                            print(f"  {i + 1}. {tool_call['name']}({args_keys})")
                     else:
                         print("🔧 Tool calls: None")
 
@@ -167,9 +167,7 @@ async def run_quiet_mode(
             # Prepend instructions to the user message since a2a doesn't have a system role
             user_message_text = f"Project Instructions:\n{instructions}\n\nUser Request: {prompt}"
 
-        user_message = Message(
-            messageId="user-input", role=Role.user, parts=[TextPart(text=user_message_text)]
-        )
+        user_message = Message(messageId="user-input", role=Role.user, parts=[TextPart(text=user_message_text)])
 
         # Run agent
         agent_input = AgentRunInput(message=user_message)
@@ -235,7 +233,7 @@ def format_tool_signature(tool) -> str:
 
             params.append(param_str)
 
-        return f'{tool.name}({", ".join(params)})'
+        return f"{tool.name}({', '.join(params)})"
 
     except Exception:
         # Fallback if we can't parse the schema
@@ -254,7 +252,7 @@ def _extract_python_type(param_info: dict) -> str:
         if len(types) == 1:
             return types[0]
         if len(types) > 1:
-            return f'Union[{", ".join(types)}]'
+            return f"Union[{', '.join(types)}]"
 
     # Handle allOf (intersection types)
     if "allOf" in param_info:
@@ -302,7 +300,7 @@ def _extract_python_type(param_info: dict) -> str:
 # --- CLI Command Groups ---
 
 
-@click.command()
+@click.group(invoke_without_command=True)
 @click.option("--version", is_flag=True, help="Show version and exit")
 @click.option(
     "--approval-mode",
@@ -320,11 +318,11 @@ def _extract_python_type(param_info: dict) -> str:
     help="Specify custom config file path",
 )
 @click.option("--tools", "show_tools", is_flag=True, help="Show available tools and exit")
-@click.option(
-    "--providers", "show_providers", is_flag=True, help="Show available providers and exit"
-)
+@click.option("--providers", "show_providers", is_flag=True, help="Show available providers and exit")
 @click.argument("prompt", required=False)
+@click.pass_context
 def cli(
+    ctx: click.Context,
     version: bool,
     approval_mode: str | None,
     quiet: bool,
@@ -379,6 +377,9 @@ def cli(
       codin --config-file ./my-config.yaml         # Use custom config file
       codin --tools                                 # Show available tools
     """
+    if ctx.invoked_subcommand is not None:
+        return
+
     # Handle utility flags first
     if version:
         from codin import version as codin_version
@@ -446,7 +447,7 @@ def show_config_info(config_file: Path | None = None) -> None:
     click.echo(f"  Model: {config_obj.model}")
     click.echo(f"  Provider: {config_obj.provider}")
     click.echo(f"  Approval Mode: {config_obj.approval_mode.value}")
-    click.echo(f'  Project Docs: {"enabled" if config_obj.enable_rules else "disabled"}')
+    click.echo(f"  Project Docs: {'enabled' if config_obj.enable_rules else 'disabled'}")
     click.echo(f"  Debug: {config_obj.debug}")
     click.echo()
 
@@ -459,7 +460,7 @@ def show_config_info(config_file: Path | None = None) -> None:
         api_key_status = "🟢 SET" if get_api_key(config_file.stem) else "🔴 NOT SET"
         click.echo(f"  API Key: {api_key_status}")
         if provider_config.models:
-            click.echo(f'  Supported Models: {", ".join(provider_config.models[:5])}')
+            click.echo(f"  Supported Models: {', '.join(provider_config.models[:5])}")
             if len(provider_config.models) > 5:
                 click.echo(f"    ...and {len(provider_config.models) - 5} more")
     elif not config_file:
@@ -485,11 +486,9 @@ def show_config_info(config_file: Path | None = None) -> None:
                 click.echo(f"  {name:<12} [STDIO] {mcp_config.description}")
                 click.echo(f"    Command: {mcp_config.command}")
                 if mcp_config.args:
-                    click.echo(f'    Args: {" ".join(mcp_config.args)}')
+                    click.echo(f"    Args: {' '.join(mcp_config.args)}")
                 if mcp_config.env:
-                    click.echo(
-                        f'    Environment: {", ".join(f"{k}={v}" for k, v in mcp_config.env.items())}'
-                    )
+                    click.echo(f"    Environment: {', '.join(f'{k}={v}' for k, v in mcp_config.env.items())}")
         click.echo()
     else:
         click.echo(click.style("MCP Servers:", bold=True))
@@ -505,7 +504,7 @@ def show_config_info(config_file: Path | None = None) -> None:
     config_files = find_config_files(config_file)
 
     if config_files:
-        click.echo(f'  Config files: {", ".join(str(f) for f in config_files)}')
+        click.echo(f"  Config files: {', '.join(str(f) for f in config_files)}")
     else:
         click.echo("  Config files: None found")
 
@@ -529,11 +528,7 @@ def show_providers_info() -> None:
 
     for name, provider_config in config_obj.model_configs.items():
         api_key = get_api_key(name)
-        status = (
-            click.style("🟢 CONFIGURED", fg="green")
-            if api_key
-            else click.style("🔴 NO API KEY", fg="red")
-        )
+        status = click.style("🟢 CONFIGURED", fg="green") if api_key else click.style("🔴 NO API KEY", fg="red")
 
         click.echo()
         click.echo(click.style(f"{provider_config.name} ({name})", bold=True))
@@ -573,9 +568,7 @@ async def show_tools_info(verbose: bool = False, config_file: Path | None = None
 
         # Create toolsets from config
         try:
-            mcp_toolsets = create_mcp_toolsets_from_config(
-                config_file.as_posix() if config_file else None
-            )
+            mcp_toolsets = create_mcp_toolsets_from_config(config_file.as_posix() if config_file else None)
         except Exception as e:
             click.echo(f"[ERROR] Failed to create toolsets: {e}", err=True)
             return
@@ -638,6 +631,35 @@ async def show_tools_info(verbose: bool = False, config_file: Path | None = None
                 pass  # Ignore cleanup errors
 
 
+@cli.command("debug-sandbox")
+@click.option("--full-auto", is_flag=True, default=False, help="Use the default writable policy")
+@click.option(
+    "-s", "--sandbox-permission", "permissions", multiple=True, help="Specify sandbox permission (repeatable)"
+)
+@click.argument("command", nargs=-1, required=True)
+def debug_sandbox_cmd(full_auto: bool, permissions: tuple[str, ...], command: tuple[str, ...]) -> None:
+    """Run a command under the LocalSandbox with the given SandboxPolicy."""
+
+    async def _run() -> None:
+        from codin.sandbox import LocalSandbox, create_sandbox_policy
+
+        policy = create_sandbox_policy(full_auto, list(permissions))
+        sandbox = LocalSandbox()
+        await sandbox.up()
+        try:
+            click.echo(f"Using policy: {policy}")
+            result = await sandbox.run_cmd(list(command))
+            if result.stdout:
+                click.echo(result.stdout, nl=False)
+            if result.stderr:
+                click.echo(result.stderr, err=True, nl=False)
+            click.echo(f"Exit code: {result.exit_code}")
+        finally:
+            await sandbox.down()
+
+    asyncio.run(_run())
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     import atexit
@@ -650,11 +672,7 @@ def main() -> None:
     warnings.filterwarnings("ignore", message=".*I/O operation on closed pipe.*")
 
     # Override the warning function to suppress subprocess cleanup warnings
-    original_warn = (
-        warnings._warn_unawaited_coroutine
-        if hasattr(warnings, "_warn_unawaited_coroutine")
-        else None
-    )
+    original_warn = warnings._warn_unawaited_coroutine if hasattr(warnings, "_warn_unawaited_coroutine") else None
 
     def suppress_subprocess_warnings(*args, **kwargs):
         """Suppress subprocess-related warnings."""

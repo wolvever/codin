@@ -75,7 +75,7 @@ cp .env-example .env
 from codin.agent.base_agent import BaseAgent
 from codin.agent.code_planner import CodePlanner, CodePlannerConfig
 from codin.tool.registry import ToolRegistry
-from codin.tool.core_tools import CoreToolset
+from codin.tool.sandbox import SandboxToolset
 from codin.sandbox.local import LocalSandbox
 
 # Initialize components
@@ -83,9 +83,9 @@ sandbox = LocalSandbox()
 await sandbox.up()
 
 tool_registry = ToolRegistry()
-core_toolset = CoreToolset(sandbox)
-await core_toolset.up()
-tool_registry.register_toolset(core_toolset)
+sandbox_toolset = SandboxToolset(sandbox)
+await sandbox_toolset.up()
+tool_registry.register_toolset(sandbox_toolset)
 
 # Create planner and agent
 planner_config = CodePlannerConfig(model="gpt-4")

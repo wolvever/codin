@@ -138,6 +138,9 @@ cd codin
 make setup          # Linux/macOS
 .\make.ps1 setup     # Windows
 
+# Alternatively using pip
+python -m pip install -e .[dev]
+
 # Run tests to verify everything works
 make test           # Linux/macOS
 .\make.ps1 test     # Windows

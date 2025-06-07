@@ -1,5 +1,6 @@
 import pytest
 
+import codin.agent.base_planner as base_planner
 from codin.agent.base_planner import BasePlanner
 from codin.agent.types import ErrorStep, FinishStep, State
 
@@ -11,7 +12,7 @@ async def test_error_step_emitted(monkeypatch):
     async def fail_prompt_run(*args, **kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr("codin.agent.base_planner.prompt_run", fail_prompt_run)
+    monkeypatch.setattr(base_planner, "prompt_run", fail_prompt_run)
 
     planner = BasePlanner()
     state = State.model_construct(session_id="s2")

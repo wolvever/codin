@@ -116,40 +116,44 @@ async def run_quiet_mode(
             async def debug_event_callback(event):
                 if event.event_type == "debug_llm_response":
                     debug_info = event.data
-                    print(f"🤖 LLM Response (Turn {debug_info['turn_count']}):")
-                    print("-" * 60)
-                    print(f"📄 Raw content length: {debug_info['raw_content_length']} characters")
+                    logger.info("🤖 LLM Response (Turn %s):", debug_info["turn_count"])
+                    logger.info("-" * 60)
+                    logger.info(
+                        "📄 Raw content length: %s characters",
+                        debug_info["raw_content_length"],
+                    )
 
                     thinking = debug_info.get("thinking")
                     if thinking:
-                        print(f"💭 Thinking: {thinking}")
+                        logger.info("💭 Thinking: %s", thinking)
                     else:
-                        print("💭 Thinking: None")
+                        logger.info("💭 Thinking: None")
 
                     message = debug_info.get("message")
                     if message:
-                        print(f"💬 Message: {message}")
+                        logger.info("💬 Message: %s", message)
                     else:
-                        print("💬 Message: None")
+                        logger.info("💬 Message: None")
 
-                    print(f"🔄 Should continue: {debug_info['should_continue']}")
+                    logger.info("🔄 Should continue: %s", debug_info["should_continue"])
 
                     task_list = debug_info["task_list"]
-                    print(
-                        f"📋 Task list - Completed: {task_list['completed_count']}, "
-                        f"Pending: {task_list['pending_count']}"
+                    logger.info(
+                        "📋 Task list - Completed: %s, Pending: %s",
+                        task_list["completed_count"],
+                        task_list["pending_count"],
                     )
 
                     tool_calls = debug_info.get("tool_calls", [])
                     if tool_calls:
-                        print(f"🔧 Tool calls: {len(tool_calls)}")
+                        logger.info("🔧 Tool calls: %s", len(tool_calls))
                         for i, tool_call in enumerate(tool_calls):
                             args_keys = tool_call.get("arguments_keys", [])
-                            print(f"  {i + 1}. {tool_call['name']}({args_keys})")
+                            logger.info("  %s. %s(%s)", i + 1, tool_call["name"], args_keys)
                     else:
-                        print("🔧 Tool calls: None")
+                        logger.info("🔧 Tool calls: None")
 
-                    print("-" * 60 + "\n")
+                    logger.info("-" * 60 + "\n")
 
             agent.add_event_callback(debug_event_callback)
 

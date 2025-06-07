@@ -67,6 +67,9 @@ if self.debug:
     }
     
     await self._emit_event("debug_llm_response", debug_info)
+
+    # Additional plain-text debug information
+    await self._emit_event("debug_info", {"text": formatted_debug_text})
 ```
 
 ### CLI Side
@@ -92,7 +95,7 @@ Quiet mode uses simple print statements:
 async def debug_event_callback(event):
     if event.event_type == "debug_llm_response":
         debug_info = event.data
-        print(f"🤖 LLM Response (Turn {debug_info['turn_count']}):")
+        logger.info("🤖 LLM Response (Turn %s):", debug_info["turn_count"])
         # ... formatting
 ```
 

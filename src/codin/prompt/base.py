@@ -16,7 +16,6 @@ This module provides concise, elegant prompt templates with:
 
 import hashlib
 import typing as _t
-
 from datetime import datetime
 
 from a2a.types import (
@@ -37,7 +36,6 @@ from a2a.types import (
     TextPart as A2ATextPart,
 )
 from pydantic import BaseModel, ConfigDict
-
 
 try:
     from jinja2 import Template as _JinjaTemplate
@@ -162,7 +160,7 @@ class PromptVariant(BaseModel):
                 if actual and required:
                     if not str(actual).lower().startswith(str(required).lower()):
                         return False
-            elif isinstance(required, (bool, int, float)):
+            elif isinstance(required, bool | int | float):
                 # Exact match for primitive types
                 if actual != required:
                     return False

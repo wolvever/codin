@@ -8,7 +8,6 @@ It handles tool name resolution, conflict detection, and lifecycle management.
 import json
 import logging
 import typing as _t
-
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -17,7 +16,6 @@ import pydantic as _pyd
 import yaml
 
 from .base import Tool, Toolset
-
 
 __all__ = [
     'ToolEndpoint',

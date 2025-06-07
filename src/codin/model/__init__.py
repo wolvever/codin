@@ -15,7 +15,6 @@ from .openai_embedding import OpenAIEmbedding
 from .openai_llm import OpenAILLM
 from .registry import ModelRegistry
 
-
 __all__ = [
     # Base classes
     'ModelType',

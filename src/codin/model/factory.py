@@ -13,7 +13,6 @@ from .gemini_llm import GeminiLLM
 from .litellm_adapter import LiteLLMAdapter
 from .openai_llm import OpenAILLM
 
-
 __all__ = [
     'LLMFactory',
     'create_llm_from_env',
@@ -102,10 +101,10 @@ class LLMFactory:
             if final_base_url:
                 env_vars_to_set['LLM_BASE_URL'] = final_base_url
 
-            for key, value in env_vars_to_set.items():
+            for key, _value in env_vars_to_set.items():
                 if key in os.environ:
                     original_env[key] = os.environ[key]
-                os.environ[key] = value
+                os.environ[key] = _value
 
             # Create the LLM instance
             llm_class = cls.PROVIDER_CLASSES[final_provider]
@@ -119,7 +118,7 @@ class LLMFactory:
 
         finally:
             # Restore original environment
-            for key, value in env_vars_to_set.items():
+            for key, _value in env_vars_to_set.items():
                 if key in original_env:
                     os.environ[key] = original_env[key]
                 elif key in os.environ:

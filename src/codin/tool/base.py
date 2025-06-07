@@ -8,11 +8,9 @@ import abc
 import typing as _t
 
 import pydantic as _pyd
-
 from pydantic import BaseModel, ConfigDict
 
 from ..lifecycle import LifecycleMixin, LifecycleState
-
 
 __all__ = [
     'LifecycleState',

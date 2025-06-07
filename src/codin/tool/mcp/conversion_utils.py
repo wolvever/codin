@@ -1,23 +1,19 @@
 """MCP type conversion utilities for codin agents.
 
-This module provides utilities for converting between MCP protocol types
-and codin internal types for seamless integration.
+This module provides utilities for converting between MCP protocol types and
+codin internal types for seamless integration.
+
+Utilities to convert generic MCP JSON responses into *codin* protocol types are
+currently implemented in a heuristic manner and therefore kept very small. Once
+real-world MCP responses are available we can iteratively enhance these
+mappings.
 """
 
 from __future__ import annotations
 
-
-"""Utilities to convert generic MCP JSON responses into *codin* protocol types.
-
-Currently implemented conversion rules are **heuristic** and therefore kept
-very small intentionally.  Once real-world MCP responses are available we can
-iteratively enhance these mappings.
-"""
-
 import typing as _t
 
 from a2a.types import DataPart, FilePart, TextPart
-
 
 __all__ = [
     'convert_mcp_to_protocol_types',
@@ -39,7 +35,7 @@ def _is_file_part(data: dict[str, _t.Any]) -> bool:
 def _convert_single(obj: _t.Any) -> _t.Any:
     """Recursively convert *obj* into protocol types when recognised."""
     # Primitive types are returned unchanged.
-    if isinstance(obj, (str, int, float, bool)) or obj is None:
+    if isinstance(obj, str | int | float | bool) or obj is None:
         return obj
 
     # Lists are converted element-wise.

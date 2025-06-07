@@ -8,12 +8,10 @@ files, and environment-based configuration.
 import json
 import os
 import typing as _t
-
 from enum import Enum
 from pathlib import Path
 
 import yaml
-
 from pydantic import BaseModel, Field
 
 
@@ -199,7 +197,9 @@ def load_config_file(config_path: Path) -> dict[str, _t.Any]:
         raise ValueError(f"Unsupported config file format: {config_path.suffix}")
 
     except Exception as e:
-        raise ValueError(f"Failed to load config from {config_path}: {e}")
+        raise ValueError(
+            f"Failed to load config from {config_path}: {e}"
+        ) from e
 
 
 def find_config_files(config_file: Path | None = None) -> list[Path]:

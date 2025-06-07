@@ -1,16 +1,16 @@
-from __future__ import annotations
 """Prompt registry for codin agents.
 
 This module provides a registry system for managing and discovering
 prompt templates across the codin framework.
 """
 
+from __future__ import annotations
+
 import os
 import typing as _t
 
 from .base import PromptTemplate
 from .storage import StorageBackend, get_storage_backend
-
 
 __all__ = [
     'PromptRegistry',
@@ -26,7 +26,7 @@ class PromptRegistry:
     - http://host:port/path -> HTTPStorage with caching
     """
 
-    _instance: 'PromptRegistry | None' = None
+    _instance: PromptRegistry | None = None
     _endpoint: str = 'fs://./prompt_templates'
     _storage: StorageBackend | None = None
 
@@ -52,7 +52,7 @@ class PromptRegistry:
         self._enable_lazy_loading: bool = True
 
     @classmethod
-    def get_instance(cls, endpoint: str | None = None) -> 'PromptRegistry':
+    def get_instance(cls, endpoint: str | None = None) -> PromptRegistry:
         """Get the singleton registry instance."""
         if cls._instance is None or (endpoint and endpoint != cls._endpoint):
             cls._instance = cls(endpoint)
@@ -130,7 +130,7 @@ class PromptRegistry:
 
             # Try to get the current event loop
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # If we're already in an async context, we can't use run_until_complete
                 # Instead, we should use the async version, but for sync compatibility
                 # we'll create a task and wait for it

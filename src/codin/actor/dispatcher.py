@@ -8,7 +8,6 @@ multi-agent workflows in the codin framework.
 import asyncio
 import typing as _t
 import uuid
-
 from abc import ABC, abstractmethod
 from datetime import datetime
 
@@ -17,7 +16,6 @@ from pydantic import BaseModel, Field
 
 from .mailbox import Mailbox
 from .supervisor import ActorSupervisor
-
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent

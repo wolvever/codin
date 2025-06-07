@@ -15,7 +15,6 @@ from ..client import Client, ClientConfig, LoggingTracer
 from .base import BaseLLM
 from .registry import ModelRegistry
 
-
 __all__ = [
     'GeminiLLM',
 ]
@@ -191,7 +190,9 @@ class GeminiLLM(BaseLLM):
         except (KeyError, IndexError) as e:
             logger.error(f'Error parsing Gemini response: {e}')
             logger.debug(f'Response data: {data}')
-            raise ValueError(f'Failed to parse Gemini response: {e}')
+            raise ValueError(
+                f'Failed to parse Gemini response: {e}'
+            ) from e
 
     async def _stream_response(self, client: Client, endpoint: str, payload: dict) -> _t.AsyncIterator[str]:
         """Handle a streaming response."""

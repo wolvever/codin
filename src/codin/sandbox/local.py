@@ -14,11 +14,9 @@ import subprocess
 import tempfile
 import typing as _t
 import zipfile
-
 from pathlib import Path
 
 from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
-
 
 __all__ = ['LocalSandbox']
 
@@ -305,7 +303,7 @@ class LocalSandbox(Sandbox):
 
                             # Find main file
                             all_files = []
-                            for root, dirs, files in os.walk(temp_path):
+                            for root, _dirs, files in os.walk(temp_path):
                                 for file in files:
                                     rel_path = os.path.relpath(os.path.join(root, file), temp_path)
                                     all_files.append(rel_path)
@@ -335,7 +333,7 @@ class LocalSandbox(Sandbox):
                     # Find main file
                     all_files = []
                     search_path = temp_path / file_path.name
-                    for root, dirs, files in os.walk(search_path):
+                    for root, _dirs, files in os.walk(search_path):
                         for file in files:
                             rel_path = os.path.relpath(os.path.join(root, file), search_path)
                             all_files.append(rel_path)

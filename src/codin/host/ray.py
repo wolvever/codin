@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from .base import BaseHost
+
+if TYPE_CHECKING:
+    from ..actor.dispatcher import Dispatcher
+    from ..actor.supervisor import ActorSupervisor
 
 
 try:  # pragma: no cover - optional dependency
@@ -22,14 +26,14 @@ class RayHost(BaseHost):
         super().__init__(config_file=config_file)
         self._ray_init_kwargs = ray_init_kwargs or {"local_mode": True, "ignore_reinit_error": True}
 
-    async def _create_actor_manager(self) -> 'ActorSupervisor':
+    async def _create_actor_manager(self) -> ActorSupervisor:
         if ray is None:
             raise ImportError("ray is required for RayHost")
         if not ray.is_initialized():  # pragma: no cover - init if needed
             ray.init(**self._ray_init_kwargs)
         return __import__('codin.actor.ray_scheduler', fromlist=['RayActorManager']).RayActorManager()
 
-    async def _create_dispatcher(self, manager: 'ActorSupervisor') -> 'Dispatcher':
+    async def _create_dispatcher(self, manager: ActorSupervisor) -> Dispatcher:
         # Dispatcher implementation is local for now
         return __import__('codin.actor.dispatcher', fromlist=['LocalDispatcher']).LocalDispatcher(manager)
 

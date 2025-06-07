@@ -11,7 +11,6 @@ import logging
 import os
 import typing as _t
 
-
 try:
     import litellm
 
@@ -21,7 +20,6 @@ except ImportError:
 
 from .base import BaseLLM
 from .registry import ModelRegistry
-
 
 __all__ = [
     'LiteLLMAdapter',

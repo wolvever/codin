@@ -5,13 +5,10 @@ from __future__ import annotations
 import typing as _t
 from datetime import datetime
 
-from pydantic import Field
-
 from .supervisor import ActorInfo, ActorSupervisor
 
 if _t.TYPE_CHECKING:  # pragma: no cover - imported for type checking only
     from ..agent.base import Agent
-    from ..agent.types import AgentRunInput
 
 
 try:  # pragma: no cover - optional dependency
@@ -26,11 +23,12 @@ __all__ = ["RayActorManager"]
 class _RayAgentWrapper:
     """Ray remote wrapper executing an Agent."""
 
-    def __init__(self, agent: "Agent") -> None:  # pragma: no cover - executed on ray worker
+    def __init__(self, agent: Agent) -> None:  # pragma: no cover - executed on ray worker
         self._agent = agent
 
     def run(self, input_data: dict) -> list[dict]:  # pragma: no cover - executed on ray worker
         import asyncio
+
         from ..agent.types import AgentRunInput
 
         data = AgentRunInput(**input_data)
@@ -59,13 +57,13 @@ else:  # pragma: no cover
 class RayActorManager(ActorSupervisor):
     """Manage agents as Ray actors."""
 
-    def __init__(self, agent_factory: _t.Callable[..., _t.Awaitable["Agent"]] | None = None) -> None:
+    def __init__(self, agent_factory: _t.Callable[..., _t.Awaitable[Agent]] | None = None) -> None:
         if ray is None:
             raise ImportError("ray is required for RayActorManager")
         self._actors: dict[str, ActorInfo] = {}
         self._factory = agent_factory
 
-    async def acquire(self, actor_type: str, key: str, *args: _t.Any, **kwargs: _t.Any) -> "ray.actor.ActorHandle":
+    async def acquire(self, actor_type: str, key: str, *args: _t.Any, **kwargs: _t.Any) -> ray.actor.ActorHandle:
         actor_id = f"{actor_type}:{key}"
         if actor_id in self._actors:
             info = self._actors[actor_id]
@@ -75,8 +73,8 @@ class RayActorManager(ActorSupervisor):
         if self._factory:
             agent = await self._factory(actor_type, key, *args, **kwargs)
         else:
-            from ..agent.base_planner import BasePlanner
             from ..agent.base_agent import BaseAgent
+            from ..agent.base_planner import BasePlanner
 
             planner = BasePlanner()
             agent = BaseAgent(agent_id=actor_id, name=f"{actor_type}-{key}", planner=planner)

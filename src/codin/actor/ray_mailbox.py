@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import typing as _t
 
-from .mailbox import Mailbox
 from ..agent.types import Message
+from .mailbox import Mailbox
 
 try:  # pragma: no cover - optional dependency
     import ray

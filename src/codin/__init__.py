@@ -6,7 +6,6 @@ that interoperate via the A2A protocol.
 
 from .config import get_api_key, get_config, load_config
 
-
 __all__: list[str] = [
     'get_api_key',
     'get_config',

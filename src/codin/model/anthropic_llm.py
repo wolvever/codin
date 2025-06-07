@@ -15,7 +15,6 @@ from ..client import Client, ClientConfig, LoggingTracer
 from .base import BaseLLM
 from .registry import ModelRegistry
 
-
 __all__ = [
     'AnthropicLLM',
 ]
@@ -193,7 +192,9 @@ class AnthropicLLM(BaseLLM):
         except (KeyError, IndexError) as e:
             logger.error(f'Error parsing Anthropic response: {e}')
             logger.debug(f'Response data: {data}')
-            raise ValueError(f'Failed to parse Anthropic response: {e}')
+            raise ValueError(
+                f'Failed to parse Anthropic response: {e}'
+            ) from e
 
     async def _stream_response(self, client: Client, payload: dict) -> _t.AsyncIterator[str]:
         """Handle a streaming response."""
@@ -202,7 +203,6 @@ class AnthropicLLM(BaseLLM):
             response = await client.post('/v1/messages', json=payload)
             response.raise_for_status()
 
-            buffer = ''
             text_buffer = ''
 
             async for line in response.aiter_lines():

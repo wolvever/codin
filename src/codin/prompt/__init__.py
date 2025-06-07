@@ -27,8 +27,6 @@ Quick Start:
 
 from __future__ import annotations
 
-import typing as _t
-
 # Base types for advanced usage
 from .base import (
     A2ADataPart,
@@ -53,7 +51,6 @@ from .registry import PromptRegistry, get_registry
 
 # Core API - Simple and elegant
 from .run import prompt_run, render_only, set_endpoint
-
 
 __all__ = [
     # Primary API - Use these for most cases

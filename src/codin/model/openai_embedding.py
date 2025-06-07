@@ -12,7 +12,6 @@ from ..client import Client, ClientConfig, LoggingTracer
 from .base import BaseEmbedding
 from .registry import ModelRegistry
 
-
 __all__ = [
     'OpenAIEmbedding',
 ]

@@ -138,6 +138,7 @@ class LocalDispatcher(Dispatcher):
         stream_queue: asyncio.Queue,
     ) -> None:
         """Handle an A2A request by creating and orchestrating agents."""
+        created_agents: list[str] = []
         try:
             # Parse A2A request
             a2a_data = request.a2a_request
@@ -165,9 +166,11 @@ class LocalDispatcher(Dispatcher):
             for agent_type, key in agents_to_create:
                 agent = await self.actor_manager.acquire(agent_type, key)
                 agents.append(agent)
-                result.agents.append(
+                agent_id = (
                     agent.agent_id if hasattr(agent, 'agent_id') else f'{agent_type}:{key}'
                 )
+                created_agents.append(agent_id)
+                result.agents.append(agent_id)
 
             # Create agent run input
             from ..agent.types import AgentRunInput
@@ -208,6 +211,10 @@ class LocalDispatcher(Dispatcher):
             result.metadata['error_timestamp'] = datetime.now().isoformat()
 
         finally:
+            # Release any acquired agents
+            for agent_id in created_agents:
+                await self.actor_manager.release(agent_id)
+
             # signal end of stream
             await stream_queue.put(None)
 

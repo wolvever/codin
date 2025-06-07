@@ -10,7 +10,6 @@ import logging
 import time
 import typing as _t
 import uuid
-
 from datetime import datetime
 from enum import Enum
 
@@ -41,7 +40,6 @@ from .types import (
     ToolCallStep,
     ToolUsePart,
 )
-
 
 __all__ = ['BaseAgent', 'ContinueDecision']
 logger = logging.getLogger('codin.agent.base_agent')

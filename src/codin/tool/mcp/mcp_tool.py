@@ -15,7 +15,6 @@ from ..base import LifecycleState, Tool, ToolContext
 from .session_manager import MCPSessionManager
 from .utils import retry_on_closed_resource
 
-
 __all__ = [
     'MCPTool',
 ]

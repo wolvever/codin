@@ -7,11 +7,9 @@ commands including interactive REPL mode, quiet mode, and comprehensive provider
 import asyncio
 import os
 import sys
-
 from pathlib import Path
 
 import click
-
 from a2a.types import Message, Role, TextPart
 from dotenv import load_dotenv
 
@@ -28,7 +26,6 @@ from ..config import (
 from ..sandbox import LocalSandbox
 from .repl import start_repl
 from .utils import create_mcp_toolsets_from_config
-
 
 __all__ = [
     "cli",
@@ -52,9 +49,11 @@ def validate_approval_mode(mode: str) -> ApprovalMode:
     """Validate and return approval mode."""
     try:
         return ApprovalMode(mode)
-    except ValueError:
+    except ValueError as err:
         available = ", ".join([m.value for m in ApprovalMode])
-        raise click.BadParameter(f"Unknown approval mode '{mode}'. Available: {available}")
+        raise click.BadParameter(
+            f"Unknown approval mode '{mode}'. Available: {available}"
+        ) from err
 
 
 async def run_quiet_mode(
@@ -467,7 +466,6 @@ def show_config_info(config_file: Path | None = None) -> None:
         # All providers
         click.echo(click.style("Available Providers:", bold=True))
         for name, provider_config in config_obj.model_configs.items():
-            status = "[SET]" if get_api_key(name) else "[NOT SET]"
             status_icon = "🟢" if get_api_key(name) else "🔴"
             click.echo(f"  {status_icon} {name:<12} {provider_config.name}")
 
@@ -672,8 +670,6 @@ def main() -> None:
     warnings.filterwarnings("ignore", message=".*I/O operation on closed pipe.*")
 
     # Override the warning function to suppress subprocess cleanup warnings
-    original_warn = warnings._warn_unawaited_coroutine if hasattr(warnings, "_warn_unawaited_coroutine") else None
-
     def suppress_subprocess_warnings(*args, **kwargs):
         """Suppress subprocess-related warnings."""
 
@@ -687,7 +683,7 @@ def main() -> None:
             # Override the _warn function used by asyncio
             if hasattr(warnings, "_warn_unawaited_coroutine"):
                 warnings._warn_unawaited_coroutine = suppress_subprocess_warnings
-        except:
+        except Exception:
             pass
 
     # Register cleanup suppression to run at exit
@@ -713,7 +709,7 @@ def main() -> None:
             import time
 
             time.sleep(0.05)
-        except:
+        except Exception:
             pass
 
 

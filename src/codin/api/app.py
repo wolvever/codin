@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from ..actor import LocalActorManager, LocalDispatcher, Dispatcher
+from ..actor import Dispatcher, LocalActorManager, LocalDispatcher
 
 
 class SubmitRequest(BaseModel):

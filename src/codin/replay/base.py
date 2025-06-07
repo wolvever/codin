@@ -5,7 +5,6 @@ agent execution steps, enabling debugging and performance analysis.
 """
 
 import typing as _t
-
 from datetime import datetime
 
 

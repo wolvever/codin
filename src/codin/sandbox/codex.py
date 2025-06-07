@@ -5,11 +5,9 @@ the Codex CLI for secure code execution and file operations.
 """
 
 import typing as _t
-
 from pathlib import Path
 
 from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
-
 
 __all__ = ['CodexSandbox']
 

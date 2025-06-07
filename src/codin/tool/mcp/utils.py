@@ -7,7 +7,6 @@ MCP servers and handling connection management.
 import functools
 import logging
 
-
 __all__ = [
     'retry_on_closed_resource',
 ]

@@ -8,7 +8,6 @@ multi-agent workflows in the codin framework.
 import asyncio
 import typing as _t
 import uuid
-
 from abc import ABC, abstractmethod
 from datetime import datetime
 
@@ -17,7 +16,6 @@ from pydantic import BaseModel, Field
 
 from .mailbox import Mailbox
 from .supervisor import ActorSupervisor
-
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
@@ -73,12 +71,15 @@ class Dispatcher(ABC):
 class LocalDispatcher(Dispatcher):
     """Local implementation of dispatcher using asyncio."""
 
-    def __init__(self, actor_manager: ActorSupervisor):
+    def __init__(self, actor_manager: ActorSupervisor, max_concurrency: int | None = None):
         self.actor_manager = actor_manager
         self._active_runs: dict[str, DispatchResult] = {}
         self._run_tasks: dict[str, asyncio.Task] = {}
         # per-run stream queues for realtime outputs
         self._run_streams: dict[str, asyncio.Queue] = {}
+        self._semaphore: asyncio.Semaphore | None = (
+            asyncio.Semaphore(max_concurrency) if max_concurrency else None
+        )
 
     async def submit(self, a2a_request: dict) -> str:
         """Submit an A2A request and return runner_id."""
@@ -138,6 +139,7 @@ class LocalDispatcher(Dispatcher):
         stream_queue: asyncio.Queue,
     ) -> None:
         """Handle an A2A request by creating and orchestrating agents."""
+        created_agents: list[str] = []
         try:
             # Parse A2A request
             a2a_data = request.a2a_request
@@ -165,9 +167,11 @@ class LocalDispatcher(Dispatcher):
             for agent_type, key in agents_to_create:
                 agent = await self.actor_manager.acquire(agent_type, key)
                 agents.append(agent)
-                result.agents.append(
+                agent_id = (
                     agent.agent_id if hasattr(agent, 'agent_id') else f'{agent_type}:{key}'
                 )
+                created_agents.append(agent_id)
+                result.agents.append(agent_id)
 
             # Create agent run input
             from ..agent.types import AgentRunInput
@@ -187,7 +191,7 @@ class LocalDispatcher(Dispatcher):
             await runner_group.start_all()
 
             tasks = [
-                asyncio.create_task(self._run_agent(a, run_input, stream_queue, result))
+                asyncio.create_task(self._run_agent_with_semaphore(a, run_input, stream_queue, result))
                 for a in agents
             ]
             errors = await asyncio.gather(*tasks, return_exceptions=True)
@@ -208,6 +212,10 @@ class LocalDispatcher(Dispatcher):
             result.metadata['error_timestamp'] = datetime.now().isoformat()
 
         finally:
+            # Release any acquired agents
+            for agent_id in created_agents:
+                await self.actor_manager.release(agent_id)
+
             # signal end of stream
             await stream_queue.put(None)
 
@@ -238,6 +246,20 @@ class LocalDispatcher(Dispatcher):
                     'output': output.dict() if hasattr(output, 'dict') else str(output),
                 }
             )
+
+    async def _run_agent_with_semaphore(
+        self,
+        agent: 'Agent',
+        run_input: 'AgentRunInput',
+        stream_queue: asyncio.Queue,
+        result: DispatchResult,
+    ) -> None:
+        if self._semaphore is None:
+            await self._run_agent(agent, run_input, stream_queue, result)
+            return
+
+        async with self._semaphore:
+            await self._run_agent(agent, run_input, stream_queue, result)
 
     def _create_message_from_a2a(self, message_data: dict, context_id: str) -> Message:
         """Create a Message object from A2A message data."""

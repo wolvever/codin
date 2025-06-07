@@ -10,11 +10,9 @@ import shlex
 import tempfile
 import typing as _t
 import zipfile
-
 from pathlib import Path
 
 from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
-
 
 __all__ = ['DaytonaSandbox']
 
@@ -283,7 +281,7 @@ class DaytonaSandbox(Sandbox):
                                 zip_ref.extractall(temp_path)
 
                             # Upload all extracted files
-                            for root, dirs, files in temp_path.rglob('*'):
+                            for root, _dirs, _files in temp_path.rglob('*'):
                                 if root.is_file():
                                     rel_path = root.relative_to(temp_path)
                                     content = root.read_text(encoding='utf-8')

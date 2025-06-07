@@ -10,7 +10,6 @@ import logging
 import time
 import typing as _t
 import uuid
-
 from datetime import datetime
 from enum import Enum
 
@@ -41,7 +40,6 @@ from .types import (
     ToolCallStep,
     ToolUsePart,
 )
-
 
 __all__ = ['BaseAgent', 'ContinueDecision']
 logger = logging.getLogger('codin.agent.base_agent')
@@ -230,6 +228,17 @@ class BaseAgent(Agent):
             )
             yield AgentRunOutput(
                 id=str(uuid.uuid4()), result=error_message, metadata={'error': str(e), 'agent_id': self.id}
+            )
+
+        finally:
+            await self.cleanup()
+            await self._emit_event(
+                'run_end',
+                {
+                    'agent_id': self.id,
+                    'session_id': session_id,
+                    'elapsed_time': time.time() - start_time,
+                },
             )
 
     async def _build_state(self, session_id: str, input_data: AgentRunInput) -> State:

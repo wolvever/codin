@@ -11,7 +11,6 @@ import asyncio
 import json
 import logging
 import time
-
 from datetime import datetime
 
 from a2a.types import (
@@ -34,7 +33,6 @@ from ..prompt import prompt_run
 from ..tool.base import Tool
 from .base import Agent, AgentRunInput, AgentRunOutput
 from .dag_types import Plan, PlanResult, Task, TaskStatus
-
 
 logger = logging.getLogger(__name__)
 
@@ -284,11 +282,13 @@ class DAGExecutor(Agent):
                                 plan_data = json_data['plan']
                             else:
                                 plan_data = json_data
-                        except json.JSONDecodeError:
+                        except json.JSONDecodeError as err:
                             # Not JSON, check if there's plan_id in metadata
                             if inp.metadata and 'plan_id' in inp.metadata:
-                                raise ValueError(f'Plan with ID {inp.metadata["plan_id"]} not found in input')
-                            raise ValueError('No plan data found in input')
+                                raise ValueError(
+                                    f"Plan with ID {inp.metadata['plan_id']} not found in input"
+                                ) from err
+                            raise ValueError('No plan data found in input') from err
 
                 if not plan_data:
                     raise ValueError('No plan data found in input')

@@ -6,12 +6,10 @@ agent instances in the codin framework.
 """
 
 import typing as _t
-
 from abc import ABC, abstractmethod
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent

@@ -4,7 +4,6 @@ This module provides MCP client functionality for connecting to and
 using tools from MCP servers in codin agents.
 """
 
-import typing as _t
 
 from .conversion_utils import convert_mcp_to_protocol_types
 from .mcp_tool import MCPTool
@@ -21,7 +20,6 @@ from .session_manager import (
 )
 from .toolset import MCPToolset
 from .utils import retry_on_closed_resource
-
 
 __all__ = [
     # Session management

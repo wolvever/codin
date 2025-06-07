@@ -21,7 +21,6 @@ from .server_connection import (
 )
 from .session_manager import MCPSessionManager
 
-
 __all__ = [
     'MCPToolset',
 ]
@@ -219,7 +218,7 @@ class MCPToolset(Toolset):
             if sys.stderr != original_stderr:
                 try:
                     sys.stderr.close()
-                except:
+                except Exception:
                     pass
             sys.stderr = original_stderr
             warnings.showwarning = original_showwarning

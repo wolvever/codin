@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-import typing as _t
 
-from .base_agent import BaseAgent
-from .types import AgentRunInput, RunnerControl, ControlSignal
-from ..actor.mailbox import Mailbox, LocalMailbox
+from ..actor.mailbox import LocalMailbox, Mailbox
 from ..session.base import SessionManager
-from a2a.types import Message
-
+from .base_agent import BaseAgent
+from .types import AgentRunInput, ControlSignal, RunnerControl
 
 __all__ = ["AgentRunner"]
 

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import typing as _t
 from abc import ABC, abstractmethod
-
 from typing import TYPE_CHECKING
-if TYPE_CHECKING:  # pragma: no cover - for type hints only
+from .local_mailbox import LocalMailbox
+from .ray_mailbox import RayMailbox
+
+if TYPE_CHECKING:
+
     from ..agent.types import Message
     from .local_mailbox import LocalMailbox as _LocalMailbox
     from .ray_mailbox import RayMailbox as _RayMailbox
@@ -51,7 +53,6 @@ class Mailbox(ABC):
     async def subscribe_outbox(self) -> _t.AsyncIterator[Message]:
         """Iterate over outbox messages."""
 
-
 def __getattr__(name: str):
     if name == "LocalMailbox":  # pragma: no cover - lazy import
         from .local_mailbox import LocalMailbox as cls
@@ -60,4 +61,5 @@ def __getattr__(name: str):
         from .ray_mailbox import RayMailbox as cls
         return cls
     raise AttributeError(name)
+
 

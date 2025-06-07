@@ -1,9 +1,9 @@
 """Memory system for codin agents."""
 
 from .base import ChunkType, Memory, MemoryChunk, MemoryService
+from .chunk_builder import prompt_chunk_builder
 from .local import MemMemoryService
 from .remote import MemoryClient
-from .chunk_builder import prompt_chunk_builder
 
 __all__ = [
     "ChunkType",

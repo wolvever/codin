@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 
 from .base import RequestTracer
 
-
 __all__ = [
     'LoggingTracer',
     'MetricsTracer',

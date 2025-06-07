@@ -7,13 +7,12 @@ conversation recording, metrics collection, and session lifecycle management.
 import asyncio
 import typing as _t
 from contextlib import asynccontextmanager
-
 from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field
+from codin.replay.base import ReplayService
 
 from ..agent.types import State
-
+from ..memory.base import MemMemoryService, MemoryService
 
 __all__ = [
     'ReplayService',
@@ -63,10 +62,7 @@ class SessionService:
 # Data-oriented Session classes (merged from agent/session.py)
 # =============================================================================
 
-# Import needed for the merged classes
-from codin.replay.base import ReplayService
 
-from ..memory.base import MemMemoryService, MemoryService
 
 
 class Session(BaseModel):

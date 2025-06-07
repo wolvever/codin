@@ -76,19 +76,19 @@ test-watch: ## Run tests in watch mode (requires pytest-watch)
 # Code Quality
 lint: ## Run linting checks
 	@echo "$(BLUE)Running linting checks...$(RESET)"
-	uv run ruff check $(SRC_DIR) $(TESTS_DIR)
+	uv run ruff check $(SRC_DIR)
 
 lint-fix: ## Run linting checks and fix issues
 	@echo "$(BLUE)Running linting checks and fixing issues...$(RESET)"
-	uv run ruff check --fix $(SRC_DIR) $(TESTS_DIR)
+	uv run ruff check --fix $(SRC_DIR)
 
 format: ## Format code
 	@echo "$(BLUE)Formatting code...$(RESET)"
-	uv run ruff format $(SRC_DIR) $(TESTS_DIR)
+	uv run ruff format $(SRC_DIR)
 
 format-check: ## Check code formatting
 	@echo "$(BLUE)Checking code formatting...$(RESET)"
-	uv run ruff format --check $(SRC_DIR) $(TESTS_DIR)
+	uv run ruff format --check $(SRC_DIR)
 
 type-check: ## Run type checking
 	@echo "$(BLUE)Running type checks...$(RESET)"

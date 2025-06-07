@@ -15,7 +15,6 @@ from ..client import Client, ClientConfig
 from .base import BaseLLM
 from .registry import ModelRegistry
 
-
 __all__ = [
     'OpenAILLM',
 ]

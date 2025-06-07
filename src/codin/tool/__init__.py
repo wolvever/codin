@@ -4,9 +4,8 @@ This module provides the core tool infrastructure including tool definitions,
 execution, registry, and MCP (Model Context Protocol) integration.
 """
 
-import typing as _t
 
-from .base import Tool, ToolContext, ToolSpec, Toolset  # type: ignore F401 – re-export
+from .base import Tool, ToolContext, Toolset, ToolSpec  # type: ignore F401 – re-export
 from .core_tools import FetchTool
 from .decorators import ToolDecorator, tool
 from .executor import ToolExecutor
@@ -26,7 +25,6 @@ from .sandbox import (
     SandboxTool,
     SandboxToolset,
 )
-
 
 __all__ = [
     # Core tool system

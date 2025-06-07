@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 """Simple sandbox policy helpers used by the CLI debug command."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Union
 
 
 class SandboxPermission(Enum):
@@ -29,25 +28,25 @@ class SandboxWriteFolderPermission:
         return f"disk-write-folder={self.folder}"
 
 
-SandboxPermissionType = Union[SandboxPermission, SandboxWriteFolderPermission]
+SandboxPermissionType = SandboxPermission | SandboxWriteFolderPermission
 
 
 @dataclass
 class SandboxPolicy:
     """Collection of sandbox permissions."""
 
-    permissions: List[SandboxPermissionType]
+    permissions: list[SandboxPermissionType]
 
     def __str__(self) -> str:  # pragma: no cover - trivial
         perms = ", ".join(str(p) for p in self.permissions)
         return f"SandboxPolicy([{perms}])"
 
     @classmethod
-    def new_read_only_policy(cls) -> "SandboxPolicy":
+    def new_read_only_policy(cls) -> SandboxPolicy:
         return cls([SandboxPermission.DISK_FULL_READ_ACCESS])
 
     @classmethod
-    def new_full_auto_policy(cls) -> "SandboxPolicy":
+    def new_full_auto_policy(cls) -> SandboxPolicy:
         return cls(
             [
                 SandboxPermission.DISK_FULL_READ_ACCESS,
@@ -73,7 +72,7 @@ def parse_sandbox_permission(value: str) -> SandboxPermissionType:
         raise ValueError(f"Unknown sandbox permission '{value}'") from exc
 
 
-def create_sandbox_policy(full_auto: bool, permissions: List[str]) -> SandboxPolicy:
+def create_sandbox_policy(full_auto: bool, permissions: list[str]) -> SandboxPolicy:
     """Create a SandboxPolicy from CLI flags."""
 
     if full_auto:

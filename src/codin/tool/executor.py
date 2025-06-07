@@ -11,13 +11,11 @@ import logging
 import time
 import types
 import typing as _t
-
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 # Prometheus imports
 import prometheus_client as prom
-
 from a2a.types import Message, TextPart
 
 # OpenTelemetry imports
@@ -27,7 +25,6 @@ from opentelemetry.trace import Status, StatusCode
 from ..config import ApprovalMode
 from .base import Tool, ToolContext
 from .registry import ToolRegistry
-
 
 __all__ = [
     'ApprovalHook',
@@ -214,7 +211,6 @@ class ToolExecutor:
     ) -> _t.Any:
         """Execute with retry logic."""
         attempt = 0
-        last_error = None
 
         while True:
             attempt += 1
@@ -224,8 +220,7 @@ class ToolExecutor:
                     span.set_attribute('tool.max_attempts', retries + 1)
 
                     return await self._execute_once(tool, args, context, timeout)
-            except TimeoutError as e:
-                last_error = e
+            except TimeoutError:
                 if attempt > retries:
                     self.logger.error(f'Tool {tool.name} timed out after {retries} retries')
                     tool_execution_errors.add(1, {'tool': tool.name, 'error': 'timeout'})
@@ -234,7 +229,6 @@ class ToolExecutor:
                 self.logger.warning(f'Tool {tool.name} timed out, retrying ({attempt}/{retries})')
                 prom_tool_retries.labels(tool=tool.name).inc()
             except Exception as e:
-                last_error = e
                 if attempt > retries:
                     self.logger.error(f'Tool {tool.name} failed after {retries} retries: {e!s}')
                     tool_execution_errors.add(1, {'tool': tool.name, 'error': str(e)[:100]})
@@ -347,7 +341,7 @@ class ToolExecutor:
         # If already a protocol type, return as is
         from a2a.types import DataPart, FilePart
 
-        if isinstance(result, (Message, TextPart, DataPart, FilePart)):
+        if isinstance(result, Message | TextPart | DataPart | FilePart):
             return result
 
         # Check if result is from MCP

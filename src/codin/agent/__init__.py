@@ -5,9 +5,6 @@ implementations, and supporting types for creating and managing AI agents
 in the codin framework.
 """
 
-# Import existing components
-from ..actor.mailbox import Mailbox
-
 # Import codin architecture components
 from ..memory.base import MemMemoryService, Memory
 from ..model.base import BaseLLM
@@ -91,7 +88,6 @@ __all__ = [
     'MemMemoryService',
     'BaseLLM',
     'Tool',
-    'Mailbox',
     # Lazy access functions
     'get_base_agent',
     'get_base_planner',

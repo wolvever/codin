@@ -27,12 +27,32 @@ __all__ = [
 class ToolDefinition(BaseModel):
     """Tool definition for LLM function calling."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict()
 
     name: str
     description: str
     parameters: dict[str, _t.Any]
     metadata: dict[str, _t.Any] | None = None
+
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        parameters: dict[str, _t.Any],
+        metadata: dict[str, _t.Any] | None = None,
+    ) -> None:
+        super().__init__(
+            name=name,
+            description=description,
+            parameters=parameters,
+            metadata=metadata,
+        )
+        object.__setattr__(self, "_frozen", True)
+
+    def __setattr__(self, name: str, value: _t.Any) -> None:
+        if getattr(self, "_frozen", False):
+            raise AttributeError("ToolDefinition is frozen")
+        super().__setattr__(name, value)
 
 
 class ToolContext:

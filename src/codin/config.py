@@ -441,6 +441,12 @@ def get_config(config_file: Path | str | None = None) -> CodinConfig:
         _config = load_config(config_file)
         _config_file = config_file
 
+    # Apply environment overrides on each call
+    if "LLM_MODEL" in os.environ:
+        _config.model = os.environ["LLM_MODEL"]
+    if "LLM_PROVIDER" in os.environ:
+        _config.provider = os.environ["LLM_PROVIDER"]
+
     return _config
 
 

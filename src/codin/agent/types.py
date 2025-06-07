@@ -1,5 +1,7 @@
 """Type definitions for agent system."""
 
+from __future__ import annotations
+
 import typing as _t
 
 from datetime import datetime
@@ -15,13 +17,15 @@ from a2a.types import (
     TaskArtifactUpdateEvent,
     TaskStatusUpdateEvent,
     TextPart,
+    DataPart,
+    FilePart,
 )
 
 # Re-export core A2A types for compatibility
 from a2a.types import (
     Task as A2ATask,
 )
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 if _t.TYPE_CHECKING:
@@ -79,6 +83,40 @@ class Message(A2AMessage):
 
     sender_id: str = ""
     recipient_ids: list[str] = Field(default_factory=list)
+    parts: list[_t.Union[TextPart, FilePart, DataPart, "ToolUsePart"]]
+
+    def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
+        """Convenience helper to append a TextPart."""
+        self.parts.append(TextPart(text=text, metadata=metadata))
+
+    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
+        """Convenience helper to append a DataPart."""
+        from a2a.types import DataPart
+
+        self.parts.append(DataPart(data=data, metadata=metadata))
+
+    def add_tool_call_part(self, call: "ToolCall") -> None:
+        """Append a tool call as a ToolUsePart."""
+        self.parts.append(
+            ToolUsePart(
+                type="call",
+                id=call.call_id,
+                name=call.name,
+                input=call.arguments,
+            )
+        )
+
+    def add_tool_result_part(self, result: "ToolCallResult", name: str) -> None:
+        """Append a tool result as a ToolUsePart."""
+        self.parts.append(
+            ToolUsePart(
+                type="result",
+                id=result.call_id,
+                name=name,
+                output=result.output,
+                metadata={"error": result.error} if result.error else None,
+            )
+        )
 
 
 class ToolCall(_pyd.BaseModel):
@@ -376,8 +414,53 @@ class Step(BaseModel):
     # Content fields - can contain multiple types
     message: Message | None = None  # A2A Message content
     event: Event | None = None  # A2A Event or Internal Event content
+    tool_call: ToolUsePart | ToolCall | None = None
+    tool_call_result: ToolUsePart | ToolCallResult | None = None
     thinking: str | None = None  # Internal reasoning
 
+    # ------------------------------------------------------------------
+    # Content helpers
+    # ------------------------------------------------------------------
+
+    def has_message_content(self) -> bool:
+        """Return True if this step contains message content."""
+        return self.message is not None or getattr(self, "final_message", None) is not None
+
+    def has_event_content(self) -> bool:
+        """Return True if this step contains an event."""
+        return self.event is not None
+
+    def has_tool_content(self) -> bool:
+        """Return True if this step relates to tool usage."""
+        if isinstance(self, ToolCallStep):
+            return self.tool_call is not None or self.tool_call_result is not None
+        if getattr(self, "tool_call", None) is not None or getattr(self, "tool_call_result", None) is not None:
+            return True
+        if self.message:
+            return any(getattr(p, "kind", None) == "tool-use" for p in self.message.parts)
+        return False
+
+    def get_content_types(self) -> list[str]:
+        """Return a list of content types present on this step."""
+        types: list[str] = []
+        if self.has_message_content():
+            types.append("message")
+        if self.has_event_content():
+            types.append("event")
+        if self.thinking:
+            types.append("thinking")
+        if self.has_tool_content():
+            if "tool" not in types:
+                types.append("tool")
+        return types
+
+    def is_a2a_event(self) -> bool:
+        """Return True if the event is an A2A event."""
+        return isinstance(self.event, (TaskStatusUpdateEvent, TaskArtifactUpdateEvent))
+
+    def is_internal_event(self) -> bool:
+        """Return True if the event is an internal RunEvent."""
+        return isinstance(self.event, RunEvent)
 
 class MessageStep(Step):
     """A2A compatible message step with enhanced support for mixed content."""
@@ -407,19 +490,56 @@ class MessageStep(Step):
                 for i in range(0, len(text), chunk_size):
                     yield text[i : i + chunk_size]
 
-
 class ToolCallStep(Step):
     """Step for executing a tool call with enhanced result handling."""
 
     step_type: StepType = StepType.TOOL_CALL
     tool_call: ToolUsePart | None = None
     tool_call_result: ToolUsePart | None = None
+    success: bool = True
 
-    def __post_init__(self):
+    @model_validator(mode="before")
+    @classmethod
+    def _convert_calls(cls, data: dict[str, _t.Any]) -> dict[str, _t.Any]:
+        call = data.get("tool_call")
+        if isinstance(call, ToolCall):
+            data["tool_call"] = ToolUsePart(
+                type="call",
+                id=call.call_id,
+                name=call.name,
+                input=call.arguments,
+            )
+        result = data.get("tool_call_result")
+        if isinstance(result, ToolCallResult):
+            data["tool_call_result"] = ToolUsePart(
+                type="result",
+                id=result.call_id,
+                name=call.name if call else "",
+                output=result.output,
+                metadata={"error": result.error} if result.error else None,
+            )
+        return data
+
+    def model_post_init(self, __context: _t.Any) -> None:
         if self.tool_call is None:
             raise ValueError("tool_call (ToolUsePart type='call') is required for ToolCallStep")
         if self.tool_call.type != 'call':
             raise ValueError("ToolCallStep.tool_call must be a ToolUsePart with type='call'")
+
+    def add_result(self, result: ToolCallResult) -> None:
+        """Attach a ToolCallResult to this step and update success."""
+        self.tool_call_result = ToolUsePart(
+            type="result",
+            id=result.call_id,
+            name=self.tool_call.name if self.tool_call else "",
+            output=result.output,
+            metadata={"error": result.error} if result.error else None,
+        )
+        self.success = result.success
+
+    def to_message_parts(self) -> tuple[ToolUsePart, ToolUsePart | None]:
+        """Return tool call and result parts for message conversion."""
+        return self.tool_call, self.tool_call_result
 
 
 class EventStep(Step):
@@ -427,7 +547,7 @@ class EventStep(Step):
 
     step_type: StepType = StepType.EVENT
 
-    def __post_init__(self):
+    def model_post_init(self, __context: _t.Any) -> None:
         if self.event is None:
             raise ValueError('event is required for EventStep')
 
@@ -437,7 +557,7 @@ class ThinkStep(Step):
 
     step_type: StepType = StepType.THINK
 
-    def __post_init__(self):
+    def model_post_init(self, __context: _t.Any) -> None:
         if self.thinking is None:
             self.thinking = ''
 
@@ -451,19 +571,21 @@ class FinishStep(Step):
     success: bool = True
     task: Task | None = None
 
-    def __post_init__(self):
+    def model_post_init(self, __context: _t.Any) -> None:
         if self.reason is None:
             self.reason = 'Task completed'
         # Only create a message if none is provided and we have a reason
         if self.message is None and self.final_message is None and self.reason:
             # Create a simple message for the finish step
-            self.final_message = Message(
+            msg = Message(
                 messageId=f'finish-{self.step_id}',
                 role=Role.agent,
                 parts=[TextPart(text=self.reason)],
                 contextId=None,
                 kind='message',
             )
+            self.message = msg
+            self.final_message = msg
 
     def create_completion_event(self, task_id: str, context_id: str) -> TaskStatusUpdateEvent:
         """Create a task completion event."""

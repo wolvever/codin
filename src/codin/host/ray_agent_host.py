@@ -483,10 +483,10 @@ async def create_ray_agent_host(
 
             # Create a basic agent - use concrete BaseAgent implementation
             from ..memory.base import MemMemoryService
-            from ..agent.code_planner import CodePlanner
+            from ..agent.base_planner import BasePlanner
             
             # Create a basic planner for the BaseAgent
-            planner = CodePlanner(llm=llm)
+            planner = BasePlanner(llm=llm)
             
             agent = BaseAgent(
                 agent_id=agent_id,

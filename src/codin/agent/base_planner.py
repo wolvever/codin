@@ -1,4 +1,4 @@
-"""CodePlanner is a planner that uses LLM to generate execution steps, adapted from CodeAgent."""
+"""BasePlanner is a planner that uses LLM to generate execution steps, adapted from CodeAgent."""
 
 import json
 import logging
@@ -19,15 +19,15 @@ from .types import FinishStep, MessageStep, Planner, State, Step, ThinkStep, Too
 
 
 __all__ = [
-    'CodePlanner',
-    'CodePlannerConfig',
+    'BasePlanner',
+    'BasePlannerConfig',
 ]
 
-logger = logging.getLogger('codin.agent.code_planner')
+logger = logging.getLogger('codin.agent.base_planner')
 
 
-class CodePlannerConfig(BaseModel):
-    """Configuration for CodePlanner."""
+class BasePlannerConfig(BaseModel):
+    """Configuration for BasePlanner."""
 
     model: str = 'gpt-4'
     max_tokens: int = 4000
@@ -38,17 +38,17 @@ class CodePlannerConfig(BaseModel):
     rules: str | None = None
 
 
-class CodePlanner(Planner):
+class BasePlanner(Planner):
     """Planner that uses LLM to generate execution steps, adapted from CodeAgent."""
 
     def __init__(
         self,
-        config: CodePlannerConfig | None = None,
+        config: BasePlannerConfig | None = None,
         llm: BaseLLM | None = None,
         tool_registry: ToolRegistry | None = None,
         debug: bool = False,
     ):
-        """Initialize the CodePlanner.
+        """Initialize the BasePlanner.
 
         Args:
             config: Planner configuration
@@ -56,12 +56,12 @@ class CodePlanner(Planner):
             tool_registry: Tool registry for available tools
             debug: Enable debug logging
         """
-        self.config = config or CodePlannerConfig()
+        self.config = config or BasePlannerConfig()
         self.llm = llm or LLMFactory.create_llm(model=self.config.model)
         self.tool_registry = tool_registry or ToolRegistry()
         self.debug = debug
 
-        logger.info(f'Initialized CodePlanner with {len(self.tool_registry.get_tools())} tools')
+        logger.info(f'Initialized BasePlanner with {len(self.tool_registry.get_tools())} tools')
 
     async def next(self, state: State) -> _t.AsyncGenerator[Step]:
         """Generate execution steps based on current state."""
@@ -213,7 +213,7 @@ class CodePlanner(Planner):
             tool_results_text = self._format_tool_results_for_conversation(state.last_tool_results)
 
         return {
-            'agent_name': 'CodePlanner',
+            'agent_name': 'BasePlanner',
             'task_id': state.session_id,
             'turn_count': state.turn_count,
             'has_tools': len(tool_definitions) > 0,
@@ -412,11 +412,11 @@ class CodePlanner(Planner):
 
     async def reset(self, state: State) -> None:
         """Reset the planner to the initial state."""
-        # For CodePlanner, resetting means clearing any internal state
-        # Since CodePlanner is stateless (each call to next() is independent),
+        # For BasePlanner, resetting means clearing any internal state
+        # Since BasePlanner is stateless (each call to next() is independent),
         # we don't need to do anything specific here
         if self.debug:
-            logger.debug(f'CodePlanner reset for session {state.session_id}')
+            logger.debug(f'BasePlanner reset for session {state.session_id}')
 
         # If we had any internal state to clear, we would do it here
         # For example, clearing conversation history, resetting counters, etc.

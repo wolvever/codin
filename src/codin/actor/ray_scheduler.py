@@ -75,10 +75,10 @@ class RayActorManager(ActorScheduler):
         if self._factory:
             agent = await self._factory(actor_type, key)
         else:
-            from ..agent.code_planner import CodePlanner
+            from ..agent.base_planner import BasePlanner
             from ..agent.base_agent import BaseAgent
 
-            planner = CodePlanner()
+            planner = BasePlanner()
             agent = BaseAgent(agent_id=actor_id, name=f"{actor_type}-{key}", planner=planner)
 
         handle = RayAgentActor.remote(agent)

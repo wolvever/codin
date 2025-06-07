@@ -76,6 +76,8 @@ class Task(A2ATask):
 class Message(A2AMessage):
     """A2A-compatible message with additional codin features."""
 
+    sender_id: str = ""
+    recipient_ids: list[str] = Field(default_factory=list)
 
 
 class ToolCall(_pyd.BaseModel):

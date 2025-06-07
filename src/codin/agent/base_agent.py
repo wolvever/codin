@@ -17,7 +17,7 @@ from enum import Enum
 # Import a2a types that we need
 from a2a.types import Role, TextPart
 
-from ..actor.mailbox import LocalAsyncMailbox, Mailbox
+from ..actor.mailbox import LocalMailbox, Mailbox
 from ..memory.base import MemMemoryService, Memory
 from ..model.base import BaseLLM
 from ..tool.base import Tool, ToolContext
@@ -86,7 +86,7 @@ class BaseAgent(Agent):
         self.memory = memory or MemMemoryService()
         self.tools = tools or []
         self.llm = llm
-        self.mailbox = mailbox or LocalAsyncMailbox(self.id)
+        self.mailbox = mailbox or LocalMailbox()
         self.default_config = default_config
         self.debug = debug
 

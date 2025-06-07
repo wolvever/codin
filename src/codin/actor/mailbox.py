@@ -1,172 +1,208 @@
-"""Mailbox for inter-agent communication.
+"""Mailbox implementations for inter-agent communication."""
 
-This module provides mailbox implementations for message passing between agents,
-supporting both synchronous and asynchronous communication patterns with
-inbox/outbox queues for bidirectional messaging.
-"""
+from __future__ import annotations
 
 import asyncio
 import typing as _t
-
 from abc import ABC, abstractmethod
-from datetime import datetime
 
-from a2a.types import Message
-from pydantic import BaseModel, ConfigDict, Field
+from ..agent.types import Message
+
+try:  # pragma: no cover - optional dependency
+    import ray
+except Exception:  # pragma: no cover
+    ray = None
 
 
-__all__ = ['AsyncMailbox', 'LocalAsyncMailbox', 'Mailbox', 'MailboxMessage']
-
-
-class MailboxMessage(BaseModel):
-    """Message wrapper for mailbox delivery."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    message: Message
-    sender_id: str
-    recipient_id: str
-    timestamp: datetime = Field(default_factory=datetime.now)
-    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+__all__ = ["Mailbox", "LocalMailbox", "RayMailbox"]
 
 
 class Mailbox(ABC):
-    """Abstract bidirectional mailbox protocol from design document."""
+    """Abstract bidirectional mailbox."""
 
     @abstractmethod
-    async def put_inbox(self, msg: Message) -> None:
-        """Put a message into the inbox (control/user feedback)."""
+    async def put_inbox(
+        self, msgs: Message | list[Message], timeout: float | None = None
+    ) -> None:
+        """Put message(s) into inbox."""
 
     @abstractmethod
-    async def put_outbox(self, msg: Message) -> None:
-        """Put a message into the outbox (events/deltas)."""
+    async def put_outbox(
+        self, msgs: Message | list[Message], timeout: float | None = None
+    ) -> None:
+        """Put message(s) into outbox."""
 
     @abstractmethod
-    async def get_inbox(self, timeout: float | None = None) -> Message:
-        """Get a message from the inbox with optional timeout."""
+    async def get_inbox(
+        self, max_messages: int = 1, timeout: float | None = None
+    ) -> list[Message]:
+        """Get up to ``max_messages`` from inbox."""
 
     @abstractmethod
-    async def get_outbox(self, timeout: float | None = None) -> Message:
-        """Get a message from the outbox with optional timeout."""
+    async def get_outbox(
+        self, max_messages: int = 1, timeout: float | None = None
+    ) -> list[Message]:
+        """Get up to ``max_messages`` from outbox."""
 
     @abstractmethod
     async def subscribe_inbox(self) -> _t.AsyncIterator[Message]:
-        """Subscribe to inbox messages."""
+        """Iterate over inbox messages."""
 
     @abstractmethod
     async def subscribe_outbox(self) -> _t.AsyncIterator[Message]:
-        """Subscribe to outbox messages."""
+        """Iterate over outbox messages."""
 
 
-class AsyncMailbox:
-    """Legacy interface for backward compatibility."""
+class LocalMailbox(Mailbox):
+    """Local asyncio based mailbox."""
 
-    def __init__(self, agent_id: str):
-        self.agent_id = agent_id
-        self._inbox: list[MailboxMessage] = []
-        self._outbox: list[MailboxMessage] = []
-        self._subscribers: list[_t.Callable[[MailboxMessage], _t.Awaitable[None]]] = []
-
-    async def send_message(
-        self, message: Message, recipient_id: str, metadata: dict[str, _t.Any] | None = None
-    ) -> None:
-        """Send a message to another agent."""
-        mailbox_msg = MailboxMessage(
-            message=message, sender_id=self.agent_id, recipient_id=recipient_id, metadata=metadata or {}
-        )
-        self._outbox.append(mailbox_msg)
-
-        # Notify subscribers
-        for subscriber in self._subscribers:
-            try:
-                await subscriber(mailbox_msg)
-            except Exception:
-                # Log error but don't fail the send operation
-                pass
-
-    async def receive_message(self, mailbox_msg: MailboxMessage) -> None:
-        """Receive a message from another agent."""
-        if mailbox_msg.recipient_id == self.agent_id:
-            self._inbox.append(mailbox_msg)
-
-    def get_inbox_messages(self, limit: int | None = None) -> list[MailboxMessage]:
-        """Get messages from inbox."""
-        if limit is None:
-            return list(self._inbox)
-        if limit <= 0:
-            return []
-        return self._inbox[-limit:]
-
-    def get_outbox_messages(self, limit: int | None = None) -> list[MailboxMessage]:
-        """Get messages from outbox."""
-        if limit is None:
-            return list(self._outbox)
-        if limit <= 0:
-            return []
-        return self._outbox[-limit:]
-
-    def clear_inbox(self) -> None:
-        """Clear all inbox messages."""
-        self._inbox.clear()
-
-    def clear_outbox(self) -> None:
-        """Clear all outbox messages."""
-        self._outbox.clear()
-
-    def subscribe(self, callback: _t.Callable[[MailboxMessage], _t.Awaitable[None]]) -> None:
-        """Subscribe to outgoing messages."""
-        self._subscribers.append(callback)
-
-    def unsubscribe(self, callback: _t.Callable[[MailboxMessage], _t.Awaitable[None]]) -> None:
-        """Unsubscribe from outgoing messages."""
-        if callback in self._subscribers:
-            self._subscribers.remove(callback)
-
-
-class LocalAsyncMailbox(Mailbox):
-    """Local asyncio implementation of bidirectional mailbox."""
-
-    def __init__(self, agent_id: str, maxsize: int = 100):
-        self.agent_id = agent_id
+    def __init__(self, maxsize: int = 100):
         self._inbox: asyncio.Queue[Message] = asyncio.Queue(maxsize=maxsize)
         self._outbox: asyncio.Queue[Message] = asyncio.Queue(maxsize=maxsize)
 
-    async def put_inbox(self, msg: Message) -> None:
-        """Put a message into the inbox (control/user feedback)."""
-        await self._inbox.put(msg)
+    async def _put(
+        self, q: asyncio.Queue[Message], msgs: Message | list[Message], timeout: float | None
+    ) -> None:
+        if not isinstance(msgs, list):
+            msgs = [msgs]
+        for msg in msgs:
+            if timeout is None:
+                while not q.empty():
+                    await asyncio.sleep(0)
+                await q.put(msg)
+            else:
+                await asyncio.wait_for(q.put(msg), timeout=timeout)
 
-    async def put_outbox(self, msg: Message) -> None:
-        """Put a message into the outbox (events/deltas)."""
-        await self._outbox.put(msg)
+    async def put_inbox(self, msgs: Message | list[Message], timeout: float | None = None) -> None:
+        await self._put(self._inbox, msgs, timeout)
 
-    async def get_inbox(self, timeout: float | None = None) -> Message:
-        """Get a message from the inbox with optional timeout."""
-        try:
-            return await asyncio.wait_for(self._inbox.get(), timeout=timeout)
-        except TimeoutError:
-            raise TimeoutError('Inbox get operation timed out')
+    async def put_outbox(self, msgs: Message | list[Message], timeout: float | None = None) -> None:
+        await self._put(self._outbox, msgs, timeout)
 
-    async def get_outbox(self, timeout: float | None = None) -> Message:
-        """Get a message from the outbox with optional timeout."""
-        try:
-            return await asyncio.wait_for(self._outbox.get(), timeout=timeout)
-        except TimeoutError:
-            raise TimeoutError('Outbox get operation timed out')
+    async def _get(
+        self, q: asyncio.Queue[Message], max_messages: int, timeout: float | None
+    ) -> list[Message]:
+        msgs: list[Message] = []
+        for _ in range(max_messages):
+            msg = await asyncio.wait_for(q.get(), timeout=timeout)
+            msgs.append(msg)
+        return msgs
+
+    async def get_inbox(
+        self, max_messages: int = 1, timeout: float | None = None
+    ) -> list[Message]:
+        return await self._get(self._inbox, max_messages, timeout)
+
+    async def get_outbox(
+        self, max_messages: int = 1, timeout: float | None = None
+    ) -> list[Message]:
+        return await self._get(self._outbox, max_messages, timeout)
 
     async def subscribe_inbox(self) -> _t.AsyncIterator[Message]:
-        """Subscribe to inbox messages."""
         while True:
-            try:
-                message = await self._inbox.get()
-                yield message
-            except asyncio.CancelledError:
-                break
+            msg = await self._inbox.get()
+            yield msg
 
     async def subscribe_outbox(self) -> _t.AsyncIterator[Message]:
-        """Subscribe to outbox messages."""
         while True:
-            try:
-                message = await self._outbox.get()
-                yield message
-            except asyncio.CancelledError:
-                break
+            msg = await self._outbox.get()
+            yield msg
+
+
+if ray:  # pragma: no cover - avoid ray when not installed
+
+    @ray.remote
+    class _MailboxActor:
+        def __init__(self, maxsize: int = 100):
+            self._inbox: asyncio.Queue[Message] = asyncio.Queue(maxsize=maxsize)
+            self._outbox: asyncio.Queue[Message] = asyncio.Queue(maxsize=maxsize)
+
+        async def put_inbox(self, msgs: list[Message]):
+            for m in msgs:
+                await self._inbox.put(m)
+
+        async def put_outbox(self, msgs: list[Message]):
+            for m in msgs:
+                await self._outbox.put(m)
+
+        async def get_inbox(self, n: int, timeout: float | None):
+            res = []
+            for _ in range(n):
+                res.append(await asyncio.wait_for(self._inbox.get(), timeout=timeout))
+            return res
+
+        async def get_outbox(self, n: int, timeout: float | None):
+            res = []
+            for _ in range(n):
+                res.append(await asyncio.wait_for(self._outbox.get(), timeout=timeout))
+            return res
+
+    class RayMailbox(Mailbox):
+        """Mailbox backed by a Ray actor."""
+
+        def __init__(self, agent_id: str, maxsize: int = 100):
+            if ray is None:
+                raise ImportError("ray is required for RayMailbox")
+            self._actor = _MailboxActor.options(name=None).remote(maxsize)
+            self.agent_id = agent_id
+
+        async def put_inbox(self, msgs: Message | list[Message], timeout: float | None = None) -> None:
+            if not isinstance(msgs, list):
+                msgs = [msgs]
+            await self._actor.put_inbox.remote(msgs)
+
+        async def put_outbox(self, msgs: Message | list[Message], timeout: float | None = None) -> None:
+            if not isinstance(msgs, list):
+                msgs = [msgs]
+            await self._actor.put_outbox.remote(msgs)
+
+        async def get_inbox(
+            self, max_messages: int = 1, timeout: float | None = None
+        ) -> list[Message]:
+            return await self._actor.get_inbox.remote(max_messages, timeout)
+
+        async def get_outbox(
+            self, max_messages: int = 1, timeout: float | None = None
+        ) -> list[Message]:
+            return await self._actor.get_outbox.remote(max_messages, timeout)
+
+        async def subscribe_inbox(self) -> _t.AsyncIterator[Message]:
+            while True:
+                msgs = await self.get_inbox()
+                for m in msgs:
+                    yield m
+
+        async def subscribe_outbox(self) -> _t.AsyncIterator[Message]:
+            while True:
+                msgs = await self.get_outbox()
+                for m in msgs:
+                    yield m
+
+else:  # pragma: no cover - provide stub
+
+    class RayMailbox(Mailbox):
+        def __init__(self, *a, **k):
+            raise ImportError("ray is required for RayMailbox")
+
+        async def put_inbox(self, msgs: Message | list[Message], timeout: float | None = None) -> None:
+            raise NotImplementedError()
+
+        async def put_outbox(self, msgs: Message | list[Message], timeout: float | None = None) -> None:
+            raise NotImplementedError()
+
+        async def get_inbox(
+            self, max_messages: int = 1, timeout: float | None = None
+        ) -> list[Message]:
+            raise NotImplementedError()
+
+        async def get_outbox(
+            self, max_messages: int = 1, timeout: float | None = None
+        ) -> list[Message]:
+            raise NotImplementedError()
+
+        async def subscribe_inbox(self) -> _t.AsyncIterator[Message]:
+            raise NotImplementedError()
+
+        async def subscribe_outbox(self) -> _t.AsyncIterator[Message]:
+            raise NotImplementedError()
+

@@ -7,17 +7,21 @@ from datetime import datetime
 from a2a.types import Message, Role, TextPart
 
 from codin.actor import (
-    Mailbox, LocalAsyncMailbox, MailboxMessage,
-    ActorScheduler, LocalActorManager, ActorInfo,
-    Dispatcher, LocalDispatcher
+    Mailbox,
+    LocalMailbox,
+    ActorScheduler,
+    LocalActorManager,
+    ActorInfo,
+    Dispatcher,
+    LocalDispatcher,
 )
 from codin.agent.types import ControlSignal, RunnerControl, RunnerInput
 
 
 @pytest.mark.asyncio
-async def test_local_async_mailbox():
-    """Test the LocalAsyncMailbox implementation."""
-    mailbox = LocalAsyncMailbox("test_agent", maxsize=10)
+async def test_local_mailbox():
+    """Test the LocalMailbox implementation."""
+    mailbox = LocalMailbox(maxsize=10)
     
     # Test basic inbox/outbox operations
     msg1 = Message(
@@ -32,7 +36,7 @@ async def test_local_async_mailbox():
     await mailbox.put_inbox(msg1)
     
     # Get message from inbox
-    received = await mailbox.get_inbox(timeout=1.0)
+    received = (await mailbox.get_inbox(timeout=1.0))[0]
     assert received.messageId == "msg1"
     assert received.parts[0].root.text == "Hello"
     
@@ -46,7 +50,7 @@ async def test_local_async_mailbox():
     )
     
     await mailbox.put_outbox(msg2)
-    received_out = await mailbox.get_outbox(timeout=1.0)
+    received_out = (await mailbox.get_outbox(timeout=1.0))[0]
     assert received_out.messageId == "msg2"
 
 
@@ -163,7 +167,7 @@ async def test_control_signals():
 @pytest.mark.asyncio
 async def test_mailbox_timeout():
     """Test mailbox timeout behavior."""
-    mailbox = LocalAsyncMailbox("test_agent")
+    mailbox = LocalMailbox()
     
     # Test timeout on empty inbox
     with pytest.raises(asyncio.TimeoutError):
@@ -177,7 +181,7 @@ async def test_mailbox_timeout():
 @pytest.mark.asyncio
 async def test_mailbox_subscription():
     """Test mailbox subscription patterns."""
-    mailbox = LocalAsyncMailbox("test_agent")
+    mailbox = LocalMailbox()
     
     # Put a message in inbox
     msg = Message(

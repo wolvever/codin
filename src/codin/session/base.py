@@ -6,6 +6,7 @@ conversation recording, metrics collection, and session lifecycle management.
 
 import asyncio
 import typing as _t
+from contextlib import asynccontextmanager
 
 from datetime import datetime
 
@@ -191,6 +192,21 @@ class SessionManager:
     def get_session(self, session_id: str) -> Session | None:
         """Get existing session by ID."""
         return self._sessions.get(session_id)
+
+    @asynccontextmanager
+    async def session(
+        self, session_id: str, memory_system: MemoryService | None = None
+    ) -> _t.AsyncGenerator[Session, None]:
+        """Context manager to manage a session's lifecycle.
+
+        Creates or retrieves the session and ensures it is closed when the
+        context exits.
+        """
+        session = await self.get_or_create_session(session_id, memory_system)
+        try:
+            yield session
+        finally:
+            await self.close_session(session_id)
 
     async def close_session(self, session_id: str) -> None:
         """Close and cleanup a session."""

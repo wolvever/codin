@@ -1,3 +1,4 @@
+# ruff: noqa
 """Script that spawns a local webserver for retrieving an OpenAI API key.
 
 - Listens on 127.0.0.1:1455
@@ -103,9 +104,7 @@ def main() -> None:
             except Exception as e:
                 eprint(f"Failed to open browser: {e}")
 
-        eprint(
-            f"If your browser did not open, navigate to this URL to authenticate:\n\n{auth_url}"
-        )
+        eprint(f"If your browser did not open, navigate to this URL to authenticate:\n\n{auth_url}")
 
         # Run the server in the main thread until `shutdown()` is called by the
         # request handler.
@@ -334,11 +333,7 @@ class _ApiKeyHTTPHandler(http.server.BaseHTTPRequestHandler):
             eprint(f"Unable to redeem ChatGPT subscriber API credits: {exc}")
 
         # Persist refresh_token/id_token for future use (redeem credits etc.)
-        last_refresh_str = (
-            datetime.datetime.now(datetime.timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
+        last_refresh_str = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
         auth_bundle = AuthBundle(
             api_key=exchanged_access_token,
@@ -500,11 +495,7 @@ def maybe_redeem_credits(
             tokens["id_token"] = new_id_token
             # Note this does not touch the access_token?
             tokens["refresh_token"] = new_refresh_token
-            tokens["last_refresh"] = (
-                datetime.datetime.now(datetime.timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z")
-            )
+            tokens["last_refresh"] = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
             with open(auth_path, "w", encoding="utf-8") as fp:
                 if hasattr(os, "fchmod"):
@@ -532,12 +523,8 @@ def maybe_redeem_credits(
     if isinstance(sub_start_str, str):
         try:
             sub_start_ts = datetime.datetime.fromisoformat(sub_start_str.rstrip("Z"))
-            if datetime.datetime.now(
-                datetime.timezone.utc
-            ) - sub_start_ts < datetime.timedelta(days=7):
-                eprint(
-                    "Sorry, your subscription must be active for more than 7 days to redeem credits."
-                )
+            if datetime.datetime.now(datetime.timezone.utc) - sub_start_ts < datetime.timedelta(days=7):
+                eprint("Sorry, your subscription must be active for more than 7 days to redeem credits.")
                 return
         except ValueError:
             # Malformed; ignore
@@ -552,11 +539,7 @@ def maybe_redeem_credits(
         eprint("Only users with Plus or Pro subscriptions can redeem free API credits.")
         return
 
-    api_host = (
-        "https://api.openai.com"
-        if issuer == "https://auth.openai.com"
-        else "https://api.openai.org"
-    )
+    api_host = "https://api.openai.com" if issuer == "https://auth.openai.com" else "https://api.openai.org"
 
     try:
         redeem_payload = json.dumps({"id_token": id_token}).encode()
@@ -573,8 +556,8 @@ def maybe_redeem_credits(
         granted = redeem_data.get("granted_chatgpt_subscriber_api_credits", 0)
         if granted and granted > 0:
             eprint(
-                f"""Thanks for being a ChatGPT {'Plus' if plan_type=='plus' else 'Pro'} subscriber!
-If you haven't already redeemed, you should receive {'$5' if plan_type=='plus' else '$50'} in API credits.
+                f"""Thanks for being a ChatGPT {"Plus" if plan_type == "plus" else "Pro"} subscriber!
+If you haven't already redeemed, you should receive {"$5" if plan_type == "plus" else "$50"} in API credits.
 
 Credits: https://platform.openai.com/settings/organization/billing/credit-grants
 More info: https://help.openai.com/en/articles/11381614""",

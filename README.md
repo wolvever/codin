@@ -118,6 +118,17 @@ async for output in agent.run(agent_input):
     print(f"Agent output: {output}")
 ```
 
+### Debug Sandbox
+
+Run commands under the same sandbox used by Codin. This mirrors the Rust debug helpers.
+
+```bash
+codin debug-sandbox --full-auto echo "hello sandbox"
+codin debug-sandbox -s disk-write-cwd -s network-full-access -- python script.py
+```
+
+Use `-s/--sandbox-permission` multiple times to customize the policy or `--full-auto` for a permissive default.
+
 ## Architecture
 
 The framework follows a modular architecture:

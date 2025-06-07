@@ -10,7 +10,6 @@ import logging
 
 import click
 
-
 # Use a2a types instead of internal protocol types
 from a2a.types import Message, Role, TextPart
 
@@ -24,7 +23,6 @@ from ..config import (
 from ..sandbox import LocalSandbox
 from ..tool.base import Toolset
 from .utils import create_mcp_toolsets_from_config
-
 
 __all__ = [
     "ReplSession",
@@ -587,7 +585,7 @@ class ReplSession:
         # Handle different value types
         if isinstance(value, bool):
             return "✓" if value else "✗"
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, list):
             if len(value) == 0:

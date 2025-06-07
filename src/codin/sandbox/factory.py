@@ -12,7 +12,6 @@ from .daytona import DaytonaSandbox
 from .e2b import E2BSandbox
 from .local import LocalSandbox
 
-
 __all__ = ['create_sandbox']
 
 # Registry of available sandbox backends

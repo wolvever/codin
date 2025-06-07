@@ -3,9 +3,7 @@
 import abc
 import enum
 import logging
-
 from contextlib import asynccontextmanager
-
 
 __all__ = [
     'LifecycleManager',

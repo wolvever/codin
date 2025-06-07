@@ -5,26 +5,25 @@ import logging
 import re
 import typing as _t
 import uuid
-
 from datetime import datetime
 
-from .types import Message, Role, TextPart
-
+from ..id import new_id
 from ..prompt.run import prompt_run
 from ..tool.base import to_tool_definitions
-from ..id import new_id
 from .types import (
+    ErrorStep,
     FinishStep,
+    Message,
     MessageStep,
     Planner,
+    Role,
     State,
     Step,
+    TextPart,
     ThinkStep,
     ToolCall,
     ToolCallStep,
-    ErrorStep,
 )
-
 
 __all__ = [
     'BasePlanner',
@@ -355,13 +354,13 @@ class BasePlanner(Planner):
                     for k, v in value.items()
                     if not (hasattr(v, '__class__') and v.__class__.__name__ == 'Undefined')
                 }
-            if isinstance(value, (list, tuple)):
+            if isinstance(value, list | tuple):
                 return [
                     clean_value(item)
                     for item in value
                     if not (hasattr(item, '__class__') and item.__class__.__name__ == 'Undefined')
                 ]
-            if isinstance(value, (str, int, float, bool, type(None))):
+            if isinstance(value, str | int | float | bool | type(None)):
                 return value
             # Try to convert to string for other types
             try:

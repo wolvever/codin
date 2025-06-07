@@ -11,28 +11,25 @@ import json
 import logging
 import typing as _t
 import uuid
-
 from datetime import datetime
 from pathlib import Path
 
 # Prometheus imports
 import prometheus_client as prom
 
-
 # OpenTelemetry imports
 from opentelemetry import metrics, trace
 from opentelemetry.trace import Status, StatusCode
 
 from ..agent.base import Agent
+
+# Import concrete agent implementations
+from ..agent.base_agent import BaseAgent
 from ..agent.dag_planner import DAGExecutor, DAGPlanner
 from ..model.base import BaseLLM
 from ..protocol.types import AgentRunInput, AgentRunOutput, Message, TaskState, TextPart
 from ..protocol.types import TaskStatus as ProtocolTaskStatus
 from ..tool.base import Tool
-
-# Import concrete agent implementations
-from ..agent.base_agent import BaseAgent
-
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -330,7 +327,7 @@ class AgentHost:
 
             # Create tasks for all agents
             tasks = []
-            for agent_id, agent in self.agents.items():
+            for agent_id, _agent in self.agents.items():
                 if agent_id not in exclude_agents:
                     task = self.send_message_to_agent(agent_id, message, metadata)
                     tasks.append((agent_id, asyncio.create_task(task)))
@@ -647,8 +644,8 @@ async def create_agent_host(
                 )
             else:
                 # Basic agent - use concrete BaseAgent implementation
-                from ..memory.base import MemMemoryService
                 from ..agent.base_planner import BasePlanner
+                from ..memory.base import MemMemoryService
                 
                 # Create a basic planner for the BaseAgent
                 planner = BasePlanner(llm=llm)
@@ -735,7 +732,7 @@ async def create_dag_agent_host(
     Returns:
         An AgentHost instance with a DAG-based agent
     """
-    with tracer.start_as_current_span('create_dag_agent_host') as span:
+    with tracer.start_as_current_span('create_dag_agent_host'):
         # Create DAG agent specs
         agent_specs = [
             {

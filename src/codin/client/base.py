@@ -11,10 +11,8 @@ import time
 import typing as _t
 
 import httpx
-
 from pydantic import BaseModel, ConfigDict, Field
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
-
 
 __all__ = [
     'Client',

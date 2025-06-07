@@ -19,7 +19,6 @@ from pydantic import BaseModel
 
 from ..lifecycle import LifecycleMixin
 
-
 __all__ = [
     'ExecResult',
     'EnvironmentVariablePattern',
@@ -619,7 +618,6 @@ class Sandbox(LifecycleMixin, ABC):
         """
         try:
             import requests
-
             from bs4 import BeautifulSoup
 
             # Use requests to fetch the URL

@@ -61,7 +61,7 @@ class MemoryChunk(BaseModel):
                 full_key = f"{prefix}.{key}" if prefix else key
                 if isinstance(value, dict):
                     flatten(value, full_key)
-                elif isinstance(value, (list, tuple)):
+                elif isinstance(value, list | tuple):
                     for i, item in enumerate(value):
                         if isinstance(item, dict):
                             flatten(item, f"{full_key}[{i}]")

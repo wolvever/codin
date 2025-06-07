@@ -6,7 +6,6 @@ tracking state, and coordinating multi-agent conversations.
 
 from .base import Session, SessionManager, SessionService
 
-
 __all__ = [
     'Session',
     'SessionManager',

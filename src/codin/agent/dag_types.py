@@ -1,14 +1,12 @@
 """DAG-based task planning types."""
 
 import typing as _t
-
 from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..id import new_id
-
 
 __all__ = [
     'Plan',

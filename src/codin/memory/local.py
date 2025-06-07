@@ -196,7 +196,9 @@ class MemMemoryService(Memory):
         for i in range(0, len(to_compress), chunk_size):
             chunk_msgs = to_compress[i : i + chunk_size]
             if chunk_msgs:
-                chunks = await self._create_memory_chunk_legacy(session_id, chunk_msgs, llm_summarizer)
+                await self._create_memory_chunk_legacy(
+                    session_id, chunk_msgs, llm_summarizer
+                )
                 chunk_groups_created += 1
         self._messages[session_id] = messages[-keep_recent:]
         return chunk_groups_created

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import typing as _t
 import uuid
 from datetime import datetime
 

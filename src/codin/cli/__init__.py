@@ -6,5 +6,4 @@ and interacting with them in various modes.
 
 from .commands import main
 
-
 __all__ = ['main']

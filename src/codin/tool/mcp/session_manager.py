@@ -1,24 +1,12 @@
 """MCP session management for codin agents.
 
-This module provides session managers for different MCP connection types
-including HTTP, stdio, and Server-Sent Events (SSE) connections.
+This module provides session managers for different MCP connection types,
+including HTTP, stdio and Server-Sent Events (SSE) connections. The
+:class:`MCPSessionManager` maintains a connection to an MCP server using one of
+several protocols and exposes a consistent interface to the rest of the system.
 """
 
 from __future__ import annotations
-
-
-"""Session management utilities for communicating with an MCP server.
-
-The :class:`MCPSessionManager` maintains a connection to an MCP server using
-one of several protocols:
-
-- HTTP: REST API-based connection to an MCP server
-- stdio: Subprocess-based connection with stdin/stdout communication
-- SSE: Server-Sent Events connection
-
-A session manager provides a common interface regardless of the underlying
-protocol, enabling MCPTool to work consistently with any MCP server.
-"""
 
 import abc
 import asyncio
@@ -26,11 +14,15 @@ import logging
 import os
 import sys
 import typing as _t
-
 from contextlib import AsyncExitStack
 
 import httpx
 
+from .server_connection import (
+    HttpServerParams,
+    SseServerParams,
+    StdioServerParams,
+)
 
 try:
     # Make MCP imports optional so codin can work without special imports
@@ -41,9 +33,6 @@ try:
     HAS_MCP_CLIENT = True
 except ImportError:
     HAS_MCP_CLIENT = False
-
-from .server_connection import HttpServerParams, SseServerParams, StdioServerParams
-
 
 __all__ = [
     'HttpSessionManager',
@@ -97,7 +86,7 @@ class MCPSessionManager(abc.ABC):
     @classmethod
     def create(
         cls, connection_params: HttpServerParams | StdioServerParams | SseServerParams, **kwargs
-    ) -> 'MCPSessionManager':
+    ) -> MCPSessionManager:
         """Factory method to create the appropriate session manager.
 
         Parameters
@@ -328,7 +317,7 @@ class StdioSessionManager(MCPSessionManager):
                 try:
                     if hasattr(session_to_close, 'close'):
                         await asyncio.wait_for(session_to_close.close(), timeout=0.5)
-                except:
+                except Exception:
                     pass  # Ignore all errors
 
             # Close exit stack with improved error handling
@@ -367,7 +356,7 @@ class StdioSessionManager(MCPSessionManager):
                     try:
                         if hasattr(exit_stack_to_close, '_exit_callbacks'):
                             exit_stack_to_close._exit_callbacks.clear()
-                    except:
+                    except Exception:
                         pass
                 except Exception:
                     # For any other error, just abandon the cleanup
@@ -380,7 +369,7 @@ class StdioSessionManager(MCPSessionManager):
             if sys.stderr != original_stderr:
                 try:
                     sys.stderr.close()
-                except:
+                except Exception:
                     pass
             sys.stderr = original_stderr
             warnings.showwarning = original_showwarning

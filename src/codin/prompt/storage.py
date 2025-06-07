@@ -12,17 +12,14 @@ import pathlib
 import pickle
 import tempfile
 import time
-
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse
 
 import httpx
 import yaml
-
 from pydantic import BaseModel, ConfigDict
 
 from .base import ModelOptions, PromptTemplate, PromptVariant
-
 
 __all__ = [
     'FilesystemStorage',
@@ -377,7 +374,9 @@ class HTTPStorage(StorageBackend):
                 self._save_cache_entry(cache_key, entry)
 
         except Exception as e:
-            raise RuntimeError(f'Failed to save template to remote storage: {e}')
+            raise RuntimeError(
+                f'Failed to save template to remote storage: {e}'
+            ) from e
 
 
 def get_storage_backend(endpoint: str) -> StorageBackend:

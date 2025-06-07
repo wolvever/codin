@@ -2,4 +2,5 @@
 line-length = 120
 
 [lint]
-select = ["E501"]
+select = ["E", "F", "I", "B", "UP"]
+

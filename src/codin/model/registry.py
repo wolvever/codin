@@ -13,7 +13,6 @@ import typing as _t
 
 from .base import BaseEmbedding, BaseLLM, BaseModel, BaseReranker, ModelType
 
-
 __all__ = [
     'ModelRegistry',
 ]

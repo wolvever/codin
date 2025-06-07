@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 import typing as _t
-
 from datetime import datetime
 from enum import Enum
 
 import pydantic as _pyd
-
 from a2a.types import (
-    Message as A2AMessage,
-)
-from a2a.types import (
+    DataPart,
+    FilePart,
     Role,
     TaskArtifactUpdateEvent,
     TaskStatusUpdateEvent,
     TextPart,
-    DataPart,
-    FilePart,
+)
+from a2a.types import (
+    Message as A2AMessage,
 )
 
 # Re-export core A2A types for compatibility
@@ -26,7 +24,6 @@ from a2a.types import (
     Task as A2ATask,
 )
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 
 if _t.TYPE_CHECKING:
     from ..artifact.base import ArtifactService
@@ -83,7 +80,7 @@ class Message(A2AMessage):
 
     sender_id: str = ""
     recipient_ids: list[str] = Field(default_factory=list)
-    parts: list[_t.Union[TextPart, FilePart, DataPart, "ToolUsePart"]]
+    parts: list[TextPart | FilePart | DataPart | ToolUsePart]
 
     def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
         """Convenience helper to append a TextPart."""
@@ -95,7 +92,7 @@ class Message(A2AMessage):
 
         self.parts.append(DataPart(data=data, metadata=metadata))
 
-    def add_tool_call_part(self, call: "ToolCall") -> None:
+    def add_tool_call_part(self, call: ToolCall) -> None:
         """Append a tool call as a ToolUsePart."""
         self.parts.append(
             ToolUsePart(
@@ -106,7 +103,7 @@ class Message(A2AMessage):
             )
         )
 
-    def add_tool_result_part(self, result: "ToolCallResult", name: str) -> None:
+    def add_tool_result_part(self, result: ToolCallResult, name: str) -> None:
         """Append a tool result as a ToolUsePart."""
         self.parts.append(
             ToolUsePart(
@@ -228,12 +225,12 @@ class RunnerInput(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
 
     @classmethod
-    def from_message(cls, message: Message) -> 'RunnerInput':
+    def from_message(cls, message: Message) -> RunnerInput:
         """Create RunnerInput from a message."""
         return cls(message=message)
 
     @classmethod
-    def from_control(cls, signal: ControlSignal, metadata: dict[str, _t.Any] | None = None) -> 'RunnerInput':
+    def from_control(cls, signal: ControlSignal, metadata: dict[str, _t.Any] | None = None) -> RunnerInput:
         """Create RunnerInput from a control signal."""
         control = RunnerControl(signal=signal, metadata=metadata or {})
         return cls(control=control)
@@ -276,7 +273,7 @@ class RunConfig(BaseModel):
     time_budget: float | None = None  # Maximum execution time in seconds
     deadline: datetime | None = None  # Absolute deadline
 
-    def is_budget_exceeded(self, metrics: 'Metrics', elapsed_time: float) -> tuple[bool, str]:
+    def is_budget_exceeded(self, metrics: Metrics, elapsed_time: float) -> tuple[bool, str]:
         """Check if any budget constraints are exceeded."""
         if self.turn_budget and metrics.iterations >= self.turn_budget:
             return True, f'Turn budget exceeded: {metrics.iterations} >= {self.turn_budget}'
@@ -363,7 +360,7 @@ class State(BaseModel):
     agent_id: str = ''
     config: RunConfig = Field(default_factory=RunConfig)
     model_config_dict: dict[str, _t.Any] = Field(default_factory=dict, alias='model_config')
-    tools: list['Tool'] = Field(default_factory=list)  # Tool objects from base.py
+    tools: list[Tool] = Field(default_factory=list)  # Tool objects from base.py
     created_at: datetime = Field(default_factory=datetime.now)
 
     ## Dynamic updated members
@@ -377,7 +374,7 @@ class State(BaseModel):
     # Memory references (readonly)
     pending: list[Message] = Field(default_factory=list)
     history: list[Message] = Field(default_factory=list)
-    artifact_ref: 'ArtifactService | None' = None  # Readonly reference
+    artifact_ref: ArtifactService | None = None  # Readonly reference
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
 
     # Performance metrics
@@ -456,7 +453,7 @@ class Step(BaseModel):
 
     def is_a2a_event(self) -> bool:
         """Return True if the event is an A2A event."""
-        return isinstance(self.event, (TaskStatusUpdateEvent, TaskArtifactUpdateEvent))
+        return isinstance(self.event, TaskStatusUpdateEvent | TaskArtifactUpdateEvent)
 
     def is_internal_event(self) -> bool:
         """Return True if the event is an internal RunEvent."""

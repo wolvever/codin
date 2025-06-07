@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import typing as _t
 import uuid
-
 from datetime import datetime
 
 # Use a2a SDK types directly
@@ -20,7 +19,6 @@ from a2a.types import Message, Role, TextPart
 from ..model import BaseLLM, ModelRegistry
 from .base import PromptResponse, RenderedPrompt, ToolDefinition
 from .registry import get_registry
-
 
 __all__ = ['PromptEngine']
 

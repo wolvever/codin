@@ -6,9 +6,7 @@ and metadata tracking for task artifacts, files, and generated content.
 
 import abc
 import typing as _t
-
 from datetime import datetime
-
 
 __all__ = [
     'ArtifactService',

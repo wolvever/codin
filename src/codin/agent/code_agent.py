@@ -24,7 +24,6 @@ import re
 import time
 import typing as _t
 import uuid
-
 from datetime import datetime
 from enum import Enum
 
@@ -44,7 +43,6 @@ from ..tool.base import ToolContext, Toolset, to_tool_definitions
 from ..tool.executor import ToolExecutor
 from ..tool.registry import ToolRegistry
 from .types import Message, TextPart
-
 
 __all__: list[str] = [
     'AgentEvent',
@@ -1374,7 +1372,8 @@ class CodeAgent(Agent):
 
                 return intervention_msg, modified_calls
             intervention_msg = (
-                f'SYSTEM INTERVENTION: The file {file_path} has been successfully created. Task is complete.'
+                f'SYSTEM INTERVENTION: The file {file_path} has been successfully created.'
+                ' Task is complete.'
             )
             return intervention_msg, []  # No more tool calls needed
 
@@ -1397,13 +1396,13 @@ class CodeAgent(Agent):
                     for k, v in value.items()
                     if not (hasattr(v, '__class__') and v.__class__.__name__ == 'Undefined')
                 }
-            if isinstance(value, (list, tuple)):
+            if isinstance(value, list | tuple):
                 return [
                     clean_value(item)
                     for item in value
                     if not (hasattr(item, '__class__') and item.__class__.__name__ == 'Undefined')
                 ]
-            if isinstance(value, (str, int, float, bool, type(None))):
+            if isinstance(value, str | int | float | bool | type(None)):
                 return value
             # Try to convert to string for other types
             try:

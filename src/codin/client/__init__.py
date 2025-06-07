@@ -7,7 +7,6 @@ and observability features for external API integrations.
 from .base import Client, ClientConfig, RequestTracer
 from .tracers import LoggingTracer, MetricsTracer, RequestHistoryTracer
 
-
 __all__ = [
     'Client',
     'ClientConfig',

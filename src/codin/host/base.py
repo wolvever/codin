@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
 
-from ..config import load_config, CodinConfig
+from ..config import CodinConfig, load_config
 from ..lifecycle import LifecycleMixin
+
+if TYPE_CHECKING:
+    from ..actor.dispatcher import Dispatcher
+    from ..actor.supervisor import ActorSupervisor
 
 
 
@@ -18,16 +22,16 @@ class BaseHost(LifecycleMixin):
     def __init__(self, config_file: str | Path | None = None) -> None:
         super().__init__()
         self.config_file = Path(config_file) if config_file else None
-        self.config: Optional[CodinConfig] = None
-        self.dispatcher: Optional['Dispatcher'] = None
-        self.actor_manager: Optional['ActorSupervisor'] = None
+        self.config: CodinConfig | None = None
+        self.dispatcher: Dispatcher | None = None
+        self.actor_manager: ActorSupervisor | None = None
         self._resources: list[LifecycleMixin] = []
 
-    async def _create_actor_manager(self) -> 'ActorSupervisor':
+    async def _create_actor_manager(self) -> ActorSupervisor:
         """Create the actor manager instance."""
         return __import__('codin.actor.supervisor', fromlist=['LocalActorManager']).LocalActorManager()
 
-    async def _create_dispatcher(self, manager: 'ActorSupervisor') -> 'Dispatcher':
+    async def _create_dispatcher(self, manager: ActorSupervisor) -> Dispatcher:
         """Create the dispatcher instance."""
         return __import__('codin.actor.dispatcher', fromlist=['LocalDispatcher']).LocalDispatcher(manager)
 

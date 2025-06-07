@@ -53,6 +53,44 @@ async def test_local_mailbox():
     received_out = (await mailbox.get_outbox(timeout=1.0))[0]
     assert received_out.messageId == "msg2"
 
+    # Queues can hold multiple messages
+    msg3 = Message(
+        messageId="msg3",
+        role=Role.user,
+        parts=[TextPart(text="More")],
+        contextId="test",
+        kind="message",
+    )
+    msg4 = Message(
+        messageId="msg4",
+        role=Role.user,
+        parts=[TextPart(text="Data")],
+        contextId="test",
+        kind="message",
+    )
+    await mailbox.put_inbox(msg3)
+    await mailbox.put_inbox(msg4)
+    received_many = await mailbox.get_inbox(max_messages=2, timeout=1.0)
+    assert [m.messageId for m in received_many] == ["msg3", "msg4"]
+
+    msg5 = Message(
+        messageId="msg5",
+        role=Role.agent,
+        parts=[TextPart(text="More")],
+        contextId="test",
+        kind="message",
+    )
+    msg6 = Message(
+        messageId="msg6",
+        role=Role.agent,
+        parts=[TextPart(text="Data")],
+        contextId="test",
+        kind="message",
+    )
+    await mailbox.put_outbox([msg5, msg6])
+    received_many_out = await mailbox.get_outbox(max_messages=2, timeout=1.0)
+    assert [m.messageId for m in received_many_out] == ["msg5", "msg6"]
+
 
 @pytest.mark.asyncio
 async def test_local_actor_manager():

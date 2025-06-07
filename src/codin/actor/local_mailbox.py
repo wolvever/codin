@@ -26,8 +26,6 @@ class LocalMailbox(Mailbox):
             msgs = [msgs]
         for msg in msgs:
             if timeout is None:
-                while not q.empty():
-                    await asyncio.sleep(0)
                 await q.put(msg)
             else:
                 await asyncio.wait_for(q.put(msg), timeout=timeout)

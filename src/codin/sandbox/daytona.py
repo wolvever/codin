@@ -13,7 +13,7 @@ import zipfile
 
 from pathlib import Path
 
-from .base import ExecResult, Sandbox
+from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
 
 
 __all__ = ['DaytonaSandbox']
@@ -29,8 +29,8 @@ class DaytonaSandbox(Sandbox):
 
     BASE_URL = 'https://runner.api.daytona.io'  # TODO: make configurable
 
-    def __init__(self, workspace_id: str | None = None, api_key: str | None = None):
-        super().__init__()
+    def __init__(self, workspace_id: str | None = None, api_key: str | None = None, *, env_policy: ShellEnvironmentPolicy | None = None):
+        super().__init__(env_policy=env_policy)
         import os
 
         import requests
@@ -191,8 +191,9 @@ class DaytonaSandbox(Sandbox):
         payload: dict[str, _t.Any] = {'cmd': cmd_str}
         if cwd:
             payload['cwd'] = cwd
-        if env:
-            payload['envs'] = env
+        env_map = self._prepare_env(env)
+        if env_map:
+            payload['envs'] = env_map
         if timeout:
             payload['timeout'] = int(timeout)
 

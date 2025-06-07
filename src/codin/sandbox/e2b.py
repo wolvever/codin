@@ -12,7 +12,7 @@ import zipfile
 
 from pathlib import Path
 
-from .base import ExecResult, Sandbox
+from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
 
 
 __all__ = ['E2BSandbox']
@@ -21,8 +21,8 @@ __all__ = ['E2BSandbox']
 class E2BSandbox(Sandbox):
     """Adapter around E2B cloud sandbox SDK."""
 
-    def __init__(self, **kwargs):
-        super().__init__()
+    def __init__(self, *, env_policy: ShellEnvironmentPolicy | None = None, **kwargs):
+        super().__init__(env_policy=env_policy)
         try:
             from e2b import Sandbox as _E2B
         except ImportError as e:  # pragma: no cover
@@ -143,7 +143,7 @@ class E2BSandbox(Sandbox):
             result = self._sandbox.commands.run(
                 cmd_str,
                 cwd=cwd,
-                envs=env,
+                envs=self._prepare_env(env),
                 timeout=timeout,
             )
             return ExecResult(result.stdout, result.stderr, result.exit_code)

@@ -148,6 +148,22 @@ Both events include the following fields:
 Event listeners registered via `add_event_callback` receive these events the same
 way as `debug_llm_response`.
 
+## Run Events
+
+When using the simplified planning loop, the agent emits a `run_end` event after
+the planning loop completes and all cleanup steps finish. This allows external
+systems to know when an agent run has fully finished.
+
+The event data includes:
+
+```python
+{
+    "agent_id": str,
+    "session_id": str,
+    "elapsed_time": float  # Total runtime in seconds
+}
+```
+
 ## Migration
 
 The previous direct print-based debug system has been completely replaced with this event-based approach. No breaking changes were made to the public API - the `debug` parameter still works the same way, but the implementation is now cleaner and more flexible. 

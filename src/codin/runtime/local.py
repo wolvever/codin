@@ -1,23 +1,19 @@
+
 """Local runtime implementation for codin agents.
 
 This module provides a runtime implementation that executes workloads
 locally using subprocess for development and testing purposes.
 """
 
-from __future__ import annotations
-
 import asyncio
 import shlex
 import types
 import typing as _t
-
 from codin.runtime.base import Runtime, RuntimeResult, Workload, WorkloadType
 
-
 __all__ = [
-    'LocalRuntime',
+    "LocalRuntime",
 ]
-
 
 class LocalRuntime(Runtime):
     """Execute workloads directly on the host Python interpreter / shell.
@@ -25,8 +21,7 @@ class LocalRuntime(Runtime):
     * Security note*: This runtime should only be used in trusted environments.
     """
 
-    name = 'local'
-
+    name = "local"
     async def _run(
         self,
         workload: Workload,
@@ -38,11 +33,15 @@ class LocalRuntime(Runtime):
             return await self._run_callable(workload)
         if workload.kind is WorkloadType.CLI:
             return await self._run_cli(workload, stream=stream)
-        raise NotImplementedError(f'LocalRuntime does not support kind={workload.kind}')
+        raise NotImplementedError(
+            f"LocalRuntime does not support kind={workload.kind}"
+        )
 
     async def _run_callable(self, workload: Workload) -> RuntimeResult:
         if workload.callable is None:
-            raise ValueError('callable must be provided for FUNCTION/CLASS workload')
+            raise ValueError(
+                "callable must be provided for FUNCTION/CLASS workload"
+            )
 
         func = workload.callable
         if isinstance(func, types.FunctionType):
@@ -64,7 +63,7 @@ class LocalRuntime(Runtime):
         stream: bool = False,
     ) -> RuntimeResult:
         if workload.command is None:
-            raise ValueError('command must be provided for CLI workload')
+            raise ValueError("command must be provided for CLI workload")
 
         cmd_list = shlex.split(workload.command)
         proc = await asyncio.create_subprocess_exec(
@@ -77,19 +76,18 @@ class LocalRuntime(Runtime):
         if stream:
             assert proc.stdout is not None
 
-            result = RuntimeResult(success=False, output='', error=None)
-
+            result = RuntimeResult(success=False, output="", error=None)
             async def _iter() -> _t.AsyncIterator[str]:
                 output_parts = []
                 async for line in proc.stdout:
                     text = line.decode()
                     output_parts.append(text)
                     yield text
-                err = b''
+                err = b""
                 if proc.stderr is not None:
                     err = await proc.stderr.read()
                 await proc.wait()
-                result.output = ''.join(output_parts)
+                result.output = "".join(output_parts)
                 result.error = err.decode()
                 result.success = proc.returncode == 0
 

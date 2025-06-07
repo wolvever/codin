@@ -8,34 +8,29 @@ import uuid
 
 from datetime import datetime
 
-from a2a.types import Message, Role, TextPart
-from pydantic import BaseModel
+from .types import Message, Role, TextPart
 
-from ..model.factory import BaseLLM, LLMFactory
 from ..prompt.run import prompt_run
 from ..tool.base import to_tool_definitions
-from ..tool.registry import ToolRegistry
-from .types import FinishStep, MessageStep, Planner, State, Step, ThinkStep, ToolCall, ToolCallStep
+from ..id import new_id
+from .types import (
+    FinishStep,
+    MessageStep,
+    Planner,
+    State,
+    Step,
+    ThinkStep,
+    ToolCall,
+    ToolCallStep,
+    ErrorStep,
+)
 
 
 __all__ = [
     'BasePlanner',
-    'BasePlannerConfig',
 ]
 
 logger = logging.getLogger('codin.agent.base_planner')
-
-
-class BasePlannerConfig(BaseModel):
-    """Configuration for BasePlanner."""
-
-    model: str = 'gpt-4'
-    max_tokens: int = 4000
-    temperature: float = 0.7
-    max_tool_calls_per_turn: int = 10
-    thinking_enabled: bool = True
-    streaming_enabled: bool = True
-    rules: str | None = None
 
 
 class BasePlanner(Planner):
@@ -43,25 +38,22 @@ class BasePlanner(Planner):
 
     def __init__(
         self,
-        config: BasePlannerConfig | None = None,
-        llm: BaseLLM | None = None,
-        tool_registry: ToolRegistry | None = None,
-        debug: bool = False,
+        *,
+        prompt_name: str = 'code_agent_loop',
+        max_tool_calls_per_turn: int = 10,
+        enable_thinking: bool = True,
+        enable_streaming: bool = True,
+        rules: str | None = None,
     ):
-        """Initialize the BasePlanner.
+        """Initialize the BasePlanner."""
 
-        Args:
-            config: Planner configuration
-            llm: LLM instance (will create if not provided)
-            tool_registry: Tool registry for available tools
-            debug: Enable debug logging
-        """
-        self.config = config or BasePlannerConfig()
-        self.llm = llm or LLMFactory.create_llm(model=self.config.model)
-        self.tool_registry = tool_registry or ToolRegistry()
-        self.debug = debug
+        self.prompt_name = prompt_name
+        self.max_tool_calls_per_turn = max_tool_calls_per_turn
+        self.thinking_enabled = enable_thinking
+        self.streaming_enabled = enable_streaming
+        self.rules = rules
 
-        logger.info(f'Initialized BasePlanner with {len(self.tool_registry.get_tools())} tools')
+        logger.info('Initialized BasePlanner')
 
     async def next(self, state: State) -> _t.AsyncGenerator[Step]:
         """Generate execution steps based on current state."""
@@ -70,26 +62,28 @@ class BasePlanner(Planner):
         # Build the prompt variables from state
         variables = await self._build_prompt_variables(state)
 
-        if self.debug:
-            logger.debug(f'Planning for session {state.session_id}, turn {state.turn_count}')
-            logger.debug(f'Variables: {variables}')
+        logger.debug(
+            f'Planning for session {state.session_id}, turn {state.turn_count}, variables: {variables}'
+        )
 
         try:
             # Get LLM response using prompt_run
             response = await prompt_run(
-                'code_agent_loop', variables=variables, tools=variables.get('tools', []), stream=False
+                self.prompt_name,
+                variables=variables,
+                tools=variables.get('tools', []),
+                stream=False,
             )
 
             # Parse the structured response
             parsed_response = self._parse_structured_response(response)
 
             # Emit thinking step if enabled and thinking is present
-            if self.config.thinking_enabled and parsed_response.get('thinking'):
+            if self.thinking_enabled and parsed_response.get('thinking'):
                 yield ThinkStep(
                     step_id=str(uuid.uuid4()),
                     thinking=parsed_response['thinking'],
                     created_at=datetime.now(),
-                    metadata={'turn': state.turn_count},
                 )
                 step_count += 1
 
@@ -98,15 +92,14 @@ class BasePlanner(Planner):
             if tool_calls:
                 for tool_call in tool_calls:
                     yield ToolCallStep(
-                        step_id=str(uuid.uuid4()),
+                        step_id=new_id("tool_call", uuid=True),
                         tool_call=tool_call,
                         created_at=datetime.now(),
-                        metadata={'turn': state.turn_count},
                     )
                     step_count += 1
 
                     # Respect max tool calls limit
-                    if step_count >= self.config.max_tool_calls_per_turn:
+                    if step_count >= self.max_tool_calls_per_turn:
                         break
 
             # Emit message step if there's a message
@@ -123,7 +116,7 @@ class BasePlanner(Planner):
                 yield MessageStep(
                     step_id=str(uuid.uuid4()),
                     message=message,
-                    is_streaming=self.config.streaming_enabled,
+                    is_streaming=self.streaming_enabled,
                     created_at=datetime.now(),
                     metadata={'turn': state.turn_count},
                 )
@@ -158,7 +151,6 @@ class BasePlanner(Planner):
         except Exception as e:
             logger.error(f'Error in planner execution: {e}', exc_info=True)
 
-            # Emit error message step
             error_message = Message(
                 messageId=str(uuid.uuid4()),
                 role=Role.agent,
@@ -167,11 +159,11 @@ class BasePlanner(Planner):
                 kind='message',
             )
 
-            yield MessageStep(
+            yield ErrorStep(
                 step_id=str(uuid.uuid4()),
                 message=error_message,
+                error=str(e),
                 created_at=datetime.now(),
-                metadata={'turn': state.turn_count, 'error': str(e)},
             )
 
             # Finish with error
@@ -186,7 +178,7 @@ class BasePlanner(Planner):
     async def _build_prompt_variables(self, state: State) -> dict[str, _t.Any]:
         """Build variables for the prompt from current state."""
         # Get tool definitions
-        tool_definitions_objects = to_tool_definitions(self.tool_registry.get_tools())
+        tool_definitions_objects = to_tool_definitions(state.tools)
         tool_definitions = [
             {'name': td.name, 'description': td.description, 'parameters': self._clean_parameters(td.parameters)}
             for td in tool_definitions_objects
@@ -224,7 +216,7 @@ class BasePlanner(Planner):
             'tool_results': bool(tool_results_text),
             'tool_results_text': tool_results_text,
             'task_list': state.task_list,
-            'rules': self.config.rules,
+            'rules': self.rules,
         }
 
     def _parse_structured_response(self, response) -> dict[str, _t.Any]:
@@ -396,27 +388,23 @@ class BasePlanner(Planner):
     def get_config(self) -> dict[str, _t.Any]:
         """Get planner configuration."""
         return {
-            'model': self.config.model,
-            'max_tokens': self.config.max_tokens,
-            'temperature': self.config.temperature,
-            'max_tool_calls_per_turn': self.config.max_tool_calls_per_turn,
-            'thinking_enabled': self.config.thinking_enabled,
-            'streaming_enabled': self.config.streaming_enabled,
-            'rules': self.config.rules,
+            'prompt_name': self.prompt_name,
+            'max_tool_calls_per_turn': self.max_tool_calls_per_turn,
+            'thinking_enabled': self.thinking_enabled,
+            'streaming_enabled': self.streaming_enabled,
+            'rules': self.rules,
         }
 
     async def cleanup(self) -> None:
         """Clean up resources."""
-        if hasattr(self.llm, 'cleanup'):
-            await self.llm.cleanup()
+        pass
 
     async def reset(self, state: State) -> None:
         """Reset the planner to the initial state."""
         # For BasePlanner, resetting means clearing any internal state
         # Since BasePlanner is stateless (each call to next() is independent),
         # we don't need to do anything specific here
-        if self.debug:
-            logger.debug(f'BasePlanner reset for session {state.session_id}')
+        logger.debug(f'BasePlanner reset for session {state.session_id}')
 
         # If we had any internal state to clear, we would do it here
         # For example, clearing conversation history, resetting counters, etc.

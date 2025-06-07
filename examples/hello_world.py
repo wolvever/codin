@@ -10,7 +10,7 @@ Usage:
 
 Environment Variables:
     OPENAI_API_KEY - Required for OpenAI models
-    ANTHROPIC_API_KEY - Required for Anthropic models  
+    ANTHROPIC_API_KEY - Required for Anthropic models
     GOOGLE_API_KEY - Required for Google models
     MODEL_PROVIDER - Optional, defaults to "openai"
     MODEL_NAME - Optional, defaults to "gpt-4"
@@ -32,7 +32,7 @@ from codin.agent.code_planner import CodePlanner, CodePlannerConfig
 from codin.agent.types import AgentRunInput, RunConfig, Message
 from codin.memory.base import MemMemoryService
 from codin.tool.registry import ToolRegistry
-from codin.tool.core_tools import CoreToolset
+from codin.tool.sandbox import SandboxToolset
 from codin.sandbox.local import LocalSandbox
 from codin.model.factory import LLMFactory
 
@@ -43,25 +43,25 @@ logger = logging.getLogger(__name__)
 
 async def create_agent_and_planner():
     """Create and configure BaseAgent with CodePlanner and tools."""
-    
+
     # 1. Initialize sandbox for code execution
     sandbox = LocalSandbox()
     await sandbox.up()
     logger.info("✓ Sandbox initialized")
-    
-    # 2. Setup tool registry with core tools
+
+    # 2. Setup tool registry with sandbox tools
     tool_registry = ToolRegistry()
-    core_toolset = CoreToolset(sandbox)
-    await core_toolset.up()
-    tool_registry.register_toolset(core_toolset)
+    sandbox_toolset = SandboxToolset(sandbox)
+    await sandbox_toolset.up()
+    tool_registry.register_toolset(sandbox_toolset)
     logger.info(f"✓ Registered {len(tool_registry.get_tools())} tools")
-    
+
     # 3. Create LLM instance
     model_provider = os.getenv("MODEL_PROVIDER", "openai")
     model_name = os.getenv("MODEL_NAME", "gpt-4")
     llm = LLMFactory.create_llm(model=model_name)
     logger.info(f"✓ LLM created: {model_name}")
-    
+
     # 4. Configure and create planner
     planner_config = CodePlannerConfig(
         model=model_name,
@@ -70,28 +70,23 @@ async def create_agent_and_planner():
         max_tool_calls_per_turn=5,
         thinking_enabled=True,
         streaming_enabled=False,
-        rules="Always write and execute code step by step. Verify output after execution."
+        rules="Always write and execute code step by step. Verify output after execution.",
     )
-    planner = CodePlanner(
-        config=planner_config,
-        llm=llm,
-        tool_registry=tool_registry,
-        debug=True
-    )
+    planner = CodePlanner(config=planner_config, llm=llm, tool_registry=tool_registry, debug=True)
     logger.info("✓ CodePlanner created")
-    
+
     # 5. Initialize memory service
     memory = MemMemoryService()
     logger.info("✓ Memory service initialized")
-    
+
     # 6. Create agent with run configuration
     run_config = RunConfig(
         turn_budget=20,
         time_budget_seconds=300,  # 5 minutes
         token_budget=10000,
-        cost_budget=1.0
+        cost_budget=1.0,
     )
-    
+
     agent = BaseAgent(
         agent_id="hello-world-agent",
         name="HelloWorldAgent",
@@ -101,22 +96,22 @@ async def create_agent_and_planner():
         tools=tool_registry.get_tools(),
         llm=llm,
         default_config=run_config,
-        debug=True
+        debug=True,
     )
     logger.info("✓ BaseAgent created")
-    
+
     return agent, sandbox
 
 
 async def run_hello_world_task():
     """Execute the hello world task using BaseAgent and CodePlanner."""
-    
+
     print("🚀 Starting Hello World Example")
     print("=" * 50)
-    
+
     # Create agent and planner
     agent, sandbox = await create_agent_and_planner()
-    
+
     try:
         # Create task message
         task_message = Message(
@@ -124,50 +119,46 @@ async def run_hello_world_task():
             role=Role.user,
             parts=[TextPart(text="Write a python hello world script and check output result")],
             contextId="hello-world-session",
-            kind="message"
+            kind="message",
         )
-        
+
         # Create agent run input
-        agent_input = AgentRunInput(
-            session_id="hello-world-session",
-            message=task_message,
-            options={}
-        )
-        
+        agent_input = AgentRunInput(session_id="hello-world-session", message=task_message, options={})
+
         print(f"📝 Task: {task_message.parts[0].root.text}")
         print()
-        
+
         # Run the agent
         print("🤖 Agent executing task...")
         async for output in agent.run(agent_input):
-            if hasattr(output, 'result') and output.result:
+            if hasattr(output, "result") and output.result:
                 # Extract text from result message
-                if hasattr(output.result, 'parts'):
+                if hasattr(output.result, "parts"):
                     for part in output.result.parts:
-                        if hasattr(part, 'text'):
+                        if hasattr(part, "text"):
                             print(f"🔹 {part.text}")
-                        elif hasattr(part, 'root') and hasattr(part.root, 'text'):
+                        elif hasattr(part, "root") and hasattr(part.root, "text"):
                             print(f"🔹 {part.root.text}")
-                
+
                 # Show metadata if available
-                if hasattr(output, 'metadata') and output.metadata:
-                    step_type = output.metadata.get('step_type', 'unknown')
-                    if step_type == 'tool_call':
-                        tool_name = output.metadata.get('tool_name', 'unknown')
-                        success = output.metadata.get('success', False)
+                if hasattr(output, "metadata") and output.metadata:
+                    step_type = output.metadata.get("step_type", "unknown")
+                    if step_type == "tool_call":
+                        tool_name = output.metadata.get("tool_name", "unknown")
+                        success = output.metadata.get("success", False)
                         status = "✅" if success else "❌"
                         print(f"  🔧 Tool: {tool_name} {status}")
-                    elif step_type == 'finish':
-                        reason = output.metadata.get('reason', 'completed')
+                    elif step_type == "finish":
+                        reason = output.metadata.get("reason", "completed")
                         print(f"  ✨ Finished: {reason}")
-        
+
         print()
         print("✅ Task completed successfully!")
-        
+
     except Exception as e:
         logger.error(f"Error during task execution: {e}", exc_info=True)
         print(f"❌ Task failed: {e}")
-        
+
     finally:
         # Cleanup
         try:
@@ -181,12 +172,12 @@ async def run_hello_world_task():
 def check_environment():
     """Check if required environment variables are set."""
     required_vars = []
-    
+
     # Check for at least one LLM API key
     llm_keys = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY"]
     if not any(os.getenv(key) for key in llm_keys):
         required_vars.extend(llm_keys)
-    
+
     if required_vars:
         print("❌ Missing required environment variables:")
         for var in required_vars:
@@ -197,7 +188,7 @@ def check_environment():
         print("   export MODEL_PROVIDER='openai'")
         print("   export MODEL_NAME='gpt-4'")
         return False
-    
+
     return True
 
 
@@ -205,7 +196,7 @@ async def main():
     """Main entry point."""
     if not check_environment():
         sys.exit(1)
-    
+
     try:
         await run_hello_world_task()
     except KeyboardInterrupt:
@@ -216,4 +207,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

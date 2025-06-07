@@ -56,6 +56,7 @@ __all__ = [
     'EventStep',
     'ThinkStep',
     'FinishStep',
+    'ErrorStep',
     # Base interfaces
     'Planner',
     'EventType',
@@ -315,12 +316,13 @@ class Metrics(BaseModel):
 class State(BaseModel):
     """Comprehensive state containing all context for planning and execution."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
 
     ## Static members that are set once and never change duration the task
     session_id: str
     agent_id: str = ''
     config: RunConfig = Field(default_factory=RunConfig)
+    model_config_dict: dict[str, _t.Any] = Field(default_factory=dict, alias='model_config')
     tools: list['Tool'] = Field(default_factory=list)  # Tool objects from base.py
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -356,6 +358,7 @@ class StepType(Enum):
     TOOL_CALL = 'tool_call'  # Tool execution
     THINK = 'think'  # Internal reasoning
     FINISH = 'finish'  # Task completion
+    ERROR = 'error'  # Error step
 
 
 class Step(BaseModel):
@@ -440,6 +443,7 @@ class FinishStep(Step):
     final_message: Message | None = None
     reason: str | None = None
     success: bool = True
+    task: Task | None = None
 
     def __post_init__(self):
         if self.reason is None:
@@ -465,6 +469,13 @@ class FinishStep(Step):
         return TaskStatusUpdateEvent(
             contextId=context_id, taskId=task_id, status=completion_status, final=True, metadata=self.metadata
         )
+
+
+class ErrorStep(Step):
+    """Step emitted when planning fails."""
+
+    step_type: StepType = StepType.ERROR
+    error: str | None = None
 
 
 # =============================================================================

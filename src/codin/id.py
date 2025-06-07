@@ -5,16 +5,25 @@ with customizable prefixes and lengths.
 """
 
 
-def new_id(prefix: str, length: int = 8) -> str:
-    """Create a random prefix of specified length using alphanumeric characters.
+def new_id(prefix: str, length: int = 8, uuid: bool = False) -> str:
+    """Create an ID with the given prefix.
 
     Args:
-        length: Length of the prefix to generate. Defaults to 8.
+        length: Length of the random segment if ``uuid`` is ``False``.
+        uuid: Generate a UUID4 segment when ``True``. Defaults to ``False``.
 
     Returns:
-        A random string of alphanumeric characters of specified length.
+        A string identifier prefixed by ``prefix``.
     """
     import random
     import string
+    import uuid as _uuid
 
-    return f'{prefix}-{"".join(random.choices(string.ascii_letters + string.digits, k=length))}'
+    if uuid:
+        suffix = str(_uuid.uuid4())
+    else:
+        suffix = "".join(
+            random.choices(string.ascii_letters + string.digits, k=length)
+        )
+
+    return f"{prefix}-{suffix}"

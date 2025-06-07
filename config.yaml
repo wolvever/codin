@@ -5,8 +5,8 @@ approval_mode: "suggest"
 
 max_turns: 100
 
-# Provider configurations with custom base URLs
-providers:
+# Model configurations with custom base URLs
+model_configs:
   openai:
     name: "OpenAI"
     base_url: "https://aiproxy.usw.sealos.io/v1"  # Custom proxy URL

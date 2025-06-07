@@ -27,8 +27,8 @@ from .utils import create_mcp_toolsets_from_config
 
 
 __all__ = [
-    'ReplSession',
-    'start_repl',
+    "ReplSession",
+    "start_repl",
 ]
 
 _logger = logging.getLogger(__name__)
@@ -89,14 +89,14 @@ class ReplSession:
             # Suppress specific MCP-related warnings
             def suppress_mcp_warnings(loop, context):
                 """Suppress MCP-related task warnings during cleanup."""
-                exception = context.get('exception')
-                message = context.get('message', '')
+                exception = context.get("exception")
+                message = context.get("message", "")
 
                 # Suppress specific MCP cleanup warnings
                 if (
-                    (exception and 'cancel scope' in str(exception))
-                    or 'Task exception was never retrieved' in message
-                    or 'stdio_client' in message
+                    (exception and "cancel scope" in str(exception))
+                    or "Task exception was never retrieved" in message
+                    or "stdio_client" in message
                 ):
                     return  # Suppress these warnings
 
@@ -113,7 +113,7 @@ class ReplSession:
             self.sandbox = sandbox  # Store reference for cleanup
 
             if self.config.verbose:
-                click.echo(f'[OK] Initialized sandbox: {type(sandbox).__name__}')
+                click.echo(f"[OK] Initialized sandbox: {type(sandbox).__name__}")
 
             # Create sandbox toolset (now auto-generates tools from sandbox methods)
             from codin.tool.sandbox import SandboxToolset
@@ -132,14 +132,14 @@ class ReplSession:
                 try:
                     await toolset.up()
                     if self.config.verbose:
-                        click.echo(f'[OK] Initialized toolset: {toolset.name}')
+                        click.echo(f"[OK] Initialized toolset: {toolset.name}")
                 except Exception as e:
-                    click.echo(f'[WARN] Failed to initialize toolset {toolset.name}: {e}', err=True)
+                    click.echo(f"[WARN] Failed to initialize toolset {toolset.name}: {e}", err=True)
 
             # Create agent with initialized sandbox and toolsets
             self.agent = CodeAgent(
-                name='Codin Assistant',
-                description='AI coding assistant with tool-calling capabilities',
+                name="Codin Assistant",
+                description="AI coding assistant with tool-calling capabilities",
                 llm_model=self.config.model,
                 sandbox=sandbox,
                 toolsets=toolsets,
@@ -151,43 +151,43 @@ class ReplSession:
             processed_tool_calls = set()  # Track processed tool calls
 
             # Track streaming state
-            current_assistant_response = ''
+            current_assistant_response = ""
             streaming_started = False
 
             async def stream_event_callback(event):
                 nonlocal current_assistant_response, streaming_started
 
-                if event.event_type == 'llm_text_delta':
+                if event.event_type == "llm_text_delta":
                     # Real-time streaming of LLM text generation
-                    delta = event.data.get('delta', '')
+                    delta = event.data.get("delta", "")
                     if delta:
                         # Show header when streaming starts
                         if not streaming_started:
                             click.echo()
-                            click.echo(click.style('Assistant:', bold=True, fg='green'))
+                            click.echo(click.style("Assistant:", bold=True, fg="green"))
                             streaming_started = True
 
                         # Print the delta immediately without newline
                         click.echo(delta, nl=False)
                         current_assistant_response += delta
 
-                elif event.event_type == 'llm_response':
+                elif event.event_type == "llm_response":
                     # Show the assistant's final response (if not already shown via streaming)
-                    content = event.data.get('content', '')
-                    thinking = event.data.get('thinking', '')
-                    message = event.data.get('message', '')
-                    task_list = event.data.get('task_list', {})
-                    should_continue = event.data.get('should_continue', True)
-                    has_tool_calls = event.data.get('has_tool_calls', False)
+                    content = event.data.get("content", "")
+                    thinking = event.data.get("thinking", "")
+                    message = event.data.get("message", "")
+                    task_list = event.data.get("task_list", {})
+                    should_continue = event.data.get("should_continue", True)
+                    has_tool_calls = event.data.get("has_tool_calls", False)
 
                     # If we haven't shown any streaming content, show it now
                     if not current_assistant_response:
                         click.echo()
-                        click.echo(click.style('Assistant:', bold=True, fg='green'))
+                        click.echo(click.style("Assistant:", bold=True, fg="green"))
 
                         # Show thinking if available
                         if thinking:
-                            click.echo(click.style('💭 Thinking:', bold=True, fg='cyan'))
+                            click.echo(click.style("💭 Thinking:", bold=True, fg="cyan"))
                             click.echo(thinking)
                             click.echo()
 
@@ -197,58 +197,58 @@ class ReplSession:
                             click.echo(display_message)
 
                         # Show task list if available
-                        if task_list and (task_list.get('completed') or task_list.get('pending')):
+                        if task_list and (task_list.get("completed") or task_list.get("pending")):
                             click.echo()
-                            click.echo(click.style('📋 Task Progress:', bold=True, fg='blue'))
+                            click.echo(click.style("📋 Task Progress:", bold=True, fg="blue"))
 
-                            completed = task_list.get('completed', [])
-                            pending = task_list.get('pending', [])
+                            completed = task_list.get("completed", [])
+                            pending = task_list.get("pending", [])
 
                             if completed:
-                                click.echo(click.style('✅ Completed:', fg='green'))
+                                click.echo(click.style("✅ Completed:", fg="green"))
                                 for task in completed:
-                                    click.echo(f'  • {task}')
+                                    click.echo(f"  • {task}")
 
                             if pending:
-                                click.echo(click.style('⏳ Pending:', fg='yellow'))
+                                click.echo(click.style("⏳ Pending:", fg="yellow"))
                                 for task in pending:
-                                    click.echo(f'  • {task}')
+                                    click.echo(f"  • {task}")
 
                         # Show continuation status
                         if not should_continue:
                             click.echo()
-                            click.echo(click.style('🎯 Task completed!', bold=True, fg='green'))
+                            click.echo(click.style("🎯 Task completed!", bold=True, fg="green"))
 
                     elif streaming_started:
                         # We've been streaming, just add a newline to end the stream
                         click.echo()  # End the streaming line
 
                     # Reset for next response
-                    current_assistant_response = ''
+                    current_assistant_response = ""
                     streaming_started = False
 
                     if has_tool_calls:
                         click.echo()
-                        click.echo(click.style('🔧 Executing tools...', bold=True, fg='cyan'))
+                        click.echo(click.style("🔧 Executing tools...", bold=True, fg="cyan"))
 
-                elif event.event_type == 'tool_call_start':
+                elif event.event_type == "tool_call_start":
                     # Show individual tool call starting
-                    tool_name = event.data.get('tool_name', 'unknown')
-                    arguments = event.data.get('arguments', {})
+                    tool_name = event.data.get("tool_name", "unknown")
+                    arguments = event.data.get("arguments", {})
 
                     click.echo()
-                    click.echo(click.style(f'[TOOL] {tool_name}', bold=True, fg='yellow'))
+                    click.echo(click.style(f"[TOOL] {tool_name}", bold=True, fg="yellow"))
 
                     # Format arguments in a generic, well-structured way
                     self._format_tool_arguments(tool_name, arguments)
 
-                elif event.event_type == 'tool_call_end':
+                elif event.event_type == "tool_call_end":
                     # Show tool call completion - only once per tool call
-                    call_id = event.data.get('call_id', '')
-                    tool_name = event.data.get('tool_name', 'unknown')
-                    success = event.data.get('success', False)
-                    output = event.data.get('output', '')
-                    error = event.data.get('error', '')
+                    call_id = event.data.get("call_id", "")
+                    tool_name = event.data.get("tool_name", "unknown")
+                    success = event.data.get("success", False)
+                    output = event.data.get("output", "")
+                    error = event.data.get("error", "")
 
                     # Skip if we've already processed this tool call
                     if call_id in processed_tool_calls:
@@ -256,103 +256,119 @@ class ReplSession:
                     processed_tool_calls.add(call_id)
 
                     if success:
-                        click.echo(f'  ✅ {tool_name} completed')
+                        click.echo(f"  ✅ {tool_name} completed")
                         if output and len(output.strip()) > 0:
                             # Show output preview for some tools
-                            if tool_name == 'sandbox_read_file':
-                                lines = output.strip().split('\n')
-                                click.echo(f'  📄 Content ({len(lines)} lines):\n{output.strip()}')
-                            elif tool_name == 'sandbox_list_files':
-                                files = output.strip().split('\n') if output.strip() else []
+                            if tool_name == "sandbox_read_file":
+                                lines = output.strip().split("\n")
+                                click.echo(f"  📄 Content ({len(lines)} lines):\n{output.strip()}")
+                            elif tool_name == "sandbox_list_files":
+                                files = output.strip().split("\n") if output.strip() else []
                                 if files:
-                                    click.echo(f'  📁 Found {len(files)} items:')
+                                    click.echo(f"  📁 Found {len(files)} items:")
                                     for file in files:
-                                        click.echo(f'    • {file}')
-                            elif tool_name in ['sandbox_exec', 'shell', 'container_exec']:
+                                        click.echo(f"    • {file}")
+                            elif tool_name in ["sandbox_exec", "shell", "container_exec"]:
                                 if output.strip():
-                                    lines = output.strip().split('\n')
-                                    click.echo(f'  📤 Output ({len(lines)} lines):\n{output.strip()}')
-                            elif tool_name == 'sandbox_write_file':
-                                click.echo('  💾 File written successfully')
+                                    lines = output.strip().split("\n")
+                                    click.echo(
+                                        f"  📤 Output ({len(lines)} lines):\n{output.strip()}"
+                                    )
+                            elif tool_name == "sandbox_write_file":
+                                click.echo("  💾 File written successfully")
                     else:
-                        click.echo(f'  ❌ {tool_name} failed: {error}')
+                        click.echo(f"  ❌ {tool_name} failed: {error}")
 
-                elif event.event_type == 'tool_results':
+                elif event.event_type == "tool_results":
                     # Summary of all tool executions
-                    num_tools = event.data.get('num_tools_executed', 0)
-                    successful = event.data.get('successful_calls', 0)
-                    failed = event.data.get('failed_calls', 0)
+                    num_tools = event.data.get("num_tools_executed", 0)
+                    successful = event.data.get("successful_calls", 0)
+                    failed = event.data.get("failed_calls", 0)
 
                     if num_tools > 0:
                         click.echo()
                         if failed == 0:
                             click.echo(
-                                click.style(f'✨ All {num_tools} tools completed successfully', bold=True, fg='green')
+                                click.style(
+                                    f"✨ All {num_tools} tools completed successfully",
+                                    bold=True,
+                                    fg="green",
+                                )
                             )
                         else:
                             click.echo(
                                 click.style(
-                                    f'⚠️  Tools: {successful} successful, {failed} failed', bold=True, fg='yellow'
+                                    f"⚠️  Tools: {successful} successful, {failed} failed",
+                                    bold=True,
+                                    fg="yellow",
                                 )
                             )
 
-                elif event.event_type == 'approval_requested':
-                    tool_name = event.data.get('tool_name', 'unknown')
-                    auto_approved = event.data.get('auto_approved', False)
+                elif event.event_type == "approval_requested":
+                    tool_name = event.data.get("tool_name", "unknown")
+                    auto_approved = event.data.get("auto_approved", False)
                     if auto_approved:
-                        click.echo(f'  🔐 Auto-approved: {tool_name}')
+                        click.echo(f"  🔐 Auto-approved: {tool_name}")
 
-                elif event.event_type == 'debug_llm_response':
+                elif event.event_type == "debug_llm_response":
                     # Handle debug information display
                     debug_info = event.data
                     click.echo()
-                    click.echo(click.style(f'🤖 LLM Response (Turn {debug_info["turn_count"]}):', bold=True, fg='cyan'))
-                    click.echo(click.style('-' * 60, fg='cyan'))
+                    click.echo(
+                        click.style(
+                            f'🤖 LLM Response (Turn {debug_info["turn_count"]}):',
+                            bold=True,
+                            fg="cyan",
+                        )
+                    )
+                    click.echo(click.style("-" * 60, fg="cyan"))
 
-                    click.echo(f'📄 Raw content length: {debug_info["raw_content_length"]} characters')
+                    click.echo(
+                        f'📄 Raw content length: {debug_info["raw_content_length"]} characters'
+                    )
 
-                    thinking = debug_info.get('thinking')
+                    thinking = debug_info.get("thinking")
                     if thinking:
-                        click.echo(f'💭 Thinking: {thinking}')
+                        click.echo(f"💭 Thinking: {thinking}")
                     else:
-                        click.echo('💭 Thinking: None')
+                        click.echo("💭 Thinking: None")
 
-                    message = debug_info.get('message')
+                    message = debug_info.get("message")
                     if message:
-                        click.echo(f'💬 Message: {message}')
+                        click.echo(f"💬 Message: {message}")
                     else:
-                        click.echo('💬 Message: None')
+                        click.echo("💬 Message: None")
 
                     click.echo(f'🔄 Should continue: {debug_info["should_continue"]}')
 
-                    task_list = debug_info['task_list']
+                    task_list = debug_info["task_list"]
                     click.echo(
                         f'📋 Task list - Completed: {task_list["completed_count"]}, '
                         f'Pending: {task_list["pending_count"]}'
                     )
 
-                    tool_calls = debug_info.get('tool_calls', [])
+                    tool_calls = debug_info.get("tool_calls", [])
                     if tool_calls:
-                        click.echo(f'🔧 Tool calls: {len(tool_calls)}')
+                        click.echo(f"🔧 Tool calls: {len(tool_calls)}")
                         for i, tool_call in enumerate(tool_calls):
-                            args_keys = tool_call.get('arguments_keys', [])
+                            args_keys = tool_call.get("arguments_keys", [])
                             click.echo(f'  {i + 1}. {tool_call["name"]}({args_keys})')
                     else:
-                        click.echo('🔧 Tool calls: None')
+                        click.echo("🔧 Tool calls: None")
 
-                    click.echo(click.style('-' * 60, fg='cyan'))
+                    click.echo(click.style("-" * 60, fg="cyan"))
                     click.echo()
 
             self.agent.add_event_callback(stream_event_callback)
 
             if self.config.verbose:
-                click.echo(f'[OK] Initialized with model: {self.config.model}')
+                click.echo(f"[OK] Initialized with model: {self.config.model}")
 
             # Mark as initialized
             self._initialized = True
 
         except Exception as e:
-            click.echo(f'[ERROR] Failed to initialize: {e}', err=True)
+            click.echo(f"[ERROR] Failed to initialize: {e}", err=True)
             raise
 
     async def cleanup(self) -> None:
@@ -360,19 +376,19 @@ class ReplSession:
         if self._cleaned_up:
             return  # Already cleaned up, skip
 
-        _logger.info('Cleaning up REPL session...')
+        _logger.info("Cleaning up REPL session...")
 
         # Use a flag to track if we're in shutdown mode
         in_shutdown = False
         try:
             import sys
 
-            if hasattr(sys, '_getframe'):
+            if hasattr(sys, "_getframe"):
                 # Check if we're being called during asyncio.run() shutdown
                 for i in range(10):
                     try:
                         frame = sys._getframe(i)
-                        if frame and 'run_until_complete' in str(frame.f_code.co_name):
+                        if frame and "run_until_complete" in str(frame.f_code.co_name):
                             in_shutdown = True
                             break
                     except ValueError:
@@ -388,24 +404,24 @@ class ReplSession:
                 if in_shutdown:
                     # During shutdown, just fire and forget
                     asyncio.create_task(self._safe_cleanup_agent())
-                    click.echo('[OK] Initiated agent cleanup')
+                    click.echo("[OK] Initiated agent cleanup")
                 else:
                     await asyncio.wait_for(self.agent.cleanup(), timeout=3.0)
-                    click.echo('[OK] Cleaned up agent')
+                    click.echo("[OK] Cleaned up agent")
             except (TimeoutError, asyncio.CancelledError):
-                click.echo('[WARN] Agent cleanup timed out or was cancelled')
+                click.echo("[WARN] Agent cleanup timed out or was cancelled")
             except Exception as e:
-                click.echo(f'[WARN] Error cleaning up agent: {e}')
+                click.echo(f"[WARN] Error cleaning up agent: {e}")
             finally:
                 self.agent = None
 
         # Cleanup toolsets with better error handling
-        if hasattr(self, 'toolsets') and self.toolsets:
+        if hasattr(self, "toolsets") and self.toolsets:
             if in_shutdown:
                 # During shutdown, just fire and forget all cleanups
                 for toolset in self.toolsets:
                     asyncio.create_task(self._safe_cleanup_toolset(toolset))
-                click.echo(f'[OK] Initiated cleanup for {len(self.toolsets)} toolsets')
+                click.echo(f"[OK] Initiated cleanup for {len(self.toolsets)} toolsets")
             else:
                 # Normal cleanup with timeouts
                 cleanup_tasks = []
@@ -420,32 +436,32 @@ class ReplSession:
                         if isinstance(result, str):
                             click.echo(result)
                         elif isinstance(result, Exception):
-                            click.echo(f'[WARN] Toolset cleanup error: {result}')
+                            click.echo(f"[WARN] Toolset cleanup error: {result}")
                 except (TimeoutError, asyncio.CancelledError):
-                    click.echo('[WARN] Overall toolset cleanup timed out or was cancelled')
+                    click.echo("[WARN] Overall toolset cleanup timed out or was cancelled")
                 except Exception as e:
-                    click.echo(f'[WARN] Error during toolset cleanup: {e}')
+                    click.echo(f"[WARN] Error during toolset cleanup: {e}")
 
             self.toolsets = []
 
         # Cleanup sandbox
-        if hasattr(self, 'sandbox') and self.sandbox:
+        if hasattr(self, "sandbox") and self.sandbox:
             try:
                 if in_shutdown:
                     # During shutdown, just fire and forget
                     asyncio.create_task(self._safe_cleanup_sandbox())
-                    click.echo('[OK] Initiated sandbox cleanup')
+                    click.echo("[OK] Initiated sandbox cleanup")
                 else:
                     await asyncio.wait_for(self.sandbox.down(), timeout=3.0)
-                    click.echo('[OK] Cleaned up sandbox')
+                    click.echo("[OK] Cleaned up sandbox")
             except (TimeoutError, asyncio.CancelledError):
-                click.echo('[WARN] Sandbox cleanup timed out or was cancelled')
+                click.echo("[WARN] Sandbox cleanup timed out or was cancelled")
             except Exception as e:
-                click.echo(f'[WARN] Error cleaning up sandbox: {e}')
+                click.echo(f"[WARN] Error cleaning up sandbox: {e}")
             finally:
                 self.sandbox = None
 
-        click.echo('[OK] REPL session cleanup completed')
+        click.echo("[OK] REPL session cleanup completed")
 
         # Mark as cleaned up
         self._cleaned_up = True
@@ -462,10 +478,10 @@ class ReplSession:
         """Safely cleanup a toolset with complete error suppression."""
         try:
             await toolset.cleanup()
-            return f'[OK] Cleaned up toolset: {toolset.name}'
+            return f"[OK] Cleaned up toolset: {toolset.name}"
         except Exception:
             # During shutdown, don't show errors for expected cancellations
-            return f'[OK] Cleaned up toolset: {toolset.name}'
+            return f"[OK] Cleaned up toolset: {toolset.name}"
 
     async def _safe_cleanup_sandbox(self) -> None:
         """Safely cleanup sandbox with complete error suppression."""
@@ -486,7 +502,7 @@ class ReplSession:
                 return instructions
         except Exception as e:
             if self.config.verbose:
-                click.echo(f'[WARN] Warning: Failed to load project instructions: {e}')
+                click.echo(f"[WARN] Warning: Failed to load project instructions: {e}")
 
         return None
 
@@ -502,29 +518,29 @@ class ReplSession:
 
         # Define argument formatting rules
         IMPORTANT_ARGS = {
-            'path',
-            'file_path',
-            'target_file',
-            'directory',
-            'filename',
-            'command',
-            'cmd',
-            'script',
-            'query',
-            'search_term',
-            'pattern',
-            'content',
-            'text',
-            'data',
-            'message',
-            'input',
-            'output',
-            'url',
-            'endpoint',
-            'host',
-            'port',
-            'name',
-            'id',
+            "path",
+            "file_path",
+            "target_file",
+            "directory",
+            "filename",
+            "command",
+            "cmd",
+            "script",
+            "query",
+            "search_term",
+            "pattern",
+            "content",
+            "text",
+            "data",
+            "message",
+            "input",
+            "output",
+            "url",
+            "endpoint",
+            "host",
+            "port",
+            "name",
+            "id",
         }
 
         # Separate important and other arguments
@@ -542,14 +558,14 @@ class ReplSession:
             for key, value in important_args.items():
                 formatted_value = self._format_argument_value(key, value, max_length=None)
                 icon = self._get_argument_icon(key)
-                click.echo(f'  {icon} {key}: {formatted_value}')
+                click.echo(f"  {icon} {key}: {formatted_value}")
 
         # Display other arguments if any
         if other_args:
             other_formatted = []
             for key, value in other_args.items():
                 formatted_value = self._format_argument_value(key, value, max_length=None)
-                other_formatted.append(f'{key}={formatted_value}')
+                other_formatted.append(f"{key}={formatted_value}")
 
             if other_formatted:
                 click.echo(f'  📋 Additional args: {", ".join(other_formatted)}')
@@ -566,37 +582,37 @@ class ReplSession:
             Formatted string representation of the value
         """
         if value is None:
-            return 'None'
+            return "None"
 
         # Handle different value types
         if isinstance(value, bool):
-            return '✓' if value else '✗'
+            return "✓" if value else "✗"
         if isinstance(value, (int, float)):
             return str(value)
         if isinstance(value, list):
             if len(value) == 0:
-                return '[]'
+                return "[]"
             if len(value) == 1:
                 # For single item lists, format recursively
                 item_max_length = max_length // 2 if max_length else None
-                return f'[{self._format_argument_value(key, value[0], item_max_length)}]'
+                return f"[{self._format_argument_value(key, value[0], item_max_length)}]"
             # For multi-item lists, show first item and count
             item_max_length = max_length // 3 if max_length else None
             first_item = self._format_argument_value(key, value[0], item_max_length)
-            return f'[{first_item}, ...{len(value) - 1} more]'
+            return f"[{first_item}, ...{len(value) - 1} more]"
         if isinstance(value, dict):
             if len(value) == 0:
-                return '{}'
+                return "{}"
             keys = list(value.keys())[:3]
-            key_str = ', '.join(keys)
+            key_str = ", ".join(keys)
             if len(value) > 3:
-                key_str += f', ...{len(value) - 3} more'
-            return f'{{{key_str}}}'
+                key_str += f", ...{len(value) - 3} more"
+            return f"{{{key_str}}}"
         # String or other types
         str_value = str(value)
         if max_length is None or len(str_value) <= max_length:
             return str_value
-        return str_value[: max_length - 3] + '...'
+        return str_value[: max_length - 3] + "..."
 
     def _get_argument_icon(self, key: str) -> str:
         """Get an appropriate icon for an argument key.
@@ -610,156 +626,160 @@ class ReplSession:
         key_lower = key.lower()
 
         # File/path related
-        if any(word in key_lower for word in ['path', 'file', 'directory', 'folder']):
-            return '📁'
+        if any(word in key_lower for word in ["path", "file", "directory", "folder"]):
+            return "📁"
         # Command/execution related
-        if any(word in key_lower for word in ['command', 'cmd', 'script', 'exec']):
-            return '🏃'
+        if any(word in key_lower for word in ["command", "cmd", "script", "exec"]):
+            return "🏃"
         # Search/query related
-        if any(word in key_lower for word in ['query', 'search', 'pattern', 'filter']):
-            return '🔍'
+        if any(word in key_lower for word in ["query", "search", "pattern", "filter"]):
+            return "🔍"
         # Content/text related
-        if any(word in key_lower for word in ['content', 'text', 'data', 'message', 'body']):
-            return '📝'
+        if any(word in key_lower for word in ["content", "text", "data", "message", "body"]):
+            return "📝"
         # Network/URL related
-        if any(word in key_lower for word in ['url', 'endpoint', 'host', 'address']):
-            return '🌐'
+        if any(word in key_lower for word in ["url", "endpoint", "host", "address"]):
+            return "🌐"
         # ID/name related
-        if any(word in key_lower for word in ['id', 'name', 'key', 'token']):
-            return '🏷️'
+        if any(word in key_lower for word in ["id", "name", "key", "token"]):
+            return "🏷️"
         # Default
-        return '⚙️'
+        return "⚙️"
 
     def display_welcome(self) -> None:
         """Display welcome message."""
         click.echo()
-        click.echo(click.style('Codin AI Coding Assistant', bold=True, fg='cyan'))
-        click.echo(f'Model: {self.config.model} | Provider: {self.config.provider}')
-        click.echo(f'Approval: {self.config.approval_mode.value}')
+        click.echo(click.style("Codin AI Coding Assistant", bold=True, fg="cyan"))
+        click.echo(f"Model: {self.config.model} | Provider: {self.config.provider}")
+        click.echo(f"Approval: {self.config.approval_mode.value}")
 
         # Check for project instructions
         instructions = self.load_project_instructions()
         if instructions:
-            click.echo('[DOCS] Loaded project instructions from codin_rules.md')
+            click.echo("[DOCS] Loaded project instructions from codin_rules.md")
 
         click.echo()
-        click.echo('Type your coding request, or:')
-        click.echo('  /help    - Show available commands')
-        click.echo('  /clear   - Clear conversation history')
-        click.echo('  /config  - Show current configuration')
-        click.echo('  /exit    - Exit the REPL')
+        click.echo("Type your coding request, or:")
+        click.echo("  /help    - Show available commands")
+        click.echo("  /clear   - Clear conversation history")
+        click.echo("  /config  - Show current configuration")
+        click.echo("  /exit    - Exit the REPL")
         click.echo()
 
     def display_help(self) -> None:
         """Display help information."""
         click.echo()
-        click.echo(click.style('Available Commands:', bold=True))
-        click.echo('  /help     - Show this help message')
-        click.echo('  /clear    - Clear conversation history')
-        click.echo('  /config   - Show current configuration')
-        click.echo('  /history  - Show conversation history')
-        click.echo('  /mode     - Change approval mode')
-        click.echo('  /exit     - Exit the REPL')
+        click.echo(click.style("Available Commands:", bold=True))
+        click.echo("  /help     - Show this help message")
+        click.echo("  /clear    - Clear conversation history")
+        click.echo("  /config   - Show current configuration")
+        click.echo("  /history  - Show conversation history")
+        click.echo("  /mode     - Change approval mode")
+        click.echo("  /exit     - Exit the REPL")
         click.echo()
-        click.echo(click.style('Usage Tips:', bold=True))
+        click.echo(click.style("Usage Tips:", bold=True))
         click.echo("• Ask for coding tasks: 'Create a Python web scraper'")
         click.echo("• Request explanations: 'Explain this regex pattern'")
         click.echo("• Get help with errors: 'Fix the bug in utils.py'")
-        click.echo('• Multi-line input: End with Ctrl+D or empty line')
+        click.echo("• Multi-line input: End with Ctrl+D or empty line")
         click.echo()
 
     def display_config(self) -> None:
         """Display current configuration."""
         click.echo()
-        click.echo(click.style('Current Configuration:', bold=True))
-        click.echo(f'  Model: {self.config.model}')
-        click.echo(f'  Provider: {self.config.provider}')
+        click.echo(click.style("Current Configuration:", bold=True))
+        click.echo(f"  Model: {self.config.model}")
+        click.echo(f"  Provider: {self.config.provider}")
 
         # Show base URL for current provider
-        if self.config.provider in self.config.providers:
-            provider_config = self.config.providers[self.config.provider]
-            click.echo(f'  Base URL: {provider_config.base_url}')
+        if self.config.provider in self.config.model_configs:
+            provider_config = self.config.model_configs[self.config.provider]
+            click.echo(f"  Base URL: {provider_config.base_url}")
 
-        click.echo(f'  Approval Mode: {self.config.approval_mode.value}')
-        click.echo(f'  Verbose: {self.config.verbose}')
+        click.echo(f"  Approval Mode: {self.config.approval_mode.value}")
+        click.echo(f"  Verbose: {self.config.verbose}")
         click.echo(f'  Project Docs: {"enabled" if self.config.enable_rules else "disabled"}')
         click.echo()
 
     def display_history(self) -> None:
         """Display conversation history."""
         if not self.conversation_history:
-            click.echo('No conversation history.')
+            click.echo("No conversation history.")
             return
 
         click.echo()
-        click.echo(click.style('Conversation History:', bold=True))
+        click.echo(click.style("Conversation History:", bold=True))
         for i, msg in enumerate(self.conversation_history, 1):  # Show all messages
-            role_color = 'blue' if msg.role == Role.user else 'green'
-            role_name = 'You' if msg.role == Role.user else 'Assistant'
+            role_color = "blue" if msg.role == Role.user else "green"
+            role_name = "You" if msg.role == Role.user else "Assistant"
 
             # Get text content from parts
             text_parts = []
             for p in msg.parts:
                 # Handle Part objects that contain TextPart objects
-                if hasattr(p, 'root') and hasattr(p.root, 'text'):
+                if hasattr(p, "root") and hasattr(p.root, "text"):
                     text_parts.append(p.root.text)
                 # Handle direct TextPart objects
-                elif hasattr(p, 'text'):
+                elif hasattr(p, "text"):
                     text_parts.append(p.text)
-            content = ' '.join(text_parts)
+            content = " ".join(text_parts)
 
-            click.echo(f'  {i}. {click.style(role_name, fg=role_color)}: {content}')
+            click.echo(f"  {i}. {click.style(role_name, fg=role_color)}: {content}")
         click.echo()
 
     def change_approval_mode(self) -> None:
         """Change approval mode interactively."""
         click.echo()
-        click.echo('Available approval modes:')
-        click.echo('  1. suggest    - Show suggestions only (safest)')
-        click.echo('  2. auto-edit  - Automatically edit files')
-        click.echo('  3. full-auto  - Fully autonomous (runs commands)')
+        click.echo("Available approval modes:")
+        click.echo("  1. suggest    - Show suggestions only (safest)")
+        click.echo("  2. auto-edit  - Automatically edit files")
+        click.echo("  3. full-auto  - Fully autonomous (runs commands)")
         click.echo()
 
         try:
-            choice = click.prompt('Select mode (1-3)', type=int)
-            mode_map = {1: ApprovalMode.SUGGEST, 2: ApprovalMode.AUTO_EDIT, 3: ApprovalMode.FULL_AUTO}
+            choice = click.prompt("Select mode (1-3)", type=int)
+            mode_map = {
+                1: ApprovalMode.SUGGEST,
+                2: ApprovalMode.AUTO_EDIT,
+                3: ApprovalMode.FULL_AUTO,
+            }
 
             if choice in mode_map:
                 self.config.approval_mode = mode_map[choice]
-                click.echo(f'[OK] Approval mode changed to: {self.config.approval_mode.value}')
+                click.echo(f"[OK] Approval mode changed to: {self.config.approval_mode.value}")
             else:
-                click.echo('Invalid choice.')
+                click.echo("Invalid choice.")
         except click.Abort:
-            click.echo('Cancelled.')
+            click.echo("Cancelled.")
 
         click.echo()
 
     async def process_user_input(self, user_input: str) -> bool:
         """Process user input and return True to continue, False to exit."""
         # Handle commands
-        if user_input.startswith('/'):
+        if user_input.startswith("/"):
             command = user_input[1:].lower().strip()
 
-            if command in ['exit', 'quit', 'q']:
+            if command in ["exit", "quit", "q"]:
                 return False
-            if command == 'help':
+            if command == "help":
                 self.display_help()
                 return True
-            if command == 'clear':
+            if command == "clear":
                 self.conversation_history.clear()
-                click.echo('[OK] Conversation history cleared.')
+                click.echo("[OK] Conversation history cleared.")
                 return True
-            if command == 'config':
+            if command == "config":
                 self.display_config()
                 return True
-            if command == 'history':
+            if command == "history":
                 self.display_history()
                 return True
-            if command == 'mode':
+            if command == "mode":
                 self.change_approval_mode()
                 return True
-            click.echo(f'Unknown command: /{command}')
-            click.echo('Type /help for available commands.')
+            click.echo(f"Unknown command: /{command}")
+            click.echo("Type /help for available commands.")
             return True
 
         # Process as regular input
@@ -769,7 +789,9 @@ class ReplSession:
         try:
             # Create user message using a2a structure
             user_message = Message(
-                messageId=f'user-{len(self.conversation_history)}', role=Role.user, parts=[TextPart(text=user_input)]
+                messageId=f"user-{len(self.conversation_history)}",
+                role=Role.user,
+                parts=[TextPart(text=user_input)],
             )
 
             # Add to history
@@ -783,14 +805,14 @@ class ReplSession:
                     # since a2a doesn't have a system role
                     original_text = user_message.parts[0].text
                     user_message.parts[0] = TextPart(
-                        text=f'Project Instructions:\n{instructions}\n\nUser Request: {original_text}'
+                        text=f"Project Instructions:\n{instructions}\n\nUser Request: {original_text}"
                     )
 
             # Run agent with timeout
             agent_input = AgentRunInput(message=user_message)
 
             if self.agent is None:
-                raise RuntimeError('Agent not initialized')
+                raise RuntimeError("Agent not initialized")
 
             try:
                 # Add overall timeout for the entire agent run
@@ -800,29 +822,33 @@ class ReplSession:
                 )
             except TimeoutError:
                 click.echo(
-                    '\n[WARN] Request timed out after 5 minutes. This might be due to network issues '
-                    'or complex processing.'
+                    "\n[WARN] Request timed out after 5 minutes. This might be due to network issues "
+                    "or complex processing."
                 )
-                click.echo('You can try:')
-                click.echo('  - Simplifying your request')
-                click.echo('  - Checking your internet connection')
-                click.echo('  - Trying again in a moment')
+                click.echo("You can try:")
+                click.echo("  - Simplifying your request")
+                click.echo("  - Checking your internet connection")
+                click.echo("  - Trying again in a moment")
                 return True
             except ConnectionError as e:
-                click.echo(f'\n[WARN] Connection error: {e}')
-                click.echo('Please check your internet connection and try again.')
+                click.echo(f"\n[WARN] Connection error: {e}")
+                click.echo("Please check your internet connection and try again.")
                 return True
             except Exception as e:
                 # Check for specific error types
                 error_str = str(e).lower()
-                if 'timeout' in error_str or 'timed out' in error_str:
-                    click.echo(f'\n[WARN] Request timed out: {e}')
-                    click.echo('This might be due to network issues or high server load. Please try again.')
-                elif 'connection' in error_str or 'network' in error_str:
-                    click.echo(f'\n[WARN] Network error: {e}')
-                    click.echo('Please check your internet connection and try again.')
-                elif 'cancelled' in error_str:
-                    click.echo('\n[WARN] Request was cancelled. This might be due to cleanup during shutdown.')
+                if "timeout" in error_str or "timed out" in error_str:
+                    click.echo(f"\n[WARN] Request timed out: {e}")
+                    click.echo(
+                        "This might be due to network issues or high server load. Please try again."
+                    )
+                elif "connection" in error_str or "network" in error_str:
+                    click.echo(f"\n[WARN] Network error: {e}")
+                    click.echo("Please check your internet connection and try again.")
+                elif "cancelled" in error_str:
+                    click.echo(
+                        "\n[WARN] Request was cancelled. This might be due to cleanup during shutdown."
+                    )
                     return True
                 else:
                     # Re-raise for general error handling below
@@ -830,17 +856,17 @@ class ReplSession:
                 return True
 
             # Extract response text for conversation history
-            if hasattr(result.result, 'parts'):
+            if hasattr(result.result, "parts"):
                 # It's a Message
                 text_parts = []
                 for p in result.result.parts:
                     # Handle Part objects that contain TextPart objects
-                    if hasattr(p, 'root') and hasattr(p.root, 'text'):
+                    if hasattr(p, "root") and hasattr(p.root, "text"):
                         text_parts.append(p.root.text)
                     # Handle direct TextPart objects
-                    elif hasattr(p, 'text'):
+                    elif hasattr(p, "text"):
                         text_parts.append(p.text)
-                response_text = '\n'.join(text_parts)
+                response_text = "\n".join(text_parts)
             else:
                 # Fallback to string representation
                 response_text = str(result.result)
@@ -849,17 +875,17 @@ class ReplSession:
 
             # Add assistant response to history
             assistant_message = Message(
-                messageId=f'assistant-{len(self.conversation_history)}',
+                messageId=f"assistant-{len(self.conversation_history)}",
                 role=Role.agent,
                 parts=[TextPart(text=response_text)],
             )
             self.conversation_history.append(assistant_message)
 
         except KeyboardInterrupt:
-            click.echo('\n[WARN] Interrupted by user.')
+            click.echo("\n[WARN] Interrupted by user.")
             return True
         except Exception as e:
-            click.echo(f'\n[ERROR] Error: {e}', err=True)
+            click.echo(f"\n[ERROR] Error: {e}", err=True)
             if self.config.verbose:
                 import traceback
 
@@ -867,12 +893,12 @@ class ReplSession:
 
             # Provide helpful suggestions based on error type
             error_str = str(e).lower()
-            if 'model' in error_str or 'api' in error_str:
-                click.echo('\nTip: Check your API keys and model configuration with /config')
-            elif 'tool' in error_str:
-                click.echo('\nTip: Some tools might not be available. Try a simpler request.')
-            elif 'memory' in error_str or 'out of memory' in error_str:
-                click.echo('\nTip: Try clearing conversation history with /clear')
+            if "model" in error_str or "api" in error_str:
+                click.echo("\nTip: Check your API keys and model configuration with /config")
+            elif "tool" in error_str:
+                click.echo("\nTip: Some tools might not be available. Try a simpler request.")
+            elif "memory" in error_str or "out of memory" in error_str:
+                click.echo("\nTip: Try clearing conversation history with /clear")
 
             return True
 
@@ -894,7 +920,9 @@ class ReplSession:
                     try:
                         # Get user input
                         user_input = click.prompt(
-                            click.style('You', fg='blue', bold=True), prompt_suffix='> ', show_default=False
+                            click.style("You", fg="blue", bold=True),
+                            prompt_suffix="> ",
+                            show_default=False,
                         )
 
                         # Process input
@@ -902,7 +930,7 @@ class ReplSession:
 
                         # If this is piped input, exit after processing the first command
                         if is_pipe:
-                            click.echo('\n[INFO] Piped input processed. Exiting.')
+                            click.echo("\n[INFO] Piped input processed. Exiting.")
                             break
 
                         if not should_continue:
@@ -911,14 +939,14 @@ class ReplSession:
                     except (KeyboardInterrupt, EOFError):
                         if is_pipe:
                             # For piped input, EOFError is expected - just exit gracefully
-                            click.echo('\n[INFO] Piped input completed.')
+                            click.echo("\n[INFO] Piped input completed.")
                         else:
                             # For interactive mode, show goodbye message
-                            click.echo('\nGoodbye!')
+                            click.echo("\nGoodbye!")
                         break
 
             except Exception as e:
-                click.echo(f'\n[ERROR] Fatal error: {e}', err=True)
+                click.echo(f"\n[ERROR] Fatal error: {e}", err=True)
                 raise
         except Exception:
             # Re-raise exceptions to be handled by start_repl
@@ -958,9 +986,9 @@ async def start_repl(
 
         await session.run()
     except KeyboardInterrupt:
-        click.echo('\nGoodbye!')
+        click.echo("\nGoodbye!")
     except Exception as e:
-        click.echo(f'\n[ERROR] Fatal error: {e}', err=True)
+        click.echo(f"\n[ERROR] Fatal error: {e}", err=True)
         if verbose:
             import traceback
 
@@ -971,9 +999,9 @@ async def start_repl(
             await session.cleanup()
         except (asyncio.CancelledError, RuntimeError) as e:
             # These are expected during shutdown
-            if 'Event loop is closed' in str(e) or 'cancel scope' in str(e):
-                click.echo('[OK] Cleanup completed during shutdown')
+            if "Event loop is closed" in str(e) or "cancel scope" in str(e):
+                click.echo("[OK] Cleanup completed during shutdown")
             else:
-                click.echo(f'[WARN] Cleanup error during shutdown: {e}')
+                click.echo(f"[WARN] Cleanup error during shutdown: {e}")
         except Exception as e:
-            click.echo(f'[WARN] Error during cleanup: {e}')
+            click.echo(f"[WARN] Error during cleanup: {e}")

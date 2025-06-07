@@ -22,7 +22,12 @@ from .supervisor import ActorSupervisor
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
 
-__all__ = ['DispatchRequest', 'DispatchResult', 'Dispatcher', 'LocalDispatcher']
+__all__ = [
+    'DispatchRequest',
+    'DispatchResult',
+    'Dispatcher',
+    'LocalDispatcher',
+]
 
 
 class DispatchRequest(BaseModel):
@@ -72,6 +77,8 @@ class LocalDispatcher(Dispatcher):
         self.actor_manager = actor_manager
         self._active_runs: dict[str, DispatchResult] = {}
         self._run_tasks: dict[str, asyncio.Task] = {}
+        # per-run stream queues for realtime outputs
+        self._run_streams: dict[str, asyncio.Queue] = {}
 
     async def submit(self, a2a_request: dict) -> str:
         """Submit an A2A request and return runner_id."""
@@ -85,8 +92,12 @@ class LocalDispatcher(Dispatcher):
         result = DispatchResult(runner_id=runner_id, request_id=request_id, status='started')
         self._active_runs[runner_id] = result
 
+        # Stream queue for this run
+        stream_queue: asyncio.Queue = asyncio.Queue()
+        self._run_streams[runner_id] = stream_queue
+
         # Start async task to handle the request
-        task = asyncio.create_task(self._handle_request(dispatch_request, result))
+        task = asyncio.create_task(self._handle_request(dispatch_request, result, stream_queue))
         self._run_tasks[runner_id] = task
 
         return runner_id
@@ -120,7 +131,12 @@ class LocalDispatcher(Dispatcher):
         """List all active runs."""
         return list(self._active_runs.values())
 
-    async def _handle_request(self, request: DispatchRequest, result: DispatchResult) -> None:
+    async def _handle_request(
+        self,
+        request: DispatchRequest,
+        result: DispatchResult,
+        stream_queue: asyncio.Queue,
+    ) -> None:
         """Handle an A2A request by creating and orchestrating agents."""
         try:
             # Parse A2A request
@@ -157,8 +173,12 @@ class LocalDispatcher(Dispatcher):
             # Run the main agent (could be extended to orchestrate multiple agents)
             main_agent = agents[0]
             async for output in main_agent.run(run_input):
-                # Stream outputs - in a real implementation, this would be sent to client
-                # For now, just update metadata
+                # enqueue output for subscribers
+                await stream_queue.put(
+                    output.dict() if hasattr(output, 'dict') else str(output)
+                )
+
+                # also keep history in metadata
                 if 'outputs' not in result.metadata:
                     result.metadata['outputs'] = []
                 result.metadata['outputs'].append(
@@ -178,9 +198,14 @@ class LocalDispatcher(Dispatcher):
             result.metadata['error_timestamp'] = datetime.now().isoformat()
 
         finally:
+            # signal end of stream
+            await stream_queue.put(None)
+
             # Clean up task reference
             if result.runner_id in self._run_tasks:
                 del self._run_tasks[result.runner_id]
+            if result.runner_id in self._run_streams:
+                del self._run_streams[result.runner_id]
 
     def _create_message_from_a2a(self, message_data: dict, context_id: str) -> Message:
         """Create a Message object from A2A message data."""
@@ -204,6 +229,10 @@ class LocalDispatcher(Dispatcher):
             metadata=message_data.get('metadata', {}),
         )
 
+    def get_stream_queue(self, runner_id: str) -> asyncio.Queue | None:
+        """Return the stream queue for a running request."""
+        return self._run_streams.get(runner_id)
+
     async def cleanup(self) -> None:
         """Clean up all active runs and tasks."""
         # Cancel all running tasks
@@ -217,3 +246,4 @@ class LocalDispatcher(Dispatcher):
 
         self._run_tasks.clear()
         self._active_runs.clear()
+        self._run_streams.clear()

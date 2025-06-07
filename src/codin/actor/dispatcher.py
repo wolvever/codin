@@ -176,12 +176,23 @@ class LocalDispatcher(Dispatcher):
                 id=request.request_id, message=message, session_id=context_id, metadata=request.metadata
             )
 
-            # Run all agents concurrently
+            # Start runners for all agents and run them concurrently
+            from ..agent.runner import AgentRunner
+            from ..agent.concurrent_runner import ConcurrentRunner
+
+            runner_group = ConcurrentRunner()
+            for agent in agents:
+                runner_group.add_runner(AgentRunner(agent))
+
+            await runner_group.start_all()
+
             tasks = [
                 asyncio.create_task(self._run_agent(a, run_input, stream_queue, result))
                 for a in agents
             ]
             errors = await asyncio.gather(*tasks, return_exceptions=True)
+
+            await runner_group.stop_all()
 
             exceptions = [e for e in errors if isinstance(e, Exception)]
             if exceptions:

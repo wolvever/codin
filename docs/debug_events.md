@@ -128,6 +128,26 @@ async def my_debug_handler(event):
 agent.add_event_callback(my_debug_handler)
 ```
 
+## Task Events
+
+Two additional events provide high-level progress information:
+
+- `task_start` - emitted when a task begins.
+- `task_end` - emitted when the task finishes.
+
+Both events include the following fields:
+
+```python
+{
+    "session_id": str,   # Conversation/session identifier
+    "iteration": int,    # Current iteration when the event was emitted
+    "elapsed_time": float  # Seconds since the task started
+}
+```
+
+Event listeners registered via `add_event_callback` receive these events the same
+way as `debug_llm_response`.
+
 ## Migration
 
 The previous direct print-based debug system has been completely replaced with this event-based approach. No breaking changes were made to the public API - the `debug` parameter still works the same way, but the implementation is now cleaner and more flexible. 

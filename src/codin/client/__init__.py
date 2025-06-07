@@ -1,16 +1,18 @@
-"""Client module for making HTTP requests.
+"""HTTP client infrastructure for codin agents.
 
-This module provides a robust HTTP client with retry, logging, and tracing support.
+This module provides HTTP client functionality with tracing, metrics,
+and observability features for external API integrations.
 """
 
 from .base import Client, ClientConfig, RequestTracer
 from .tracers import LoggingTracer, MetricsTracer, RequestHistoryTracer
 
+
 __all__ = [
-    "Client", 
-    "ClientConfig", 
-    "RequestTracer",
-    "LoggingTracer",
-    "MetricsTracer",
-    "RequestHistoryTracer",
-] 
+    'Client',
+    'ClientConfig',
+    'LoggingTracer',
+    'MetricsTracer',
+    'RequestHistoryTracer',
+    'RequestTracer',
+]

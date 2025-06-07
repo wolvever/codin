@@ -83,7 +83,10 @@ class TestToolFormatting:
         # Test list
         assert repl_session._format_argument_value("items", []) == "[]"
         assert repl_session._format_argument_value("items", ["one"]) == "[one]"
-        assert repl_session._format_argument_value("items", ["one", "two", "three"]) == "[one, ...2 more]"
+        assert (
+            repl_session._format_argument_value("items", ["one", "two", "three"]) 
+            == "[one, ...2 more]"
+        )
         
         # Test dict
         assert repl_session._format_argument_value("config", {}) == "{}"
@@ -123,7 +126,10 @@ class TestToolFormatting:
     @patch('click.echo')
     def test_format_full_arguments_no_truncation(self, mock_echo, repl_session):
         """Test that tool arguments are displayed in full without truncation."""
-        long_explanation = "This is a very long explanation that would normally be truncated but should now be shown in full without any truncation"
+        long_explanation = (
+            "This is a very long explanation that would normally be truncated "
+            "but should now be shown in full without any truncation"
+        )
         
         repl_session._format_tool_arguments("test_tool", {
             "path": "/home/user/very/long/path/to/some/file/that/is/quite/lengthy.txt",

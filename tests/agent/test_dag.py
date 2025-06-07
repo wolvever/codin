@@ -396,7 +396,7 @@ class TestPlan:
         
         assert "task-1" in plan.tasks
         assert plan.tasks["task-1"] == task
-        assert task._plan == plan
+        assert task.plan_ref == plan
     
     def test_get_task(self):
         """Test getting a task by ID."""

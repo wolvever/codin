@@ -1,12 +1,15 @@
-"""Host module for running codin agents.
+"""Host system for codin agents.
 
-This module provides functionality for hosting and running codin agents,
-including single-agent and multi-agent hosts.
+This module provides host infrastructure for managing agent execution
+environments, including local and distributed hosting capabilities
+for running codin agents at scale.
 """
 
-from __future__ import annotations
+import typing as _t
 
-from .single import SingleAgentHost
+from .agent_host import AgentHost
 from .multi import MultiAgentHost
+from .single import SingleAgentHost
 
-__all__ = ["SingleAgentHost", "MultiAgentHost"] 
+
+__all__ = ['MultiAgentHost', 'SingleAgentHost']

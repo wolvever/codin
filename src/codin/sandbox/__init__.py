@@ -1,23 +1,23 @@
-"""Sandbox abstraction layer.
+"""Sandbox environments for codin agents.
 
-This package provides a unified interface for interacting with sandboxed execution
-environments. Multiple backends are supported including local subprocess execution,
-E2B cloud sandboxes, Daytona Runner API, and Codex CLI sandboxes.
+This module provides sandbox implementations for secure code execution
+including local, E2B, Daytona, and Codex sandbox environments.
 """
 
 from .base import ExecResult, Sandbox
-from .local import LocalSandbox
-from .e2b import E2BSandbox
-from .daytona import DaytonaSandbox
 from .codex import CodexSandbox
+from .daytona import DaytonaSandbox
+from .e2b import E2BSandbox
 from .factory import create_sandbox
+from .local import LocalSandbox
+
 
 __all__ = [
-    "ExecResult",
-    "Sandbox",
-    "LocalSandbox",
-    "E2BSandbox", 
-    "DaytonaSandbox",
-    "CodexSandbox",
-    "create_sandbox",
-] 
+    'CodexSandbox',
+    'DaytonaSandbox',
+    'E2BSandbox',
+    'ExecResult',
+    'LocalSandbox',
+    'Sandbox',
+    'create_sandbox',
+]

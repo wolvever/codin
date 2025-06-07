@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 from src.codin.agent.code_agent import CodeAgent, AgentEvent
 from src.codin.sandbox import LocalSandbox
 from src.codin.tool.registry import ToolRegistry
-from a2a.types import Message, Role, TextPart
-from src.codin.agent.base import AgentRunInput
+from a2a.types import Role, TextPart
+from src.codin.agent.types import Message, AgentRunInput
 
 
 class TestDebugEvents:
@@ -32,7 +32,10 @@ class TestDebugEvents:
         
         # Mock the LLM to return a structured response
         mock_response = MagicMock()
-        mock_response.content = '{"thinking": "Test thinking", "message": "Test message", "should_continue": false, "task_list": {"completed": [], "pending": []}, "tool_calls": []}'
+        mock_response.content = (
+            '{"thinking": "Test thinking", "message": "Test message", "should_continue": false, '
+            '"task_list": {"completed": [], "pending": []}, "tool_calls": []}'
+        )
         
         # Mock the model's run method
         agent._model = MagicMock()
@@ -60,7 +63,10 @@ class TestDebugEvents:
         
         # Mock the LLM to return a structured response
         mock_response = MagicMock()
-        mock_response.content = '{"thinking": "Test thinking", "message": "Test message", "should_continue": false, "task_list": {"completed": [], "pending": []}, "tool_calls": []}'
+        mock_response.content = (
+            '{"thinking": "Test thinking", "message": "Test message", "should_continue": false, '
+            '"task_list": {"completed": [], "pending": []}, "tool_calls": []}'
+        )
         
         # Mock the model's run method
         agent._model = MagicMock()
@@ -94,7 +100,9 @@ class TestDebugEvents:
         
         # Check that debug events were emitted
         debug_events = [e for e in received_events if e.event_type == "debug_llm_response"]
-        assert len(debug_events) > 0, "Debug events should be emitted when debug mode is enabled"
+        assert len(debug_events) > 0, (
+            "Debug events should be emitted when debug mode is enabled"
+        )
         
         # Verify the debug event structure
         debug_event = debug_events[0]
@@ -130,7 +138,9 @@ class TestDebugEvents:
         
         # Check that no debug events were emitted
         debug_events = [e for e in received_events if e.event_type == "debug_llm_response"]
-        assert len(debug_events) == 0, "Debug events should not be emitted when debug mode is disabled"
+        assert len(debug_events) == 0, (
+            "Debug events should not be emitted when debug mode is disabled"
+        )
 
     @pytest.mark.asyncio
     async def test_debug_event_data_structure(self, agent_with_debug):
@@ -144,18 +154,25 @@ class TestDebugEvents:
         agent_with_debug.add_event_callback(event_callback)
         
         # Mock the response parsing to return specific data
+        mock_tool_call_1 = MagicMock()
+        mock_tool_call_1.name = "test_tool"
+        mock_tool_call_1.call_id = "call_1"
+        mock_tool_call_1.arguments = {"arg1": "value1"}
+        
+        mock_tool_call_2 = MagicMock()
+        mock_tool_call_2.name = "another_tool"
+        mock_tool_call_2.call_id = "call_2"
+        mock_tool_call_2.arguments = {"arg2": "value2", "arg3": "value3"}
+        
         mock_parsed_response = {
             "thinking": "Test thinking content",
             "message": "Test message content", 
-            "should_continue": True,
+            "should_continue": False,  # Set to False to prevent infinite loop
             "task_list": {
                 "completed": ["Task 1", "Task 2"],
                 "pending": ["Task 3"]
             },
-            "tool_calls": [
-                MagicMock(name="test_tool", call_id="call_1", arguments={"arg1": "value1"}),
-                MagicMock(name="another_tool", call_id="call_2", arguments={"arg2": "value2", "arg3": "value3"})
-            ]
+            "tool_calls": [mock_tool_call_1, mock_tool_call_2]
         }
         
         # Mock the parsing method
@@ -168,9 +185,12 @@ class TestDebugEvents:
             parts=[TextPart(text="Test prompt")]
         )
         
-        # Run the agent
+        # Run the agent with timeout to prevent hanging
         agent_input = AgentRunInput(message=user_message)
-        await agent_with_debug.run(agent_input)
+        try:
+            await asyncio.wait_for(agent_with_debug.run(agent_input), timeout=10.0)
+        except asyncio.TimeoutError:
+            pytest.fail("Agent run timed out - this suggests the test is hanging")
         
         # Get the debug event
         debug_events = [e for e in received_events if e.event_type == "debug_llm_response"]
@@ -181,7 +201,7 @@ class TestDebugEvents:
         # Verify the structure
         assert debug_data["thinking"] == "Test thinking content"
         assert debug_data["message"] == "Test message content"
-        assert debug_data["should_continue"] == True
+        assert debug_data["should_continue"] == False  # Updated to match new mock
         assert debug_data["task_list"]["completed_count"] == 2
         assert debug_data["task_list"]["pending_count"] == 1
         assert debug_data["task_list"]["completed"] == ["Task 1", "Task 2"]

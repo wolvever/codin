@@ -1,31 +1,39 @@
+"""Base runtime interfaces and abstractions for codin agents.
+
+This module defines the core Runtime interface and workload types
+for executing agent tasks in different environments.
+"""
+
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import enum
 import typing as _t
+
 from abc import ABC, abstractmethod
 
+from pydantic import BaseModel, ConfigDict
+
+
 __all__ = [
-    "WorkloadType",
-    "Workload",
-    "RuntimeResult",
-    "Runtime",
+    'Runtime',
+    'RuntimeResult',
+    'Workload',
+    'WorkloadType',
 ]
 
 
 class WorkloadType(str, enum.Enum):
     """Enumeration of supported workload kinds."""
 
-    FUNCTION = "function"
-    CLASS = "class"
-    CLI = "cli"
-    CONTAINER = "container"
-    ENDPOINT = "endpoint"
+    FUNCTION = 'function'
+    CLASS = 'class'
+    CLI = 'cli'
+    CONTAINER = 'container'
+    ENDPOINT = 'endpoint'
 
 
-@dataclasses.dataclass(slots=True)
-class Workload:
+class Workload(BaseModel):
     """Description of an executable workload.
 
     Depending on *kind*, one of the following fields must be provided:
@@ -34,6 +42,8 @@ class Workload:
       • CONTAINER: ``image``
       • ENDPOINT: ``url``
     """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     kind: WorkloadType
     callable: _t.Callable | None = None
@@ -46,12 +56,13 @@ class Workload:
     working_dir: str | None = None
 
 
-@dataclasses.dataclass(slots=True)
-class RuntimeResult:
+class RuntimeResult(BaseModel):
     """Return payload from a Runtime execution."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     success: bool
-    output: str | bytes | _t.Any = ""
+    output: str | bytes | _t.Any = ''
     error: str | None = None
 
     # Streaming iterator (optional)
@@ -61,28 +72,27 @@ class RuntimeResult:
 class Runtime(ABC):
     """Abstract base class for an execution backend."""
 
-    name: str = "base"
+    name: str = 'base'
 
     async def _timeout_wrapper(self, cor: _t.Coroutine, timeout: float | None) -> _t.Any:
         if timeout is None:
             return await cor
         try:
             return await asyncio.wait_for(cor, timeout=timeout)
-        except asyncio.TimeoutError as exc:
-            raise RuntimeError("Workload execution timed out") from exc
+        except TimeoutError as exc:
+            raise RuntimeError('Workload execution timed out') from exc
 
     async def run(self, workload: Workload, /, *, stream: bool = False) -> RuntimeResult:
         """Public entrypoint with timeout handling."""
-
         try:
             result = await self._timeout_wrapper(self._run(workload, stream=stream), workload.timeout)
             return result
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return RuntimeResult(success=False, error=str(exc))
 
     # ---------------------------------------------------------------------
     # Mandatory implementation
     # ---------------------------------------------------------------------
     @abstractmethod
-    async def _run(self, workload: Workload, /, *, stream: bool = False) -> RuntimeResult:  # noqa: D401
-        """Actual execution provided by concrete runtime.""" 
+    async def _run(self, workload: Workload, /, *, stream: bool = False) -> RuntimeResult:
+        """Actual execution provided by concrete runtime."""

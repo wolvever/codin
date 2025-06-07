@@ -1,47 +1,99 @@
-"""Agent adapters subpackage."""
+"""Agent system for codin.
+
+This module provides the core agent infrastructure including base classes,
+implementations, and supporting types for creating and managing AI agents
+in the codin framework.
+"""
 
 # Import existing components
-from .base import Agent
-from .types import AgentRunInput, AgentRunOutput, ToolCall, ToolCallResult
+from ..actor.mailbox import Mailbox
 
-# Import new planner-based architecture
+# Import codin architecture components
+from ..memory.base import MemMemoryService, Memory
+from ..model.base import BaseLLM
+from ..tool.base import Tool
+from .base import Agent, Planner
+
+# Import new architecture types
 from .types import (
-    Step, 
-    StepType, 
-    ThinkStep, 
-    MessageStep, 
-    ToolCallStep, 
-    FinishStep, 
-    State
+    AgentRunInput,
+    AgentRunOutput,
+    Event,
+    EventStep,
+    EventType,
+    FinishStep,
+    # A2A Compatible types
+    Message,
+    MessageStep,
+    # Configuration and metrics
+    Metrics,
+    RunConfig,
+    RunEvent,
+    # State and Steps
+    State,
+    Step,
+    StepType,
+    Task,
+    ThinkStep,
+    ToolCallStep,
 )
-from .planner import Planner
-from .session import Session, SessionManager
-from .base_agent import BaseAgent
-from .code_planner import CodePlanner, CodePlannerConfig
 
-# Import existing concrete agents
-from .code_agent import CodeAgent
+
+# Lazy imports to avoid circular dependencies
+def get_base_agent():
+    """Lazy import BaseAgent to avoid circular imports."""
+    from .base_agent import BaseAgent
+
+    return BaseAgent
+
+
+def get_code_planner():
+    """Lazy import CodePlanner to avoid circular imports."""
+    from .code_planner import CodePlanner, CodePlannerConfig
+
+    return CodePlanner, CodePlannerConfig
+
+
+def get_code_agent():
+    """Lazy import CodeAgent to avoid circular imports."""
+    from .code_agent import CodeAgent
+
+    return CodeAgent
+
 
 __all__ = [
-    "Agent", 
-    "CodeAgent",
-    # Types
-    "AgentRunInput",
-    "AgentRunOutput", 
-    "ToolCall",
-    "ToolCallResult",
-    "Step",
-    "StepType",
-    "ThinkStep",
-    "MessageStep", 
-    "ToolCallStep",
-    "FinishStep",
-    "State",
-    # Components
-    "Planner",
-    "Session",
-    "SessionManager", 
-    "BaseAgent",
-    "CodePlanner",
-    "CodePlannerConfig",
-] 
+    # Base agent interface
+    'Agent',
+    'Planner',
+    # Input/Output types
+    'AgentRunInput',
+    'AgentRunOutput',
+    # Core architecture types
+    'State',
+    'Step',
+    'StepType',
+    'MessageStep',
+    'EventStep',
+    'ToolCallStep',
+    'ThinkStep',
+    'FinishStep',
+    'EventType',
+    # A2A Compatible types
+    'Message',
+    'Task',
+    'Event',
+    'RunEvent',
+    # Configuration and metrics
+    'Metrics',
+    'RunConfig',
+    # Codin architecture components
+    'Memory',
+    'MemMemoryService',
+    'BaseLLM',
+    'Tool',
+    'Mailbox',
+    # Lazy access functions
+    'get_base_agent',
+    'get_code_planner',
+    'get_code_agent',
+]

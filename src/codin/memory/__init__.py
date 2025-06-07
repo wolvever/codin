@@ -1,8 +1,10 @@
-"""Memory system subpackage."""
+"""Memory system for codin agents.
 
-from .base import MemorySystem, InMemoryStore
- 
-__all__ = [
-    "MemorySystem",
-    "InMemoryStore",
-] 
+This module provides memory services for storing and retrieving agent
+conversation history, context, and long-term memory across sessions.
+"""
+
+from .base import MemMemoryService, Memory
+
+
+__all__ = ['MemMemoryService', 'Memory']

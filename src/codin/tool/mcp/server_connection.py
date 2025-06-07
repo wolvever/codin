@@ -1,23 +1,21 @@
-from __future__ import annotations
+"""MCP server connection parameters for codin agents.
 
-"""Connection parameters for MCP servers.
-
-This module provides the parameter classes needed to establish connections
-to MCP servers using various protocols (HTTP, stdio, SSE).
+This module defines connection parameter classes for different MCP
+server connection types including HTTP, stdio, and SSE.
 """
 
-import typing as _t
-from dataclasses import dataclass, field
+
+from pydantic import BaseModel, Field
+
 
 __all__ = [
-    "HttpServerParams",
-    "StdioServerParams",
-    "SseServerParams",
+    'HttpServerParams',
+    'SseServerParams',
+    'StdioServerParams',
 ]
 
 
-@dataclass(slots=True)
-class HttpServerParams:
+class HttpServerParams(BaseModel):
     """Parameters for HTTP connections to an MCP server.
 
     Parameters
@@ -31,31 +29,30 @@ class HttpServerParams:
     """
 
     base_url: str
-    headers: dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
     timeout: float = 30.0
 
 
-@dataclass(slots=True)
-class StdioServerParams:
+class StdioServerParams(BaseModel):
     """Parameters for stdio connections to an MCP server.
 
     Parameters
     ----------
     command:
         The command to execute (e.g., "npx", "python").
-    args:
+
+    Args:
         Command line arguments for the command.
     env:
         Environment variables to set for the command.
     """
 
     command: str
-    args: list[str] = field(default_factory=list)
-    env: dict[str, str] = field(default_factory=dict)
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
 
 
-@dataclass(slots=True)
-class SseServerParams:
+class SseServerParams(BaseModel):
     """Parameters for Server-Sent Events (SSE) connections to an MCP server.
 
     Parameters
@@ -71,6 +68,6 @@ class SseServerParams:
     """
 
     url: str
-    headers: dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
     timeout: float = 5.0
-    sse_read_timeout: float = 300.0  # 5 minutes default 
+    sse_read_timeout: float = 300.0  # 5 minutes default

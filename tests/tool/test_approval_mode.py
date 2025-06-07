@@ -3,8 +3,10 @@ from __future__ import annotations
 """Tests for ApprovalMode enum."""
 
 import pytest
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
-from src.codin.tool.base import ApprovalMode
+from src.codin.config import ApprovalMode
 
 
 class TestApprovalMode:

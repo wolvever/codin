@@ -1,17 +1,19 @@
-from __future__ import annotations
+
+"""Local runtime implementation for codin agents.
+
+This module provides a runtime implementation that executes workloads
+locally using subprocess for development and testing purposes.
+"""
 
 import asyncio
 import shlex
 import types
 import typing as _t
-
 from codin.runtime.base import Runtime, RuntimeResult, Workload, WorkloadType
-
 
 __all__ = [
     "LocalRuntime",
 ]
-
 
 class LocalRuntime(Runtime):
     """Execute workloads directly on the host Python interpreter / shell.
@@ -20,7 +22,6 @@ class LocalRuntime(Runtime):
     """
 
     name = "local"
-
     async def _run(
         self,
         workload: Workload,
@@ -76,7 +77,6 @@ class LocalRuntime(Runtime):
             assert proc.stdout is not None
 
             result = RuntimeResult(success=False, output="", error=None)
-
             async def _iter() -> _t.AsyncIterator[str]:
                 output_parts = []
                 async for line in proc.stdout:

@@ -91,7 +91,10 @@ async def test_simple_prompt():
             print("✅ Direct LLM call successful!")
             print(f"Result: {result}")
         else:
-            print(f"❌ LLM doesn't have generate method. Available methods: {[m for m in dir(llm) if not m.startswith('_')]}")
+            print(
+                f"❌ LLM doesn't have generate method. Available methods: " +
+                f"{[m for m in dir(llm) if not m.startswith('_')]}"
+            )
         
         return result
         

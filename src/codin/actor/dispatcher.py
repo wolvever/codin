@@ -73,12 +73,15 @@ class Dispatcher(ABC):
 class LocalDispatcher(Dispatcher):
     """Local implementation of dispatcher using asyncio."""
 
-    def __init__(self, actor_manager: ActorSupervisor):
+    def __init__(self, actor_manager: ActorSupervisor, max_concurrency: int | None = None):
         self.actor_manager = actor_manager
         self._active_runs: dict[str, DispatchResult] = {}
         self._run_tasks: dict[str, asyncio.Task] = {}
         # per-run stream queues for realtime outputs
         self._run_streams: dict[str, asyncio.Queue] = {}
+        self._semaphore: asyncio.Semaphore | None = (
+            asyncio.Semaphore(max_concurrency) if max_concurrency else None
+        )
 
     async def submit(self, a2a_request: dict) -> str:
         """Submit an A2A request and return runner_id."""
@@ -187,7 +190,7 @@ class LocalDispatcher(Dispatcher):
             await runner_group.start_all()
 
             tasks = [
-                asyncio.create_task(self._run_agent(a, run_input, stream_queue, result))
+                asyncio.create_task(self._run_agent_with_semaphore(a, run_input, stream_queue, result))
                 for a in agents
             ]
             errors = await asyncio.gather(*tasks, return_exceptions=True)
@@ -238,6 +241,20 @@ class LocalDispatcher(Dispatcher):
                     'output': output.dict() if hasattr(output, 'dict') else str(output),
                 }
             )
+
+    async def _run_agent_with_semaphore(
+        self,
+        agent: 'Agent',
+        run_input: 'AgentRunInput',
+        stream_queue: asyncio.Queue,
+        result: DispatchResult,
+    ) -> None:
+        if self._semaphore is None:
+            await self._run_agent(agent, run_input, stream_queue, result)
+            return
+
+        async with self._semaphore:
+            await self._run_agent(agent, run_input, stream_queue, result)
 
     def _create_message_from_a2a(self, message_data: dict, context_id: str) -> Message:
         """Create a Message object from A2A message data."""

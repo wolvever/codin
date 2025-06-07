@@ -42,7 +42,7 @@ The framework implements the same core iterative loop logic as other coding agen
 | **State Management** | Immutable State + Memory service | Mutable instance variables | Mutex-protected state |
 | **Tool Execution** | Step-based via ToolCallStep | Turn-based with results | Stream-based function calls |
 
-See `docs/agent_logic_comparison.md` for detailed analysis.
+See `docs/agent_architecture.md` for a deeper explanation of the agent loop and state handling.
 
 ## Installation
 

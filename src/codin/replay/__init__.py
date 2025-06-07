@@ -7,8 +7,10 @@ by examining past execution patterns and behaviors.
 """
 
 from .base import ReplayService
+from .file import FileReplayService
 
 
 __all__ = [
-    'ReplayService',
+    "ReplayService",
+    "FileReplayService",
 ]

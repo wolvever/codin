@@ -445,16 +445,48 @@ class BaseAgent(Agent):
         step_output_metadata_base = {'agent_id': self.id, 'step_id': step.step_id}
 
         try:
-            if step.step_type == StepType.MESSAGE and isinstance(step, MessageStep) and step.message:
-                # Message step - add to memory, send to outbox, and yield
-                await self.memory.add_message(step.message)
-                await self.mailbox.put_outbox(step.message)
-
-                yield AgentRunOutput(
-                    id=step.step_id,
-                    result=step.message,
-                    metadata={**step_output_metadata_base, 'step_type': 'message', 'is_streaming': step.is_streaming},
-                )
+            if step.step_type == StepType.MESSAGE and isinstance(step, MessageStep):
+                if step.is_streaming and step.message_stream is not None:
+                    collected: list[str] = []
+                    async for chunk in step.stream_content():
+                        collected.append(chunk)
+                        stream_msg = Message(
+                            messageId=f"{step.step_id}-stream",
+                            role=Role.agent,
+                            parts=[TextPart(text=chunk)],
+                            contextId=session_id,
+                            kind='message',
+                            metadata={'stream': True, 'step_id': step.step_id},
+                        )
+                        await self.mailbox.put_outbox(stream_msg)
+                        yield AgentRunOutput(
+                            id=step.step_id,
+                            result=stream_msg,
+                            metadata={**step_output_metadata_base, 'step_type': 'message', 'stream': True},
+                        )
+                    if step.message is None:
+                        step.message = Message(
+                            messageId=str(uuid.uuid4()),
+                            role=Role.agent,
+                            parts=[TextPart(text="".join(collected))],
+                            contextId=session_id,
+                            kind='message',
+                        )
+                    await self.memory.add_message(step.message)
+                    await self.mailbox.put_outbox(step.message)
+                    yield AgentRunOutput(
+                        id=step.step_id,
+                        result=step.message,
+                        metadata={**step_output_metadata_base, 'step_type': 'message', 'is_streaming': True},
+                    )
+                elif step.message:
+                    await self.memory.add_message(step.message)
+                    await self.mailbox.put_outbox(step.message)
+                    yield AgentRunOutput(
+                        id=step.step_id,
+                        result=step.message,
+                        metadata={**step_output_metadata_base, 'step_type': 'message', 'is_streaming': step.is_streaming},
+                    )
 
             elif step.step_type == StepType.EVENT and isinstance(step, EventStep) and step.event:
                 # Event step - emit via mailbox and internal event system

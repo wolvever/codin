@@ -10,6 +10,7 @@ from ..memory.base import MemMemoryService, Memory
 from ..model.base import BaseLLM
 from ..tool.base import Tool
 from .base import Agent, Planner
+from .runner import AgentRunner
 
 # Import new architecture types
 from .types import (
@@ -88,6 +89,7 @@ __all__ = [
     'MemMemoryService',
     'BaseLLM',
     'Tool',
+    'AgentRunner',
     # Lazy access functions
     'get_base_agent',
     'get_base_planner',

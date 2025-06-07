@@ -462,31 +462,33 @@ class Step(BaseModel):
         """Return True if the event is an internal RunEvent."""
         return isinstance(self.event, RunEvent)
 
-
 class MessageStep(Step):
     """A2A compatible message step with enhanced support for mixed content."""
 
     is_streaming: bool = False
+    message_stream: _t.AsyncIterator[str] | None = None
     step_type: StepType = StepType.MESSAGE
 
-    def model_post_init(self, __context: _t.Any) -> None:
-        if self.message is None:
-            raise ValueError('message is required for MessageStep')
+    def __post_init__(self):
+        if self.message is None and self.message_stream is None:
+            raise ValueError('message or message_stream is required for MessageStep')
 
     async def stream_content(self) -> _t.AsyncGenerator[str]:
-        """Stream message content if is_streaming=True."""
+        """Stream message content if ``is_streaming`` is True."""
+        if self.message_stream is not None:
+            async for chunk in self.message_stream:
+                yield chunk
+            return
+
         if not self.is_streaming or not self.message:
             return
 
-        # Stream text parts from the message
         for part in self.message.parts:
             if hasattr(part, 'text'):
-                # Stream text content in chunks
                 text = part.text
-                chunk_size = 50  # Adjust as needed
+                chunk_size = 50
                 for i in range(0, len(text), chunk_size):
                     yield text[i : i + chunk_size]
-
 
 class ToolCallStep(Step):
     """Step for executing a tool call with enhanced result handling."""

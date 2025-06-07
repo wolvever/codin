@@ -72,11 +72,43 @@ class BasePlanner(Planner):
                 self.prompt_name,
                 variables=variables,
                 tools=variables.get('tools', []),
-                stream=False,
+                stream=self.streaming_enabled,
             )
 
-            # Parse the structured response
-            parsed_response = self._parse_structured_response(response)
+            stream_chunks: list[str] = []
+            if response.streaming and self.streaming_enabled and isinstance(response.content, _t.AsyncIterator):
+                step = MessageStep(
+                    step_id=str(uuid.uuid4()),
+                    is_streaming=True,
+                    created_at=datetime.now(),
+                    metadata={"turn": state.turn_count},
+                )
+
+                async def _iter() -> _t.AsyncIterator[str]:
+                    async for chunk in response.content:  # type: ignore[arg-type]
+                        stream_chunks.append(str(chunk))
+                        yield str(chunk)
+                    step.message = Message(
+                        messageId=str(uuid.uuid4()),
+                        role=Role.agent,
+                        parts=[TextPart(text="".join(stream_chunks))],
+                        contextId=state.session_id,
+                        kind="message",
+                    )
+
+                step.message_stream = _iter()
+                yield step
+                message_content = "".join(stream_chunks)
+            else:
+                message_content = ""
+                if hasattr(response, "message") and response.message:
+                    for part in response.message.parts:
+                        if hasattr(part, "text"):
+                            message_content += part.text
+                elif hasattr(response, "content") and response.content:
+                    message_content = str(response.content)
+
+            parsed_response = self._parse_structured_response(message_content)
 
             # Emit thinking step if enabled and thinking is present
             if self.thinking_enabled and parsed_response.get('thinking'):
@@ -104,7 +136,7 @@ class BasePlanner(Planner):
 
             # Emit message step if there's a message
             message_content = parsed_response.get('message', '')
-            if message_content:
+            if message_content and not (response.streaming and self.streaming_enabled):
                 message = Message(
                     messageId=str(uuid.uuid4()),
                     role=Role.agent,
@@ -116,7 +148,7 @@ class BasePlanner(Planner):
                 yield MessageStep(
                     step_id=str(uuid.uuid4()),
                     message=message,
-                    is_streaming=self.streaming_enabled,
+                    is_streaming=False,
                     created_at=datetime.now(),
                     metadata={'turn': state.turn_count},
                 )
@@ -127,7 +159,7 @@ class BasePlanner(Planner):
             if not should_continue or not tool_calls:
                 # Task is complete
                 final_message = None
-                if message_content:
+                if message_content and not (response.streaming and self.streaming_enabled):
                     final_message = Message(
                         messageId=str(uuid.uuid4()),
                         role=Role.agent,

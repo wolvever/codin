@@ -17,7 +17,7 @@ import zipfile
 
 from pathlib import Path
 
-from .base import ExecResult, Sandbox
+from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
 
 
 __all__ = ['LocalSandbox']
@@ -32,8 +32,8 @@ class LocalSandbox(Sandbox):
     Enhanced to support both Windows PowerShell and Unix bash automatically.
     """
 
-    def __init__(self, workdir: str | None = None):
-        super().__init__()
+    def __init__(self, workdir: str | None = None, *, env_policy: ShellEnvironmentPolicy | None = None):
+        super().__init__(env_policy=env_policy)
         self._workdir = workdir or os.getcwd()
         self._is_windows = platform.system().lower() == 'windows'
         self._shell_executable = self._detect_shell()
@@ -172,7 +172,7 @@ class LocalSandbox(Sandbox):
 
         def _run_subprocess():
             # Set up environment with UTF-8 encoding for Windows
-            subprocess_env = {**os.environ, **(env or {})}
+            subprocess_env = self._prepare_env(env)
             if self._is_windows:
                 # Force UTF-8 encoding on Windows
                 subprocess_env['PYTHONIOENCODING'] = 'utf-8'

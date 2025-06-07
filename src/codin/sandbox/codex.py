@@ -8,7 +8,7 @@ import typing as _t
 
 from pathlib import Path
 
-from .base import ExecResult, Sandbox
+from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
 
 
 __all__ = ['CodexSandbox']
@@ -17,8 +17,8 @@ __all__ = ['CodexSandbox']
 class CodexSandbox(Sandbox):
     """Codex CLI sandbox wrapper (TODO)."""
 
-    def __init__(self, **_kwargs):
-        super().__init__()
+    def __init__(self, *, env_policy: ShellEnvironmentPolicy | None = None, **_kwargs):
+        super().__init__(env_policy=env_policy)
         raise NotImplementedError('CodexSandbox is not yet implemented. Contributions welcome!')
 
     async def _up(self) -> None:

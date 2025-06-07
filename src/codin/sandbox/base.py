@@ -6,10 +6,13 @@ including local, containerized, and cloud-based execution environments.
 """
 
 import abc
+import enum
+import fnmatch
 import logging
 import os
 import typing as _t
 from abc import ABC
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -19,7 +22,11 @@ from ..lifecycle import LifecycleMixin
 
 __all__ = [
     'ExecResult',
+    'EnvironmentVariablePattern',
+    'ShellEnvironmentPolicy',
+    'ShellEnvironmentPolicyInherit',
     'Sandbox',
+    'create_env',
 ]
 
 logger = logging.getLogger(__name__)
@@ -27,6 +34,89 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Common data-structures
 # ---------------------------------------------------------------------------
+
+
+class EnvironmentVariablePattern:
+    """Simple wildcard pattern for environment variable names."""
+
+    def __init__(self, pattern: str, *, case_insensitive: bool = False) -> None:
+        self.pattern = pattern
+        self.case_insensitive = case_insensitive
+
+    @classmethod
+    def new_case_insensitive(cls, pattern: str) -> 'EnvironmentVariablePattern':
+        return cls(pattern, case_insensitive=True)
+
+    def matches(self, name: str) -> bool:  # pragma: no cover - simple wrapper
+        if self.case_insensitive:
+            return fnmatch.fnmatch(name.lower(), self.pattern.lower())
+        return fnmatch.fnmatch(name, self.pattern)
+
+
+class ShellEnvironmentPolicyInherit(str, enum.Enum):
+    """Strategy for inheriting environment variables."""
+
+    CORE = 'core'
+    ALL = 'all'
+    NONE = 'none'
+
+
+@dataclass
+class ShellEnvironmentPolicy:
+    """Policy for constructing an environment when spawning a shell."""
+
+    inherit: ShellEnvironmentPolicyInherit = ShellEnvironmentPolicyInherit.CORE
+    ignore_default_excludes: bool = False
+    exclude: list[EnvironmentVariablePattern] = field(default_factory=list)
+    set: dict[str, str] = field(default_factory=dict)
+    include_only: list[EnvironmentVariablePattern] = field(default_factory=list)
+
+
+def create_env(policy: ShellEnvironmentPolicy) -> dict[str, str]:
+    """Create an environment map based on *policy*."""
+
+    source_env = dict(os.environ)
+
+    if policy.inherit is ShellEnvironmentPolicyInherit.ALL:
+        env_map = source_env.copy()
+    elif policy.inherit is ShellEnvironmentPolicyInherit.NONE:
+        env_map = {}
+    else:  # CORE
+        core_vars = {
+            'HOME',
+            'LOGNAME',
+            'PATH',
+            'SHELL',
+            'USER',
+            'USERNAME',
+            'TMPDIR',
+            'TEMP',
+            'TMP',
+        }
+        env_map = {k: v for k, v in source_env.items() if k in core_vars}
+
+    def matches_any(name: str, patterns: list[EnvironmentVariablePattern]) -> bool:
+        return any(p.matches(name) for p in patterns)
+
+    if not policy.ignore_default_excludes:
+        default_excludes = [
+            EnvironmentVariablePattern.new_case_insensitive('*KEY*'),
+            EnvironmentVariablePattern.new_case_insensitive('*SECRET*'),
+            EnvironmentVariablePattern.new_case_insensitive('*TOKEN*'),
+        ]
+        env_map = {
+            k: v for k, v in env_map.items() if not matches_any(k, default_excludes)
+        }
+
+    if policy.exclude:
+        env_map = {k: v for k, v in env_map.items() if not matches_any(k, policy.exclude)}
+
+    env_map.update(policy.set)
+
+    if policy.include_only:
+        env_map = {k: v for k, v in env_map.items() if matches_any(k, policy.include_only)}
+
+    return env_map
 
 
 class ExecResult(BaseModel):
@@ -53,6 +143,16 @@ class Sandbox(LifecycleMixin, ABC):
     This class also provides tool methods that can be automatically exposed
     as tools by SandboxToolset, eliminating the need for separate tool definitions.
     """
+
+    def __init__(self, *, env_policy: ShellEnvironmentPolicy | None = None) -> None:
+        super().__init__()
+        self._env_policy = env_policy or ShellEnvironmentPolicy()
+
+    def _prepare_env(self, env: dict[str, str] | None = None) -> dict[str, str]:
+        base_env = create_env(self._env_policy)
+        if env:
+            base_env.update(env)
+        return base_env
 
     # ----------------------------- exec ------------------------------------
 

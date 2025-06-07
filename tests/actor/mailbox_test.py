@@ -9,7 +9,7 @@ from a2a.types import Message, Role, TextPart
 from codin.actor import (
     Mailbox,
     LocalMailbox,
-    ActorScheduler,
+    ActorSupervisor,
     LocalActorManager,
     ActorInfo,
     Dispatcher,
@@ -73,30 +73,30 @@ async def test_local_actor_manager():
     async def factory(actor_type: str, key: str):
         return DummyAgent(f"{actor_type}:{key}")
 
-    from codin.actor.scheduler import ActorInfo
+    from codin.actor.supervisor import ActorInfo
     ActorInfo.model_rebuild()
     manager = LocalActorManager(agent_factory=factory)
     
-    # Test get_or_create
-    agent1 = await manager.get_or_create("test_agent", "key1")
+    # Test acquire
+    agent1 = await manager.acquire("test_agent", "key1")
     assert agent1 is not None
     assert hasattr(agent1, 'agent_id')
     
     # Test getting same agent
-    agent2 = await manager.get_or_create("test_agent", "key1")
+    agent2 = await manager.acquire("test_agent", "key1")
     assert agent1 is agent2  # Should be same instance
     
     # Test list actors
-    actors = await manager.list_actors()
+    actors = await manager.list()
     assert len(actors) == 1
     assert actors[0].actor_type == "test_agent"
     
-    # Test deactivate
+    # Test release
     agent_id = actors[0].actor_id
-    await manager.deactivate(agent_id)
+    await manager.release(agent_id)
     
     # Should be empty now
-    actors_after = await manager.list_actors()
+    actors_after = await manager.list()
     assert len(actors_after) == 0
 
 

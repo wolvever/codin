@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import Field
 
-from .scheduler import ActorInfo, ActorScheduler
+from .supervisor import ActorInfo, ActorSupervisor
 
 if _t.TYPE_CHECKING:  # pragma: no cover - imported for type checking only
     from ..agent.base import Agent
@@ -56,16 +56,16 @@ else:  # pragma: no cover
     RayAgentActor = None
 
 
-class RayActorManager(ActorScheduler):
+class RayActorManager(ActorSupervisor):
     """Manage agents as Ray actors."""
 
-    def __init__(self, agent_factory: _t.Callable[[str, str], _t.Awaitable["Agent"]] | None = None) -> None:
+    def __init__(self, agent_factory: _t.Callable[..., _t.Awaitable["Agent"]] | None = None) -> None:
         if ray is None:
             raise ImportError("ray is required for RayActorManager")
         self._actors: dict[str, ActorInfo] = {}
         self._factory = agent_factory
 
-    async def get_or_create(self, actor_type: str, key: str) -> "ray.actor.ActorHandle":
+    async def acquire(self, actor_type: str, key: str, *args: _t.Any, **kwargs: _t.Any) -> "ray.actor.ActorHandle":
         actor_id = f"{actor_type}:{key}"
         if actor_id in self._actors:
             info = self._actors[actor_id]
@@ -73,7 +73,7 @@ class RayActorManager(ActorScheduler):
             return info.agent
 
         if self._factory:
-            agent = await self._factory(actor_type, key)
+            agent = await self._factory(actor_type, key, *args, **kwargs)
         else:
             from ..agent.base_planner import BasePlanner
             from ..agent.base_agent import BaseAgent
@@ -86,7 +86,7 @@ class RayActorManager(ActorScheduler):
         self._actors[actor_id] = info
         return handle
 
-    async def deactivate(self, agent_id: str) -> None:
+    async def release(self, agent_id: str) -> None:
         info = self._actors.pop(agent_id, None)
         if info is None:
             return
@@ -95,8 +95,8 @@ class RayActorManager(ActorScheduler):
         finally:  # pragma: no cover - best effort
             ray.kill(info.agent)
 
-    async def list_actors(self) -> list[ActorInfo]:
+    async def list(self) -> list[ActorInfo]:
         return list(self._actors.values())
 
-    async def get_actor_info(self, agent_id: str) -> ActorInfo | None:
+    async def info(self, agent_id: str) -> ActorInfo | None:
         return self._actors.get(agent_id)

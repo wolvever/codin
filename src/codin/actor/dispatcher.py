@@ -16,7 +16,7 @@ from a2a.types import Message, Role, TextPart
 from pydantic import BaseModel, Field
 
 from .mailbox import Mailbox
-from .scheduler import ActorScheduler
+from .supervisor import ActorSupervisor
 
 
 if _t.TYPE_CHECKING:
@@ -68,7 +68,7 @@ class Dispatcher(ABC):
 class LocalDispatcher(Dispatcher):
     """Local implementation of dispatcher using asyncio."""
 
-    def __init__(self, actor_manager: ActorScheduler):
+    def __init__(self, actor_manager: ActorSupervisor):
         self.actor_manager = actor_manager
         self._active_runs: dict[str, DispatchResult] = {}
         self._run_tasks: dict[str, asyncio.Task] = {}
@@ -94,7 +94,7 @@ class LocalDispatcher(Dispatcher):
     async def signal(self, agent_id: str, ctrl: str) -> None:
         """Send a control signal to an agent."""
         # Find the agent through actor manager
-        actor_info = await self.actor_manager.get_actor_info(agent_id)
+        actor_info = await self.actor_manager.info(agent_id)
         if not actor_info:
             raise ValueError(f'Agent {agent_id} not found')
 
@@ -143,7 +143,7 @@ class LocalDispatcher(Dispatcher):
             # Create agents through actor manager
             agents: list[Agent] = []
             for agent_type, key in agents_to_create:
-                agent = await self.actor_manager.get_or_create(agent_type, key)
+                agent = await self.actor_manager.acquire(agent_type, key)
                 agents.append(agent)
                 result.agents.append(agent.agent_id if hasattr(agent, 'agent_id') else f'{agent_type}:{key}')
 

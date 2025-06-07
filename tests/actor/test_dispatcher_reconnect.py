@@ -2,8 +2,8 @@ import asyncio
 import pytest
 
 from codin.actor.dispatcher import LocalDispatcher
-from codin.actor.scheduler import LocalActorManager, ActorInfo
-import codin.actor.scheduler as scheduler
+from codin.actor.supervisor import LocalActorManager, ActorInfo
+import codin.actor.supervisor as scheduler
 from codin.agent.base_agent import BaseAgent
 from codin.agent.base import Planner
 from codin.agent.types import (

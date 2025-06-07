@@ -7,7 +7,7 @@ and dispatchers for routing requests between agents.
 
 from .dispatcher import DispatchRequest, DispatchResult, Dispatcher, LocalDispatcher
 from .mailbox import Mailbox, LocalMailbox, RayMailbox
-from .scheduler import ActorInfo, ActorScheduler, LocalActorManager
+from .supervisor import ActorInfo, ActorSupervisor, LocalActorManager
 from .ray_scheduler import RayActorManager
 
 
@@ -17,7 +17,7 @@ __all__ = [
     'LocalMailbox',
     'RayMailbox',
     # Actor manager types
-    'ActorScheduler',
+    'ActorSupervisor',
     'LocalActorManager',
     'RayActorManager',
     'ActorInfo',

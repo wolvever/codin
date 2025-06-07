@@ -6,7 +6,9 @@ import asyncio
 import typing as _t
 from abc import ABC, abstractmethod
 
-from ..agent.types import Message
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ..agent.types import Message
 
 
 __all__ = ["Mailbox", "LocalMailbox", "RayMailbox"]

@@ -51,7 +51,7 @@ class AgentRunner:
             self._task.cancel()
             try:
                 await self._task
-            except Exception:
+            except BaseException:
                 pass
             self._task = None
 

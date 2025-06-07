@@ -4,7 +4,10 @@ import asyncio
 import typing as _t
 
 from .mailbox import Mailbox
-from ..agent.types import Message
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..agent.types import Message
 
 __all__ = ["LocalMailbox"]
 

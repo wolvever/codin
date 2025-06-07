@@ -10,6 +10,11 @@ import typing as _t
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Ensure 'src.codin' imports refer to local 'codin' package
+# Add the local 'src' directory to sys.path so tests can import the package
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+SRC_DIR = os.path.join(ROOT_DIR, "src")
+sys.path.insert(0, SRC_DIR)
+
 import codin as _codin
 sys.modules.setdefault('src', types.ModuleType('src'))
 sys.modules['src.codin'] = _codin

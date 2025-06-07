@@ -1,10 +1,16 @@
-"""Memory system for codin agents.
+"""Memory system for codin agents."""
 
-This module provides memory services for storing and retrieving agent
-conversation history, context, and long-term memory across sessions.
-"""
+from .base import ChunkType, Memory, MemoryChunk, MemoryService
+from .local import MemMemoryService
+from .remote import MemoryClient
+from .chunk_builder import prompt_chunk_builder
 
-from .base import MemMemoryService, Memory
-
-
-__all__ = ['MemMemoryService', 'Memory']
+__all__ = [
+    "ChunkType",
+    "Memory",
+    "MemoryService",
+    "MemoryChunk",
+    "MemMemoryService",
+    "MemoryClient",
+    "prompt_chunk_builder",
+]

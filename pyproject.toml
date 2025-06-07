@@ -28,6 +28,8 @@ dependencies = [
     "mcp>=1.9.1",
     "requests>=2.25.0",
     "beautifulsoup4>=4.9.0",
+    "numpy>=1.24.0",
+    "lancedb>=0.4.7",
 ]
 
 [project.scripts]

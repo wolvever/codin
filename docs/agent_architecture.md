@@ -298,4 +298,4 @@ class Task:
 - **A2A compatibility** - Steps work with Agent-to-Agent protocol
 - **Service injection** - Easy testing and different implementations  
 - **Task lifecycle** - Full support for start/pause/resume/cancel
-- **Reproducible execution** - ReplayService enables debugging and analysis 
+- **Reproducible execution** - ReplayService enables debugging and analysis of runs.

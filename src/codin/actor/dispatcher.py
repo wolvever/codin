@@ -12,7 +12,8 @@ import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from a2a.types import Message, Role, TextPart
+from ..agent.types import Message, Role, TextPart
+from .utils import make_message
 from pydantic import BaseModel, Field
 
 from .mailbox import Mailbox
@@ -147,7 +148,7 @@ class LocalDispatcher(Dispatcher):
             message_data = a2a_data.get('message', {})
 
             # Create message from A2A data
-            message = self._create_message_from_a2a(message_data, context_id)
+            message = make_message(message_data, context_id)
 
             # Determine which agents to create (allows override via attribute for tests)
             # In the future, this could parse the request to determine multiple agents
@@ -239,27 +240,6 @@ class LocalDispatcher(Dispatcher):
                 }
             )
 
-    def _create_message_from_a2a(self, message_data: dict, context_id: str) -> Message:
-        """Create a Message object from A2A message data."""
-        # Extract text content from parts or fallback to direct text
-        parts = []
-        if 'parts' in message_data:
-            for part_data in message_data['parts']:
-                if part_data.get('kind') == 'text':
-                    parts.append(TextPart(text=part_data.get('text', '')))
-        elif 'text' in message_data:
-            parts.append(TextPart(text=message_data['text']))
-        else:
-            parts.append(TextPart(text=''))
-
-        return Message(
-            messageId=message_data.get('messageId', str(uuid.uuid4())),
-            role=Role(message_data.get('role', 'user')),
-            parts=parts,
-            contextId=context_id,
-            kind='message',
-            metadata=message_data.get('metadata', {}),
-        )
 
     def get_stream_queue(self, runner_id: str) -> asyncio.Queue | None:
         """Return the stream queue for a running request."""

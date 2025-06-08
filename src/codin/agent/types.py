@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import typing as _t
-from dataclasses import dataclass, field
+from uuid import uuid4
 from datetime import datetime
 from enum import Enum
 
@@ -67,36 +67,32 @@ class Role(str, Enum):
     assistant = "assistant"
 
 
-@dataclass
-class TextPart:
+class TextPart(BaseModel):
     text: str
     kind: str = "text"
     metadata: dict[str, _t.Any] | None = None
 
 
-@dataclass
-class DataPart:
+class DataPart(BaseModel):
     data: dict[str, _t.Any]
     kind: str = "data"
     metadata: dict[str, _t.Any] | None = None
 
 
-@dataclass
-class FilePart:
+class FilePart(BaseModel):
     uri: str | None = None
     path: str | None = None
     kind: str = "file"
     metadata: dict[str, _t.Any] | None = None
 
 
-@dataclass
-class Message:
-    messageId: str
+class Message(BaseModel):
+    messageId: str = Field(default_factory=lambda: str(uuid4()))
     role: Role
     parts: list[_t.Any]
     contextId: str | None = None
     kind: str = "message"
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
     taskId: str | None = None
     referenceTaskIds: list[str] | None = None
 

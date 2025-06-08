@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime
 
 from ..prompt.run import prompt_run
+from .base import Planner
 from .types import (
     FinishStep,
     Message,
@@ -27,7 +28,6 @@ from .types import (
     TextPart,
     ThinkStep,
 )
-from .base import Planner
 
 logger = logging.getLogger(__name__)
 

@@ -148,6 +148,7 @@ class Message(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+
     def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
         self.parts.append(TextPart(text=text, metadata=metadata))
 

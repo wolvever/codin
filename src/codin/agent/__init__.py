@@ -59,13 +59,12 @@ def get_code_agent():
 
     return CodeAgent
 
-
+  
 def get_codeact_planner():
     """Lazy import CodeActPlanner to avoid circular imports."""
     from .codeact_planner import CodeActPlanner
 
     return CodeActPlanner
-
 
 def get_search_agent():
     """Lazy import SearchAgent to avoid circular imports."""

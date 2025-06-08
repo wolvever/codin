@@ -18,6 +18,11 @@ from ..agent.base_agent import BaseAgent as Agent
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
+else:  # pragma: no cover - runtime fallback for forward refs
+    try:  # avoid import cycle during runtime import
+        from ..agent.base import Agent
+    except Exception:  # noqa: BLE001 - best effort fallback
+        Agent = _t.Any
 
 __all__ = [
     'ActorInfo',
@@ -40,6 +45,9 @@ class ActorInfo(BaseModel):
         """Pydantic config."""
         arbitrary_types_allowed = True
 
+
+# Ensure pydantic schema resolves forward references at import time
+ActorInfo.model_rebuild(_types_namespace={'Agent': Agent})
 
 class ActorSupervisor(ABC):
     """Abstract actor manager protocol from design document."""

@@ -13,16 +13,16 @@ import typing as _t
 import uuid
 from datetime import datetime
 
-# Use a2a SDK types directly
-from a2a.types import Message, Role, TextPart
+# Use agent protocol types directly
+from codin.agent.types import Message, Role, TextPart
 
 from ..model import BaseLLM, ModelRegistry
 from .base import PromptResponse, RenderedPrompt, ToolDefinition
 from .registry import get_registry
 
-__all__ = ['PromptEngine']
+__all__ = ["PromptEngine"]
 
-logger = logging.getLogger('codin.prompt.engine')
+logger = logging.getLogger("codin.prompt.engine")
 
 
 class PromptEngine:
@@ -46,24 +46,24 @@ class PromptEngine:
 
     def _detect_capabilities(self, llm: BaseLLM) -> dict[str, _t.Any]:
         """Detect LLM capabilities for template selection."""
-        model_name = getattr(llm, 'model', llm.__class__.__name__.lower())
+        model_name = getattr(llm, "model", llm.__class__.__name__.lower())
 
         # Simple model family detection
-        if 'claude' in model_name.lower():
-            family, provider = 'claude', 'anthropic'
-        elif 'gpt' in model_name.lower() or 'openai' in model_name.lower():
-            family, provider = 'openai', 'openai'
-        elif 'gemini' in model_name.lower() or 'google' in model_name.lower():
-            family, provider = 'google', 'google'
+        if "claude" in model_name.lower():
+            family, provider = "claude", "anthropic"
+        elif "gpt" in model_name.lower() or "openai" in model_name.lower():
+            family, provider = "openai", "openai"
+        elif "gemini" in model_name.lower() or "google" in model_name.lower():
+            family, provider = "google", "google"
         else:
-            family, provider = 'unknown', 'unknown'
+            family, provider = "unknown", "unknown"
 
         return {
-            'model': model_name,
-            'model_family': family,
-            'model_provider': provider,
-            'tool_support': hasattr(llm, 'generate_with_tools'),
-            'multimodal': getattr(llm, 'supports_multimodal', False),
+            "model": model_name,
+            "model_family": family,
+            "model_provider": provider,
+            "tool_support": hasattr(llm, "generate_with_tools"),
+            "multimodal": getattr(llm, "supports_multimodal", False),
         }
 
     def _create_message(
@@ -76,7 +76,7 @@ class PromptEngine:
             parts=[TextPart(text=content)],
             contextId=context_id,
             taskId=task_id,
-            kind='message',
+            kind="message",
         )
 
     async def _prepare_variables(
@@ -87,17 +87,17 @@ class PromptEngine:
 
         # Add tool context
         if tools:
-            tool_dicts = [{'name': t.name, 'description': t.description, 'parameters': t.parameters} for t in tools]
+            tool_dicts = [{"name": t.name, "description": t.description, "parameters": t.parameters} for t in tools]
             all_vars.update(
                 {
-                    'tools': tool_dicts,
-                    'has_tools': True,
-                    'tool_descriptions': [f'- {t.name}: {t.description}' for t in tools],
-                    'tool_names': [t.name for t in tools],
+                    "tools": tool_dicts,
+                    "has_tools": True,
+                    "tool_descriptions": [f"- {t.name}: {t.description}" for t in tools],
+                    "tool_names": [t.name for t in tools],
                 }
             )
         else:
-            all_vars.update({'has_tools': False, 'tool_descriptions': [], 'tool_names': []})
+            all_vars.update({"has_tools": False, "tool_descriptions": [], "tool_names": []})
 
         return all_vars
 
@@ -143,9 +143,9 @@ class PromptEngine:
                 self.llm = create_llm_from_env()
 
             # Prepare LLM if needed
-            if hasattr(self.llm, 'prepare'):
+            if hasattr(self.llm, "prepare"):
                 # Check if LLM has _prepared attribute to track preparation state
-                if hasattr(self.llm, '_prepared'):
+                if hasattr(self.llm, "_prepared"):
                     if not self.llm._prepared:
                         await self.llm.prepare()
                 else:
@@ -159,23 +159,23 @@ class PromptEngine:
             # Get best variant
             variant = template.get_best_variant(final_conditions)
             if not variant:
-                raise ValueError(f'No suitable variant found for template {name}')
+                raise ValueError(f"No suitable variant found for template {name}")
 
             # Prepare all variables
             all_variables = await self._prepare_variables(variables, tools, **kwargs)
             all_variables.update(
                 {
-                    'model': capabilities['model'],
-                    'model_family': capabilities['model_family'],
-                    'model_provider': capabilities['model_provider'],
-                    'streaming': stream,
+                    "model": capabilities["model"],
+                    "model_family": capabilities["model_family"],
+                    "model_provider": capabilities["model_provider"],
+                    "streaming": stream,
                 }
             )
 
             # Render template (full rendering with system prompt and messages)
             rendered_prompt = template.render(conditions=final_conditions, **all_variables)
 
-            logger.debug('Calling LLM %s with template %s@%s', capabilities['model'], template.name, template.version)
+            logger.debug("Calling LLM %s with template %s@%s", capabilities["model"], template.name, template.version)
 
             # Execute with LLM
             model_options = rendered_prompt.model_options
@@ -185,18 +185,18 @@ class PromptEngine:
                 # Use structured message format if available
                 messages = rendered_prompt.to_messages()
 
-                if tools and capabilities['tool_support'] and hasattr(self.llm, 'generate_with_tools'):
+                if tools and capabilities["tool_support"] and hasattr(self.llm, "generate_with_tools"):
                     # Convert tools for LLM
                     llm_tools = [
                         {
-                            'type': 'function',
-                            'function': {'name': t.name, 'description': t.description, 'parameters': t.parameters},
+                            "type": "function",
+                            "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
                         }
                         for t in tools
                     ]
 
                     # Check if LLM supports message-based generation with tools
-                    if hasattr(self.llm, 'generate_messages_with_tools'):
+                    if hasattr(self.llm, "generate_messages_with_tools"):
                         completion = await self.llm.generate_messages_with_tools(
                             messages, tools=llm_tools, stream=stream, **model_options
                         )
@@ -206,18 +206,18 @@ class PromptEngine:
                             rendered_prompt.text, tools=llm_tools, stream=stream, **model_options
                         )
                 # Check if LLM supports message-based generation
-                elif hasattr(self.llm, 'generate_messages'):
+                elif hasattr(self.llm, "generate_messages"):
                     completion = await self.llm.generate_messages(messages, stream=stream, **model_options)
                 else:
                     # Fallback to text-based generation
                     completion = await self.llm.generate(rendered_prompt.text, stream=stream, **model_options)
             # Use traditional single text approach
-            elif tools and capabilities['tool_support'] and hasattr(self.llm, 'generate_with_tools'):
+            elif tools and capabilities["tool_support"] and hasattr(self.llm, "generate_with_tools"):
                 # Convert tools for LLM
                 llm_tools = [
                     {
-                        'type': 'function',
-                        'function': {'name': t.name, 'description': t.description, 'parameters': t.parameters},
+                        "type": "function",
+                        "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
                     }
                     for t in tools
                 ]
@@ -231,7 +231,7 @@ class PromptEngine:
             # Create A2A response
             response = PromptResponse(streaming=stream)
 
-            if stream and hasattr(completion, '__aiter__'):
+            if stream and hasattr(completion, "__aiter__"):
                 response.content = completion
             else:
                 content_str = str(completion)
@@ -243,9 +243,9 @@ class PromptEngine:
             return response
 
         except Exception as e:
-            logger.error(f'Error in prompt execution: {e}', exc_info=True)
+            logger.error(f"Error in prompt execution: {e}", exc_info=True)
             return PromptResponse(
-                error={'type': 'execution_error', 'message': str(e), 'timestamp': datetime.now().isoformat()}
+                error={"type": "execution_error", "message": str(e), "timestamp": datetime.now().isoformat()}
             )
 
     async def render_only(

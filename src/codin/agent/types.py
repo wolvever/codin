@@ -3,93 +3,107 @@
 from __future__ import annotations
 
 import typing as _t
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
 import pydantic as _pyd
-from a2a.types import (
-    DataPart,
-    FilePart,
-    Role,
-    TaskArtifactUpdateEvent,
-    TaskStatusUpdateEvent,
-    TextPart,
-)
-from a2a.types import (
-    Message as A2AMessage,
-)
-
-# Re-export core A2A types for compatibility
-from a2a.types import (
-    Task as A2ATask,
-)
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+Any = _t.Any
+
 
 if _t.TYPE_CHECKING:
     from ..artifact.base import ArtifactService
     from ..tool.base import Tool
 
-
 __all__ = [
     # Core types (A2A compatible)
     'Task',
     'Message',
+    'Role',
+    'TextPart',
+    'DataPart',
+    'FilePart',
+    'TaskState',
+    'TaskStatus',
+    'TaskStatusUpdateEvent',
+    'TaskArtifactUpdateEvent',
     'ToolUsePart',
     'ToolCall',
     'ToolCallResult',
     # Enhanced types for internal use
-    'RunEvent',
-    'Event',
-    'ControlSignal',
-    'RunnerControl',
-    'RunnerInput',
+    "RunEvent",
+    "Event",
+    "ControlSignal",
+    "RunnerControl",
+    "RunnerInput",
     # Agent types
-    'AgentRunInput',
-    'AgentRunOutput',
-    'RunConfig',
-    'Metrics',
-    'State',
+    "AgentRunInput",
+    "AgentRunOutput",
+    "RunConfig",
+    "Metrics",
+    "State",
     # Planning types
-    'StepType',
-    'Step',
-    'MessageStep',
-    'ToolCallStep',
-    'EventStep',
-    'ThinkStep',
-    'FinishStep',
-    'ErrorStep',
+    "StepType",
+    "Step",
+    "MessageStep",
+    "ToolCallStep",
+    "EventStep",
+    "ThinkStep",
+    "FinishStep",
+    "ErrorStep",
     # Base interfaces
-    'Planner',
-    'EventType',
+    "EventType",
 ]
 
+class Role(str, Enum):
+    """Simple role enumeration used across the codebase."""
 
-# =============================================================================
-# Core A2A-compatible types
-# =============================================================================
-
-
-# Alias A2A types for convenience while maintaining compatibility
-class Task(A2ATask):
-    """A2A-compatible task with additional codin features."""
+    user = "user"
+    agent = "agent"
+    assistant = "assistant"
 
 
+@dataclass
+class TextPart:
+    text: str
+    kind: str = "text"
+    metadata: dict[str, _t.Any] | None = None
 
-class Message(A2AMessage):
-    """A2A-compatible message with additional codin features."""
 
-    sender_id: str = ""
-    recipient_ids: list[str] = Field(default_factory=list)
-    parts: list[TextPart | FilePart | DataPart | ToolUsePart]
+@dataclass
+class DataPart:
+    data: dict[str, _t.Any]
+    kind: str = "data"
+    metadata: dict[str, _t.Any] | None = None
+
+
+@dataclass
+class FilePart:
+    uri: str | None = None
+    path: str | None = None
+    kind: str = "file"
+    metadata: dict[str, _t.Any] | None = None
+
+
+@dataclass
+class Message:
+    messageId: str
+    role: Role
+    parts: list[_t.Any]
+    contextId: str | None = None
+    kind: str = "message"
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    taskId: str | None = None
+    referenceTaskIds: list[str] | None = None
 
     def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
-        """Convenience helper to append a TextPart."""
+        """Append a TextPart to the message."""
         self.parts.append(TextPart(text=text, metadata=metadata))
 
     def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
-        """Convenience helper to append a DataPart."""
-        from a2a.types import DataPart
-
+        """Append a DataPart to the message."""
         self.parts.append(DataPart(data=data, metadata=metadata))
 
     def add_tool_call_part(self, call: ToolCall) -> None:
@@ -116,6 +130,50 @@ class Message(A2AMessage):
         )
 
 
+
+
+class TaskState(str, Enum):
+    submitted = "submitted"
+    working = "working"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class TaskStatus(BaseModel):
+    state: TaskState
+
+
+class TaskStatusUpdateEvent(BaseModel):
+    contextId: str
+    taskId: str
+    status: TaskStatus
+    final: bool = False
+
+
+class TaskArtifactUpdateEvent(BaseModel):
+    contextId: str
+    taskId: str
+    artifact: dict[str, _t.Any] | None = None
+    final: bool = False
+
+
+class Task(BaseModel):
+    id: str
+    contextId: str | None = None
+    status: TaskStatus | None = None
+    message: Message | None = None
+    metadata: dict[str, _t.Any] | None = None
+
+
+class Artifact(BaseModel):
+    id: str
+    name: str | None = None
+    description: str | None = None
+    parts: list[Part] = Field(default_factory=list)
+    metadata: dict[str, _t.Any] | None = None
+
+
 class ToolCall(_pyd.BaseModel):
     """Represents a tool call request."""
 
@@ -136,10 +194,10 @@ class ToolCallResult(_pyd.BaseModel):
 class ToolUsePart(_pyd.BaseModel):
     """Represents a tool use (call and/or result) segment within message parts."""
 
-    kind: _t.Literal['tool-use'] = 'tool-use'
+    kind: _t.Literal["tool-use"] = "tool-use"
     """Part type - tool-use for ToolUseParts"""
 
-    type: _t.Literal['call', 'result'] = 'call'
+    type: _t.Literal["call", "result"] = "call"
     """Whether this is a tool call or tool result"""
 
     id: str
@@ -151,11 +209,289 @@ class ToolUsePart(_pyd.BaseModel):
     input: dict[str, _t.Any] | None = None
     """Tool input/arguments (for calls)"""
 
-    output: _t.Any | None = None
-    """Tool output/result (for results) - can be string, dict, or any serializable type"""
+=======
+Any = _t.Any
 
+
+if _t.TYPE_CHECKING:
+    from ..artifact.base import ArtifactService
+    from ..tool.base import Tool
+
+__all__ = [
+    # Core types (A2A compatible)
+    "Task",
+    "Message",
+    "Role",
+    "TextPart",
+    "DataPart",
+    "FilePart",
+    "TaskState",
+    "TaskStatus",
+    "TaskStatusUpdateEvent",
+    "TaskArtifactUpdateEvent",
+    "ToolUsePart",
+    "ToolCall",
+    "ToolCallResult",
+    # Enhanced types for internal use
+    "RunEvent",
+    "Event",
+    "ControlSignal",
+    "RunnerControl",
+    "RunnerInput",
+    # Agent types
+    "AgentRunInput",
+    "AgentRunOutput",
+    "RunConfig",
+    "Metrics",
+    "State",
+    # Planning types
+    "StepType",
+    "Step",
+    "MessageStep",
+    "ToolCallStep",
+    "EventStep",
+    "ThinkStep",
+    "FinishStep",
+    "ErrorStep",
+    # Base interfaces
+    "Planner",
+    "EventType",
+]
+
+
+class Role(str, Enum):
+    """Simple role enumeration used across the codebase."""
+
+    user = "user"
+    agent = "agent"
+    assistant = "assistant"
+
+
+@dataclass
+class TextPart:
+    text: str
+    kind: str = "text"
     metadata: dict[str, _t.Any] | None = None
-    """Additional metadata for this tool use"""
+
+
+@dataclass
+class DataPart:
+    data: dict[str, _t.Any]
+    kind: str = "data"
+    metadata: dict[str, _t.Any] | None = None
+
+
+@dataclass
+class FilePart:
+    uri: str | None = None
+    path: str | None = None
+    kind: str = "file"
+    metadata: dict[str, _t.Any] | None = None
+
+
+@dataclass
+class Message:
+    messageId: str
+    role: Role
+    parts: list[_t.Any]
+    contextId: str | None = None
+    kind: str = "message"
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    taskId: str | None = None
+    referenceTaskIds: list[str] | None = None
+
+    def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
+        """Append a TextPart to the message."""
+        self.parts.append(TextPart(text=text, metadata=metadata))
+
+    def add_data_part(
+        self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None
+    ) -> None:
+        """Append a DataPart to the message."""
+        self.parts.append(DataPart(data=data, metadata=metadata))
+
+    def add_tool_call_part(self, call: ToolCall) -> None:
+        """Append a tool call as a ToolUsePart."""
+        self.parts.append(
+            ToolUsePart(
+                type="call",
+                id=call.call_id,
+                name=call.name,
+                input=call.arguments,
+            )
+        )
+
+    def add_tool_result_part(self, result: ToolCallResult, name: str) -> None:
+        """Append a tool result as a ToolUsePart."""
+        self.parts.append(
+            ToolUsePart(
+                type="result",
+                id=result.call_id,
+                name=name,
+                output=result.output,
+                metadata={"error": result.error} if result.error else None,
+            )
+        )
+
+
+class TaskState(str, Enum):
+    QUEUED = "queued"
+    SUBMITTED = "submitted"
+    WORKING = "working"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    queued = QUEUED
+    submitted = SUBMITTED
+    working = WORKING
+    completed = COMPLETED
+    failed = FAILED
+
+
+@dataclass
+class TaskStatus:
+    state: TaskState
+    message: Message | None = None
+    timestamp: str | None = None
+
+
+@dataclass
+class TaskStatusUpdateEvent:
+    contextId: str
+    taskId: str
+    status: TaskStatus
+    final: bool = False
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+
+
+@dataclass
+class TaskArtifactUpdateEvent:
+    """Event representing artifact updates for a task."""
+
+    contextId: str
+    taskId: str
+    artifact: _t.Any
+    append: bool = False
+    lastChunk: bool = False
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+
+
+@dataclass
+class Task:
+    id: str
+    contextId: str
+    status: TaskStatus
+    query: str | None = None
+    parts: list[_t.Any] = field(default_factory=list)
+    message: Message | None = None
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+
+    def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
+        self.parts.append(TextPart(text=text, metadata=metadata))
+
+    def add_data_part(
+        self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None
+    ) -> None:
+        """Convenience helper to append a DataPart."""
+        self.parts.append(DataPart(data=data, metadata=metadata))
+
+    def add_tool_call_part(self, call: ToolCall) -> None:
+        self.parts.append(
+            ToolUsePart(type="call", id=call.call_id, name=call.name, input=call.arguments)
+        )
+
+    def add_tool_result_part(self, result: ToolCallResult, name: str) -> None:
+        self.parts.append(
+            ToolUsePart(
+                type="result",
+                id=result.call_id,
+                name=name,
+                output=result.output,
+                metadata={"error": result.error} if result.error else None,
+            )
+        )
+
+
+class TaskState(str, Enum):
+    submitted = "submitted"
+    working = "working"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class TaskStatus(BaseModel):
+    state: TaskState
+
+
+class TaskStatusUpdateEvent(BaseModel):
+    contextId: str
+    taskId: str
+    status: TaskStatus
+    final: bool = False
+
+
+class TaskArtifactUpdateEvent(BaseModel):
+    contextId: str
+    taskId: str
+    artifact: dict[str, _t.Any] | None = None
+    final: bool = False
+
+
+class Task(BaseModel):
+    id: str
+    contextId: str | None = None
+    status: TaskStatus | None = None
+    message: Message | None = None
+    metadata: dict[str, _t.Any] | None = None
+
+
+class Artifact(BaseModel):
+    id: str
+    name: str | None = None
+    description: str | None = None
+    parts: list[Part] = Field(default_factory=list)
+    metadata: dict[str, _t.Any] | None = None
+
+
+class ToolCall(_pyd.BaseModel):
+    """Represents a tool call request."""
+
+    call_id: str
+    name: str
+    arguments: dict[str, _t.Any]
+
+
+class ToolCallResult(_pyd.BaseModel):
+    """Represents the result of a tool call."""
+
+    call_id: str
+    success: bool
+    output: _t.Any = None
+    error: str | None = None
+
+
+class ToolUsePart(_pyd.BaseModel):
+    """Represents a tool use (call and/or result) segment within message parts."""
+
+    kind: _t.Literal["tool-use"] = "tool-use"
+    """Part type - tool-use for ToolUseParts"""
+
+    type: _t.Literal["call", "result"] = "call"
+    """Whether this is a tool call or tool result"""
+
+    id: str
+    """Unique identifier for the tool use"""
+
+    name: str
+    """Name of the tool being called"""
+
+    input: dict[str, _t.Any] | None = None
+    """Tool input/arguments (for calls)"""
+
+
+# Union type for message parts
+Part = TextPart | DataPart | FilePart | ToolUsePart
 
 
 # =============================================================================
@@ -167,17 +503,17 @@ class EventType(str, Enum):
     """Types of events for EventStep."""
 
     # A2A Events
-    TASK_STATUS_UPDATE = 'task_status_update'
-    TASK_ARTIFACT_UPDATE = 'task_artifact_update'
+    TASK_STATUS_UPDATE = "task_status_update"
+    TASK_ARTIFACT_UPDATE = "task_artifact_update"
 
-    TASK_START = 'task_start'
-    TASK_END = 'task_end'
-    THINK = 'think'
-    TOOL_CALL_START = 'tool_call_start'
-    TOOL_CALL_END = 'tool_call_end'
-    TURN_START = 'turn_start'
-    TURN_END = 'turn_end'
-    ERROR = 'error'
+    TASK_START = "task_start"
+    TASK_END = "task_end"
+    THINK = "think"
+    TOOL_CALL_START = "tool_call_start"
+    TOOL_CALL_END = "tool_call_end"
+    TURN_START = "turn_start"
+    TURN_END = "turn_end"
+    ERROR = "error"
 
 
 class RunEvent(BaseModel):
@@ -201,11 +537,11 @@ Event = TaskStatusUpdateEvent | TaskArtifactUpdateEvent | RunEvent
 class ControlSignal(str, Enum):
     """Control signals that can be sent through mailbox."""
 
-    PAUSE = 'pause'
-    RESUME = 'resume'
-    CANCEL = 'cancel'
-    RESET = 'reset'
-    STOP = 'stop'
+    PAUSE = "pause"
+    RESUME = "resume"
+    CANCEL = "cancel"
+    RESET = "reset"
+    STOP = "stop"
 
 
 class RunnerControl(BaseModel):
@@ -276,21 +612,21 @@ class RunConfig(BaseModel):
     def is_budget_exceeded(self, metrics: Metrics, elapsed_time: float) -> tuple[bool, str]:
         """Check if any budget constraints are exceeded."""
         if self.turn_budget and metrics.iterations >= self.turn_budget:
-            return True, f'Turn budget exceeded: {metrics.iterations} >= {self.turn_budget}'
+            return True, f"Turn budget exceeded: {metrics.iterations} >= {self.turn_budget}"
 
         if self.token_budget and metrics.tokens_used >= self.token_budget:
-            return True, f'Token budget exceeded: {metrics.tokens_used} >= {self.token_budget}'
+            return True, f"Token budget exceeded: {metrics.tokens_used} >= {self.token_budget}"
 
         if self.cost_budget and metrics.cost_used >= self.cost_budget:
-            return True, f'Cost budget exceeded: {metrics.cost_used} >= {self.cost_budget}'
+            return True, f"Cost budget exceeded: {metrics.cost_used} >= {self.cost_budget}"
 
         if self.time_budget and elapsed_time >= self.time_budget:
-            return True, f'Time budget exceeded: {elapsed_time:.1f}s >= {self.time_budget}s'
+            return True, f"Time budget exceeded: {elapsed_time:.1f}s >= {self.time_budget}s"
 
         if self.deadline and datetime.now() >= self.deadline:
-            return True, f'Deadline exceeded: {datetime.now()} >= {self.deadline}'
+            return True, f"Deadline exceeded: {datetime.now()} >= {self.deadline}"
 
-        return False, ''
+        return False, ""
 
 
 class Metrics(BaseModel):
@@ -357,9 +693,9 @@ class State(BaseModel):
 
     ## Static members that are set once and never change duration the task
     session_id: str
-    agent_id: str = ''
+    agent_id: str = ""
     config: RunConfig = Field(default_factory=RunConfig)
-    model_config_dict: dict[str, _t.Any] = Field(default_factory=dict, alias='model_config')
+    model_config_dict: dict[str, _t.Any] = Field(default_factory=dict, alias="model_config")
     tools: list[Tool] = Field(default_factory=list)  # Tool objects from base.py
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -384,18 +720,18 @@ class State(BaseModel):
     last_tool_results: list[_t.Any] = Field(default_factory=list)
 
     # Task list for structured planning (matches code_agent.py format)
-    task_list: dict[str, list[str]] = Field(default_factory=lambda: {'completed': [], 'pending': []})
+    task_list: dict[str, list[str]] = Field(default_factory=lambda: {"completed": [], "pending": []})
 
 
 class StepType(Enum):
     """Types of steps a planner can emit."""
 
-    MESSAGE = 'message'  # A2A Message (streaming or non-streaming)
-    EVENT = 'event'  # A2A Event + internal events
-    TOOL_CALL = 'tool_call'  # Tool execution
-    THINK = 'think'  # Internal reasoning
-    FINISH = 'finish'  # Task completion
-    ERROR = 'error'  # Error step
+    MESSAGE = "message"  # A2A Message (streaming or non-streaming)
+    EVENT = "event"  # A2A Event + internal events
+    TOOL_CALL = "tool_call"  # Tool execution
+    THINK = "think"  # Internal reasoning
+    FINISH = "finish"  # Task completion
+    ERROR = "error"  # Error step
 
 
 class Step(BaseModel):
@@ -459,6 +795,7 @@ class Step(BaseModel):
         """Return True if the event is an internal RunEvent."""
         return isinstance(self.event, RunEvent)
 
+
 class MessageStep(Step):
     """A2A compatible message step with enhanced support for mixed content."""
 
@@ -468,7 +805,7 @@ class MessageStep(Step):
 
     def __post_init__(self):
         if self.message is None and self.message_stream is None:
-            raise ValueError('message or message_stream is required for MessageStep')
+            raise ValueError("message or message_stream is required for MessageStep")
 
     async def stream_content(self) -> _t.AsyncGenerator[str]:
         """Stream message content if ``is_streaming`` is True."""
@@ -481,11 +818,12 @@ class MessageStep(Step):
             return
 
         for part in self.message.parts:
-            if hasattr(part, 'text'):
+            if hasattr(part, "text"):
                 text = part.text
                 chunk_size = 50
                 for i in range(0, len(text), chunk_size):
                     yield text[i : i + chunk_size]
+
 
 class ToolCallStep(Step):
     """Step for executing a tool call with enhanced result handling."""
@@ -520,7 +858,7 @@ class ToolCallStep(Step):
     def model_post_init(self, __context: _t.Any) -> None:
         if self.tool_call is None:
             raise ValueError("tool_call (ToolUsePart type='call') is required for ToolCallStep")
-        if self.tool_call.type != 'call':
+        if self.tool_call.type != "call":
             raise ValueError("ToolCallStep.tool_call must be a ToolUsePart with type='call'")
 
     def add_result(self, result: ToolCallResult) -> None:
@@ -546,7 +884,7 @@ class EventStep(Step):
 
     def model_post_init(self, __context: _t.Any) -> None:
         if self.event is None:
-            raise ValueError('event is required for EventStep')
+            raise ValueError("event is required for EventStep")
 
 
 class ThinkStep(Step):
@@ -556,7 +894,7 @@ class ThinkStep(Step):
 
     def model_post_init(self, __context: _t.Any) -> None:
         if self.thinking is None:
-            self.thinking = ''
+            self.thinking = ""
 
 
 class FinishStep(Step):
@@ -570,31 +908,28 @@ class FinishStep(Step):
 
     def model_post_init(self, __context: _t.Any) -> None:
         if self.reason is None:
-            self.reason = 'Task completed'
+            self.reason = "Task completed"
         # Only create a message if none is provided and we have a reason
         if self.message is None and self.final_message is None and self.reason:
             # Create a simple message for the finish step
             msg = Message(
-                messageId=f'finish-{self.step_id}',
+                messageId=f"finish-{self.step_id}",
                 role=Role.agent,
                 parts=[TextPart(text=self.reason)],
                 contextId=None,
-                kind='message',
+                kind="message",
             )
             self.message = msg
             self.final_message = msg
 
     def create_completion_event(self, task_id: str, context_id: str) -> TaskStatusUpdateEvent:
         """Create a task completion event."""
-        from a2a.types import TaskState, TaskStatus
-
         completion_status = TaskStatus(
             state=TaskState.completed, message=self.message, timestamp=datetime.now().isoformat()
         )
         return TaskStatusUpdateEvent(
             contextId=context_id, taskId=task_id, status=completion_status, final=True, metadata=self.metadata
         )
-
 
 class ErrorStep(Step):
     """Step emitted when planning fails."""
@@ -603,14 +938,3 @@ class ErrorStep(Step):
     error: str | None = None
 
 
-# =============================================================================
-# Base Planner interface
-# =============================================================================
-
-
-class Planner:
-    """Base planner interface."""
-
-    async def next(self, state: State) -> _t.AsyncGenerator[Step]:
-        """Generate next steps based on current state."""
-        raise NotImplementedError('Subclasses must implement next method')

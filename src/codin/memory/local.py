@@ -6,7 +6,7 @@ import typing as _t
 import uuid
 from datetime import datetime
 
-from a2a.types import Message, Role
+from codin.agent.types import Message, Role
 
 from .base import ChunkType, Memory, MemoryChunk
 
@@ -63,12 +63,7 @@ class _LanceIndex:
 
     def search(self, session_id: str, query: str, limit: int) -> list[str]:
         vector = _hash_embed(query)
-        df = (
-            self.table.search(vector)
-            .where(f"session_id == '{session_id}'")
-            .limit(limit)
-            .to_pandas()
-        )
+        df = self.table.search(vector).where(f"session_id == '{session_id}'").limit(limit).to_pandas()
         return df.get("chunk_id", []).tolist()
 
 
@@ -159,9 +154,7 @@ class MemMemoryService(Memory):
 
         return await self._create_memory_chunk_legacy(session_id, messages, llm_summarizer)
 
-    async def search_memory_chunks(
-        self, session_id: str, query: str, limit: int = 5
-    ) -> list[MemoryChunk]:
+    async def search_memory_chunks(self, session_id: str, query: str, limit: int = 5) -> list[MemoryChunk]:
         """Alias for :meth:`search_chunk` for backward compatibility."""
 
         return await self.search_chunk(session_id, query, limit)
@@ -224,9 +217,7 @@ class MemMemoryService(Memory):
         for i in range(0, len(to_compress), chunk_size):
             chunk_msgs = to_compress[i : i + chunk_size]
             if chunk_msgs:
-                await self._create_memory_chunk_legacy(
-                    session_id, chunk_msgs, llm_summarizer
-                )
+                await self._create_memory_chunk_legacy(session_id, chunk_msgs, llm_summarizer)
                 chunk_groups_created += 1
         self._messages[session_id] = messages[-keep_recent:]
         return chunk_groups_created

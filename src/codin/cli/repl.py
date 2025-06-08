@@ -10,8 +10,8 @@ import logging
 
 import click
 
-# Use a2a types instead of internal protocol types
-from a2a.types import Message, Role, TextPart
+# Use agent protocol types
+from codin.agent.types import Message, Role, TextPart
 
 from ..agent.base import AgentRunInput
 from ..agent.code_agent import CodeAgent
@@ -269,9 +269,7 @@ class ReplSession:
                             elif tool_name in ["sandbox_exec", "shell", "container_exec"]:
                                 if output.strip():
                                     lines = output.strip().split("\n")
-                                    click.echo(
-                                        f"  📤 Output ({len(lines)} lines):\n{output.strip()}"
-                                    )
+                                    click.echo(f"  📤 Output ({len(lines)} lines):\n{output.strip()}")
                             elif tool_name == "sandbox_write_file":
                                 click.echo("  💾 File written successfully")
                     else:
@@ -314,16 +312,14 @@ class ReplSession:
                     click.echo()
                     click.echo(
                         click.style(
-                            f'🤖 LLM Response (Turn {debug_info["turn_count"]}):',
+                            f"🤖 LLM Response (Turn {debug_info['turn_count']}):",
                             bold=True,
                             fg="cyan",
                         )
                     )
                     click.echo(click.style("-" * 60, fg="cyan"))
 
-                    click.echo(
-                        f'📄 Raw content length: {debug_info["raw_content_length"]} characters'
-                    )
+                    click.echo(f"📄 Raw content length: {debug_info['raw_content_length']} characters")
 
                     thinking = debug_info.get("thinking")
                     if thinking:
@@ -337,12 +333,12 @@ class ReplSession:
                     else:
                         click.echo("💬 Message: None")
 
-                    click.echo(f'🔄 Should continue: {debug_info["should_continue"]}')
+                    click.echo(f"🔄 Should continue: {debug_info['should_continue']}")
 
                     task_list = debug_info["task_list"]
                     click.echo(
-                        f'📋 Task list - Completed: {task_list["completed_count"]}, '
-                        f'Pending: {task_list["pending_count"]}'
+                        f"📋 Task list - Completed: {task_list['completed_count']}, "
+                        f"Pending: {task_list['pending_count']}"
                     )
 
                     tool_calls = debug_info.get("tool_calls", [])
@@ -350,7 +346,7 @@ class ReplSession:
                         click.echo(f"🔧 Tool calls: {len(tool_calls)}")
                         for i, tool_call in enumerate(tool_calls):
                             args_keys = tool_call.get("arguments_keys", [])
-                            click.echo(f'  {i + 1}. {tool_call["name"]}({args_keys})')
+                            click.echo(f"  {i + 1}. {tool_call['name']}({args_keys})")
                     else:
                         click.echo("🔧 Tool calls: None")
 
@@ -566,7 +562,7 @@ class ReplSession:
                 other_formatted.append(f"{key}={formatted_value}")
 
             if other_formatted:
-                click.echo(f'  📋 Additional args: {", ".join(other_formatted)}')
+                click.echo(f"  📋 Additional args: {', '.join(other_formatted)}")
 
     def _format_argument_value(self, key: str, value, max_length: int | None = None) -> str:
         """Format an argument value for display.
@@ -696,7 +692,7 @@ class ReplSession:
 
         click.echo(f"  Approval Mode: {self.config.approval_mode.value}")
         click.echo(f"  Verbose: {self.config.verbose}")
-        click.echo(f'  Project Docs: {"enabled" if self.config.enable_rules else "disabled"}')
+        click.echo(f"  Project Docs: {'enabled' if self.config.enable_rules else 'disabled'}")
         click.echo()
 
     def display_history(self) -> None:
@@ -837,16 +833,12 @@ class ReplSession:
                 error_str = str(e).lower()
                 if "timeout" in error_str or "timed out" in error_str:
                     click.echo(f"\n[WARN] Request timed out: {e}")
-                    click.echo(
-                        "This might be due to network issues or high server load. Please try again."
-                    )
+                    click.echo("This might be due to network issues or high server load. Please try again.")
                 elif "connection" in error_str or "network" in error_str:
                     click.echo(f"\n[WARN] Network error: {e}")
                     click.echo("Please check your internet connection and try again.")
                 elif "cancelled" in error_str:
-                    click.echo(
-                        "\n[WARN] Request was cancelled. This might be due to cleanup during shutdown."
-                    )
+                    click.echo("\n[WARN] Request was cancelled. This might be due to cleanup during shutdown.")
                     return True
                 else:
                     # Re-raise for general error handling below

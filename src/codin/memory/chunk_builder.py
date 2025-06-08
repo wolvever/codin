@@ -6,7 +6,7 @@ import json
 import uuid
 from datetime import datetime
 
-from a2a.types import Message, Role
+from codin.agent.types import Message, Role
 
 from ..prompt import prompt_run
 from .base import ChunkType, MemoryChunk

@@ -1,7 +1,5 @@
 """Helpers for running the SWE-bench evaluation harness."""
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Iterable
 
@@ -18,10 +16,10 @@ _ALIASES: dict[str, str] = {
     "swebench-lite": SWE_BENCH_LITE_DATASET,
 }
 
-
 def run_swe_benchmark(
     *,
-    dataset_name: str = "lite",
+    dataset_name: str = "SWE-bench/SWE-bench_Lite",
+
     split: str = "test",
     instance_ids: Iterable[str] | None = None,
     predictions_path: str,

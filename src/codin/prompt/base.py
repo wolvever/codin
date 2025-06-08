@@ -18,24 +18,23 @@ import hashlib
 import typing as _t
 from datetime import datetime
 
-from a2a.types import (
+from pydantic import BaseModel, ConfigDict
+
+from codin.agent.types import (
     DataPart as A2ADataPart,
 )
-from a2a.types import (
+from codin.agent.types import (
     FilePart as A2AFilePart,
 )
-
-# A2A SDK imports
-from a2a.types import (
+from codin.agent.types import (
     Message as A2AMessage,
 )
-from a2a.types import (
+from codin.agent.types import (
     Role as A2ARole,
 )
-from a2a.types import (
+from codin.agent.types import (
     TextPart as A2ATextPart,
 )
-from pydantic import BaseModel, ConfigDict
 
 try:
     from jinja2 import Template as _JinjaTemplate
@@ -46,25 +45,25 @@ except ImportError:  # pragma: no cover
     _JinjaTemplate = None
 
 __all__ = [
-    'A2ADataPart',
-    'A2AFilePart',
-    'A2AMessage',
-    'A2APart',
-    'A2ARole',
-    'A2ATextPart',
-    'ModelOptions',
-    'PromptResponse',
-    'PromptTemplate',
-    'PromptVariant',
-    'RenderedPrompt',
-    'ToolDefinition',
+    "A2ADataPart",
+    "A2AFilePart",
+    "A2AMessage",
+    "A2APart",
+    "A2ARole",
+    "A2ATextPart",
+    "ModelOptions",
+    "PromptResponse",
+    "PromptTemplate",
+    "PromptVariant",
+    "RenderedPrompt",
+    "ToolDefinition",
 ]
 
 # -----------------------------------------------------------------------------
 # A2A Protocol Support
 # -----------------------------------------------------------------------------
 
-# Re-export a2a types for backward compatibility
+# Re-export agent types for backward compatibility
 A2AMessage = A2AMessage
 
 # Union type for all part types
@@ -155,7 +154,7 @@ class PromptVariant(BaseModel):
             actual = conditions.get(key)
 
             # Simple equality check with some smart matching
-            if key in ('model_family', 'model_provider'):
+            if key in ("model_family", "model_provider"):
                 # Prefix matching for model families/providers
                 if actual and required:
                     if not str(actual).lower().startswith(str(required).lower()):
@@ -184,7 +183,7 @@ class PromptVariant(BaseModel):
             actual = conditions.get(key)
             if actual == required:
                 score += 10  # Exact match
-            elif key in ('model_family', 'model_provider') and actual and required:
+            elif key in ("model_family", "model_provider") and actual and required:
                 if str(actual).lower().startswith(str(required).lower()):
                     score += 5  # Prefix match
 
@@ -234,7 +233,7 @@ class PromptTemplate:
     def __init__(
         self,
         name: str,
-        version: str = 'latest',
+        version: str = "latest",
         variants: list[PromptVariant] | None = None,
         metadata: dict[str, _t.Any] | None = None,
         text: str | None = None,
@@ -284,7 +283,7 @@ class PromptTemplate:
         matches.sort(key=lambda x: x[1], reverse=True)
         return matches[0][0]
 
-    def render(self, conditions: dict[str, _t.Any] | None = None, **variables: _t.Any) -> 'RenderedPrompt':
+    def render(self, conditions: dict[str, _t.Any] | None = None, **variables: _t.Any) -> "RenderedPrompt":
         """Render the template with the best matching variant."""
         variant = self.get_best_variant(conditions)
         if not variant:
@@ -309,7 +308,7 @@ class PromptTemplate:
         """Get the text of the first variant (for backward compatibility)."""
         if self.variants:
             return self.variants[0].text
-        return ''
+        return ""
 
 
 class RenderedPrompt(BaseModel):
@@ -340,6 +339,6 @@ class RenderedPrompt(BaseModel):
 
         messages = []
         if self.system_prompt:
-            messages.append({'role': 'system', 'content': self.system_prompt})
-        messages.append({'role': 'user', 'content': self.text})
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": self.text})
         return messages

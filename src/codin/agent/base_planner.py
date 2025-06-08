@@ -15,12 +15,14 @@ from ..utils.message import (
     format_history_for_prompt,
     format_tool_results_for_conversation,
 )
+
+from .base import Planner
+
 from .types import (
     ErrorStep,
     FinishStep,
     Message,
     MessageStep,
-    Planner,
     Role,
     State,
     Step,
@@ -29,12 +31,13 @@ from .types import (
     ToolCall,
     ToolCallStep,
 )
+from .base import Planner
 
 __all__ = [
-    'BasePlanner',
+    "BasePlanner",
 ]
 
-logger = logging.getLogger('codin.agent.base_planner')
+logger = logging.getLogger("codin.agent.base_planner")
 
 
 class BasePlanner(Planner):
@@ -43,7 +46,7 @@ class BasePlanner(Planner):
     def __init__(
         self,
         *,
-        prompt_name: str = 'code_agent_loop',
+        prompt_name: str = "code_agent_loop",
         max_tool_calls_per_turn: int = 10,
         enable_thinking: bool = True,
         enable_streaming: bool = True,
@@ -57,7 +60,7 @@ class BasePlanner(Planner):
         self.streaming_enabled = enable_streaming
         self.rules = rules
 
-        logger.info('Initialized BasePlanner')
+        logger.info("Initialized BasePlanner")
 
     async def next(self, state: State) -> _t.AsyncGenerator[Step]:
         """Generate execution steps based on current state."""
@@ -67,7 +70,7 @@ class BasePlanner(Planner):
         variables = await self._build_prompt_variables(state)
 
         logger.debug(
-            f'Planning for session {state.session_id}, turn {state.turn_count}, variables: {variables}'
+            f"Planning for session {state.session_id}, turn {state.turn_count}, variables: {variables}"
         )
 
         try:
@@ -75,12 +78,16 @@ class BasePlanner(Planner):
             response = await prompt_run(
                 self.prompt_name,
                 variables=variables,
-                tools=variables.get('tools', []),
+                tools=variables.get("tools", []),
                 stream=self.streaming_enabled,
             )
 
             stream_chunks: list[str] = []
-            if response.streaming and self.streaming_enabled and isinstance(response.content, _t.AsyncIterator):
+            if (
+                response.streaming
+                and self.streaming_enabled
+                and isinstance(response.content, _t.AsyncIterator)
+            ):
                 step = MessageStep(
                     step_id=str(uuid.uuid4()),
                     is_streaming=True,
@@ -115,16 +122,16 @@ class BasePlanner(Planner):
             parsed_response = self._parse_structured_response(message_content)
 
             # Emit thinking step if enabled and thinking is present
-            if self.thinking_enabled and parsed_response.get('thinking'):
+            if self.thinking_enabled and parsed_response.get("thinking"):
                 yield ThinkStep(
                     step_id=str(uuid.uuid4()),
-                    thinking=parsed_response['thinking'],
+                    thinking=parsed_response["thinking"],
                     created_at=datetime.now(),
                 )
                 step_count += 1
 
             # Emit tool call steps if any
-            tool_calls = parsed_response.get('tool_calls', [])
+            tool_calls = parsed_response.get("tool_calls", [])
             if tool_calls:
                 for tool_call in tool_calls:
                     yield ToolCallStep(
@@ -139,14 +146,14 @@ class BasePlanner(Planner):
                         break
 
             # Emit message step if there's a message
-            message_content = parsed_response.get('message', '')
+            message_content = parsed_response.get("message", "")
             if message_content and not (response.streaming and self.streaming_enabled):
                 message = Message(
                     messageId=str(uuid.uuid4()),
                     role=Role.agent,
                     parts=[TextPart(text=message_content)],
                     contextId=state.session_id,
-                    kind='message',
+                    kind="message",
                 )
 
                 yield MessageStep(
@@ -154,12 +161,12 @@ class BasePlanner(Planner):
                     message=message,
                     is_streaming=False,
                     created_at=datetime.now(),
-                    metadata={'turn': state.turn_count},
+                    metadata={"turn": state.turn_count},
                 )
                 step_count += 1
 
             # Check if task should finish
-            should_continue = parsed_response.get('should_continue', True)
+            should_continue = parsed_response.get("should_continue", True)
             if not should_continue or not tool_calls:
                 # Task is complete
                 final_message = None
@@ -169,30 +176,30 @@ class BasePlanner(Planner):
                         role=Role.agent,
                         parts=[TextPart(text=message_content)],
                         contextId=state.session_id,
-                        kind='message',
+                        kind="message",
                     )
 
                 yield FinishStep(
                     step_id=str(uuid.uuid4()),
                     final_message=final_message,
-                    reason='Task completed based on LLM decision',
+                    reason="Task completed based on LLM decision",
                     created_at=datetime.now(),
                     metadata={
-                        'turn': state.turn_count,
-                        'should_continue': should_continue,
-                        'had_tool_calls': len(tool_calls) > 0,
+                        "turn": state.turn_count,
+                        "should_continue": should_continue,
+                        "had_tool_calls": len(tool_calls) > 0,
                     },
                 )
 
         except Exception as e:
-            logger.error(f'Error in planner execution: {e}', exc_info=True)
+            logger.error(f"Error in planner execution: {e}", exc_info=True)
 
             error_message = Message(
                 messageId=str(uuid.uuid4()),
                 role=Role.agent,
-                parts=[TextPart(text=f'I encountered an error while planning: {e!s}')],
+                parts=[TextPart(text=f"I encountered an error while planning: {e!s}")],
                 contextId=state.session_id,
-                kind='message',
+                kind="message",
             )
 
             yield ErrorStep(
@@ -206,9 +213,9 @@ class BasePlanner(Planner):
             yield FinishStep(
                 step_id=str(uuid.uuid4()),
                 final_message=error_message,
-                reason=f'Planning error: {e!s}',
+                reason=f"Planning error: {e!s}",
                 created_at=datetime.now(),
-                metadata={'turn': state.turn_count, 'error': str(e)},
+                metadata={"turn": state.turn_count, "error": str(e)},
             )
 
     async def _build_prompt_variables(self, state: State) -> dict[str, _t.Any]:
@@ -216,7 +223,11 @@ class BasePlanner(Planner):
         # Get tool definitions
         tool_definitions_objects = to_tool_definitions(state.tools)
         tool_definitions = [
-            {'name': td.name, 'description': td.description, 'parameters': self._clean_parameters(td.parameters)}
+            {
+                "name": td.name,
+                "description": td.description,
+                "parameters": self._clean_parameters(td.parameters),
+            }
             for td in tool_definitions_objects
         ]
 
@@ -225,64 +236,64 @@ class BasePlanner(Planner):
         for msg in state.history[:-1]:  # All but the last message (if it's the current input)
             history_messages.append(
                 {
-                    'role': 'user' if msg.role == Role.user else 'assistant',
-                    'content': extract_text_from_message(msg),
+                    "role": "user" if msg.role == Role.user else "assistant",
+                    "content": extract_text_from_message(msg),
                 }
             )
 
         # Get current user input (last message if it's from user)
-        current_input = ''
+        current_input = ""
         if state.history and state.history[-1].role == Role.user:
             current_input = extract_text_from_message(state.history[-1])
 
         # Format tool results from previous turn if any
-        tool_results_text = ''
+        tool_results_text = ""
         if state.last_tool_results:
             tool_results_text = format_tool_results_for_conversation(state.last_tool_results)
 
         return {
-            'agent_name': 'BasePlanner',
-            'task_id': state.session_id,
-            'turn_count': state.turn_count,
-            'has_tools': len(tool_definitions) > 0,
-            'tools': tool_definitions,
-            'has_history': len(history_messages) > 0,
-            'history_text': format_history_for_prompt(history_messages),
-            'user_input': current_input if current_input else None,
-            'tool_results': bool(tool_results_text),
-            'tool_results_text': tool_results_text,
-            'task_list': state.task_list,
-            'rules': self.rules,
+            "agent_name": "BasePlanner",
+            "task_id": state.session_id,
+            "turn_count": state.turn_count,
+            "has_tools": len(tool_definitions) > 0,
+            "tools": tool_definitions,
+            "has_history": len(history_messages) > 0,
+            "history_text": format_history_for_prompt(history_messages),
+            "user_input": current_input if current_input else None,
+            "tool_results": bool(tool_results_text),
+            "tool_results_text": tool_results_text,
+            "task_list": state.task_list,
+            "rules": self.rules,
         }
 
     def _parse_structured_response(self, response) -> dict[str, _t.Any]:
         """Parse the structured response from prompt_run, adapted from CodeAgent."""
         # Extract content from response
-        content = ''
-        if hasattr(response, 'message') and response.message:
+        content = ""
+        if hasattr(response, "message") and response.message:
             # Extract text from A2A message parts
             for part in response.message.parts:
-                if hasattr(part, 'root') and hasattr(part.root, 'text'):
+                if hasattr(part, "root") and hasattr(part.root, "text"):
                     content += part.root.text
-                elif hasattr(part, 'text'):
+                elif hasattr(part, "text"):
                     content += part.text
-        elif hasattr(response, 'content'):
+        elif hasattr(response, "content"):
             content = str(response.content)
         else:
             content = str(response)
 
         # Initialize default response structure
         parsed_response = {
-            'thinking': '',
-            'task_list': {'completed': [], 'pending': []},
-            'tool_calls': [],
-            'message': '',
-            'should_continue': True,
-            'raw_content': content,
+            "thinking": "",
+            "task_list": {"completed": [], "pending": []},
+            "tool_calls": [],
+            "message": "",
+            "should_continue": True,
+            "raw_content": content,
         }
 
         # Try to extract JSON from markdown code blocks first
-        json_pattern = r'```json\s*(\{.*?\})\s*```'
+        json_pattern = r"```json\s*(\{.*?\})\s*```"
         json_matches = re.findall(json_pattern, content, re.DOTALL)
 
         response_data = None
@@ -291,7 +302,7 @@ class BasePlanner(Planner):
             try:
                 response_data = json.loads(json_matches[0])
             except json.JSONDecodeError as e:
-                logger.warning(f'Failed to parse JSON from markdown block: {e}')
+                logger.warning(f"Failed to parse JSON from markdown block: {e}")
 
         # If no JSON block found, try parsing the entire content as JSON
         if not response_data:
@@ -299,32 +310,34 @@ class BasePlanner(Planner):
                 response_data = json.loads(content.strip())
             except json.JSONDecodeError:
                 # If JSON parsing fails, try to extract information from text
-                logger.debug('No valid JSON found, extracting from text content')
-                parsed_response['message'] = content
-                parsed_response['tool_calls'] = self._parse_tool_calls_from_text(content)
+                logger.debug("No valid JSON found, extracting from text content")
+                parsed_response["message"] = content
+                parsed_response["tool_calls"] = self._parse_tool_calls_from_text(content)
                 return parsed_response
 
         # Extract fields from parsed JSON
         if response_data and isinstance(response_data, dict):
-            parsed_response['thinking'] = response_data.get('thinking', '')
-            parsed_response['message'] = response_data.get('message', '')
-            parsed_response['should_continue'] = response_data.get('should_continue', True)
+            parsed_response["thinking"] = response_data.get("thinking", "")
+            parsed_response["message"] = response_data.get("message", "")
+            parsed_response["should_continue"] = response_data.get("should_continue", True)
 
             # Extract task list
-            task_list = response_data.get('task_list', {})
+            task_list = response_data.get("task_list", {})
             if isinstance(task_list, dict):
-                parsed_response['task_list']['completed'] = task_list.get('completed', [])
-                parsed_response['task_list']['pending'] = task_list.get('pending', [])
+                parsed_response["task_list"]["completed"] = task_list.get("completed", [])
+                parsed_response["task_list"]["pending"] = task_list.get("pending", [])
 
             # Extract tool calls and convert to ToolCall objects
-            tool_calls_data = response_data.get('tool_calls', [])
+            tool_calls_data = response_data.get("tool_calls", [])
             if isinstance(tool_calls_data, list):
                 for call_data in tool_calls_data:
-                    if isinstance(call_data, dict) and 'name' in call_data:
+                    if isinstance(call_data, dict) and "name" in call_data:
                         tool_call = ToolCall(
-                            call_id=str(uuid.uuid4()), name=call_data['name'], arguments=call_data.get('arguments', {})
+                            call_id=str(uuid.uuid4()),
+                            name=call_data["name"],
+                            arguments=call_data.get("arguments", {}),
                         )
-                        parsed_response['tool_calls'].append(tool_call)
+                        parsed_response["tool_calls"].append(tool_call)
 
         return parsed_response
 
@@ -342,7 +355,7 @@ class BasePlanner(Planner):
                 tool_call = ToolCall(call_id=str(uuid.uuid4()), name=tool_name, arguments=arguments)
                 tool_calls.append(tool_call)
             except json.JSONDecodeError:
-                logger.error(f'Failed to parse arguments for tool {tool_name}: {args_str}')
+                logger.error(f"Failed to parse arguments for tool {tool_name}: {args_str}")
 
         return tool_calls
 
@@ -351,19 +364,19 @@ class BasePlanner(Planner):
 
         def clean_value(value):
             """Recursively clean a value to make it JSON serializable."""
-            if hasattr(value, '__class__') and value.__class__.__name__ == 'Undefined':
+            if hasattr(value, "__class__") and value.__class__.__name__ == "Undefined":
                 return None
             if isinstance(value, dict):
                 return {
                     k: clean_value(v)
                     for k, v in value.items()
-                    if not (hasattr(v, '__class__') and v.__class__.__name__ == 'Undefined')
+                    if not (hasattr(v, "__class__") and v.__class__.__name__ == "Undefined")
                 }
             if isinstance(value, list | tuple):
                 return [
                     clean_value(item)
                     for item in value
-                    if not (hasattr(item, '__class__') and item.__class__.__name__ == 'Undefined')
+                    if not (hasattr(item, "__class__") and item.__class__.__name__ == "Undefined")
                 ]
             if isinstance(value, str | int | float | bool | type(None)):
                 return value
@@ -376,15 +389,14 @@ class BasePlanner(Planner):
 
         return clean_value(parameters)
 
-
     def get_config(self) -> dict[str, _t.Any]:
         """Get planner configuration."""
         return {
-            'prompt_name': self.prompt_name,
-            'max_tool_calls_per_turn': self.max_tool_calls_per_turn,
-            'thinking_enabled': self.thinking_enabled,
-            'streaming_enabled': self.streaming_enabled,
-            'rules': self.rules,
+            "prompt_name": self.prompt_name,
+            "max_tool_calls_per_turn": self.max_tool_calls_per_turn,
+            "thinking_enabled": self.thinking_enabled,
+            "streaming_enabled": self.streaming_enabled,
+            "rules": self.rules,
         }
 
     async def cleanup(self) -> None:
@@ -396,7 +408,7 @@ class BasePlanner(Planner):
         # For BasePlanner, resetting means clearing any internal state
         # Since BasePlanner is stateless (each call to next() is independent),
         # we don't need to do anything specific here
-        logger.debug(f'BasePlanner reset for session {state.session_id}')
+        logger.debug(f"BasePlanner reset for session {state.session_id}")
 
         # If we had any internal state to clear, we would do it here
         # For example, clearing conversation history, resetting counters, etc.

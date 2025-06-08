@@ -7,8 +7,9 @@ import typing as _t
 from datetime import datetime
 from enum import Enum
 
-from a2a.types import Message, Role, TextPart
 from pydantic import BaseModel, Field
+
+from codin.agent.types import Message, Role, TextPart
 
 __all__ = [
     "ChunkType",
@@ -124,14 +125,10 @@ class Memory(abc.ABC):
     ) -> None: ...
 
     @abc.abstractmethod
-    async def build_chunk(
-        self, start_index: int | None = None, end_index: int | None = None
-    ) -> int: ...
+    async def build_chunk(self, start_index: int | None = None, end_index: int | None = None) -> int: ...
 
     @abc.abstractmethod
-    async def search_chunk(
-        self, session_id: str, query: str, limit: int = 5
-    ) -> list[MemoryChunk]: ...
+    async def search_chunk(self, session_id: str, query: str, limit: int = 5) -> list[MemoryChunk]: ...
 
 
 MemoryService = Memory

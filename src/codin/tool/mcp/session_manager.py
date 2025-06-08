@@ -33,6 +33,13 @@ try:
     HAS_MCP_CLIENT = True
 except ImportError:
     HAS_MCP_CLIENT = False
+    # Provide simple placeholders for test environments without mcp installed
+    ClientSession = _t.Any  # type: ignore
+    StdioServerParameters = _t.Any  # type: ignore
+    def sse_client(*args: _t.Any, **kwargs: _t.Any) -> _t.Any:
+        raise NotImplementedError("mcp package not installed")
+    def stdio_client(*args: _t.Any, **kwargs: _t.Any) -> _t.Any:
+        raise NotImplementedError("mcp package not installed")
 
 __all__ = [
     'HttpSessionManager',

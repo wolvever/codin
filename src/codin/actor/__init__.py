@@ -6,6 +6,7 @@ and dispatchers for routing requests between agents.
 """
 
 from .actor_system import ActorSystem
+from .work_stealing import WorkStealingActorSystem
 from .dispatcher import Dispatcher, DispatchRequest, DispatchResult, LocalDispatcher
 from .mailbox import LocalMailbox, Mailbox, RayMailbox
 from .ray_scheduler import RayActorManager
@@ -27,4 +28,5 @@ __all__ = [
     'DispatchRequest',
     'DispatchResult',
     'ActorSystem',
+    'WorkStealingActorSystem',
 ]

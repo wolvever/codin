@@ -15,13 +15,15 @@ import tempfile
 import typing as _t
 import zipfile
 from pathlib import Path
+import shutil # Added for copytree and copy2
 
 from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
+from .common_exec import CommonCodeExecutionMixin # Added import
 
 __all__ = ['LocalSandbox']
 
 
-class LocalSandbox(Sandbox):
+class LocalSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
     """Execute commands directly on the host using subprocess.
 
     **Warning** – this is not isolated! Only use for trusted inputs or when
@@ -33,122 +35,54 @@ class LocalSandbox(Sandbox):
     def __init__(self, workdir: str | None = None, *, env_policy: ShellEnvironmentPolicy | None = None):
         super().__init__(env_policy=env_policy)
         self._workdir = workdir or os.getcwd()
-        self._is_windows = platform.system().lower() == 'windows'
+        self.__is_windows = platform.system().lower() == 'windows' # Renamed for clarity
         self._shell_executable = self._detect_shell()
+
+    @property
+    def _is_windows(self) -> bool: # Property for mixin access
+        return self.__is_windows
 
     def _detect_shell(self) -> str:
         """Detect the best shell to use for this platform."""
-        if self._is_windows:
-            # On Windows, prefer PowerShell, fallback to cmd
+        if self.__is_windows:
             return 'powershell.exe'
-        # On Unix-like systems, use bash
         return '/bin/bash'
 
     def _prepare_command(self, cmd: str | _t.Iterable[str]) -> tuple[str | list[str], bool]:
         """Prepare command for execution, handling cross-platform differences."""
         if isinstance(cmd, str):
-            if self._is_windows:
-                # For PowerShell, wrap the command properly
+            if self.__is_windows:
                 return ['powershell.exe', '-NoProfile', '-Command', cmd], False
-            # For bash, use shell=True
-            return cmd, True
-        # For list commands, just return as-is
+            return cmd, True # For bash, use shell=True
         return list(cmd), False
+
+    # _get_main_file_for_language is inherited from CommonCodeExecutionMixin
+    # _install_dependencies is inherited from CommonCodeExecutionMixin
 
     def _get_language_executor(self, language: str) -> list[str]:
         """Get the command to execute code for a given language."""
-        language = language.lower()
+        lang_lower = language.lower()
 
-        if language in ('python', 'py'):
-            return ['python']
-        if language in ('javascript', 'js', 'node'):
+        if lang_lower in ('python', 'py'):
+            return ['python']  # LocalSandbox specific: uses 'python'
+        if lang_lower in ('javascript', 'js', 'node'):
             return ['node']
-        if language in ('bash', 'sh'):
-            return ['/bin/bash'] if not self._is_windows else ['powershell.exe', '-Command']
-        if language in ('powershell', 'ps1'):
+        if lang_lower in ('bash', 'sh'):
+            # Use PowerShell for bash commands on Windows, consistent with original LocalSandbox
+            return ['powershell.exe', '-Command'] if self.__is_windows else ['/bin/bash']
+        if lang_lower in ('powershell', 'ps1'):
             return ['powershell.exe', '-Command']
-        if language == 'go':
+        if lang_lower == 'go':
             return ['go', 'run']
-        if language == 'rust':
+        if lang_lower == 'rust':
             return ['cargo', 'run', '--']
-        if language in ('java',):
+        if lang_lower in ('java',):
             return ['java']
-        if language in ('c', 'cpp', 'c++'):
-            # For C/C++, we'd need to compile first - this is a simplified approach
-            raise NotImplementedError(f'Language {language} requires compilation - not yet supported')
-        raise ValueError(f'Unsupported language: {language}')
-
-    def _get_main_file_for_language(self, language: str, files: list[str]) -> str | None:
-        """Determine the main file to execute for a given language."""
-        language = language.lower()
-
-        # Common main file patterns by language
-        main_patterns = {
-            'python': ['main.py', 'app.py', '__main__.py', 'run.py'],
-            'javascript': ['main.js', 'index.js', 'app.js', 'server.js'],
-            'node': ['main.js', 'index.js', 'app.js', 'server.js'],
-            'go': ['main.go'],
-            'rust': ['main.rs', 'src/main.rs'],
-            'java': ['Main.java', 'App.java'],
-            'bash': ['main.sh', 'run.sh', 'start.sh'],
-            'powershell': ['main.ps1', 'run.ps1', 'start.ps1'],
-            'c': ['main.c'],
-            'cpp': ['main.cpp', 'main.cc', 'main.cxx'],
-            'c++': ['main.cpp', 'main.cc', 'main.cxx'],
-        }
-
-        patterns = main_patterns.get(language, [])
-
-        # First, look for exact matches
-        for pattern in patterns:
-            if pattern in files:
-                return pattern
-
-        # Then look for files with the right extension
-        extensions = {
-            'python': ['.py'],
-            'javascript': ['.js'],
-            'node': ['.js'],
-            'go': ['.go'],
-            'rust': ['.rs'],
-            'java': ['.java'],
-            'bash': ['.sh'],
-            'powershell': ['.ps1'],
-            'c': ['.c'],
-            'cpp': ['.cpp', '.cc', '.cxx'],
-            'c++': ['.cpp', '.cc', '.cxx'],
-        }
-
-        if language in extensions:
-            for file in files:
-                if any(file.endswith(ext) for ext in extensions[language]):
-                    return file
-
-        return None
-
-    async def _install_dependencies(self, dependencies: list[str], language: str) -> ExecResult:
-        """Install dependencies for the given language."""
-        if not dependencies:
-            return ExecResult(stdout='', stderr='', exit_code=0)
-
-        language = language.lower()
-
-        if language in ('python', 'py'):
-            # Use pip to install Python dependencies
-            cmd = ['pip', 'install'] + dependencies
-        elif language in ('javascript', 'js', 'node'):
-            # Use npm to install Node.js dependencies
-            cmd = ['npm', 'install'] + dependencies
-        elif language == 'go':
-            # Use go get for Go dependencies
-            cmd = ['go', 'get'] + dependencies
-        elif language == 'rust':
-            # For Rust, dependencies should be in Cargo.toml
-            return ExecResult(stdout='', stderr='Rust dependencies should be specified in Cargo.toml', exit_code=1)
-        else:
-            return ExecResult(stdout='', stderr=f'Dependency installation not supported for {language}', exit_code=1)
-
-        return await self.run_cmd(cmd)
+        if lang_lower in ('c', 'cpp', 'c++'):
+            # Compilation is handled within run_code for LocalSandbox
+            raise NotImplementedError(f'Language {language} requires compilation handled by run_code.')
+        # Fallback to mixin's definition or its ValueError for unsupported languages
+        return super()._get_language_executor(language)
 
     # Lifecycle ------------------------------------------------------------
     async def _up(self) -> None:
@@ -177,22 +111,24 @@ class LocalSandbox(Sandbox):
         def _run_subprocess():
             # Set up environment with UTF-8 encoding for Windows
             subprocess_env = self._prepare_env(env)
-            if self._is_windows:
+            if self.__is_windows: # Use renamed internal variable
                 # Force UTF-8 encoding on Windows
                 subprocess_env['PYTHONIOENCODING'] = 'utf-8'
 
+            effective_cwd = cwd or self._workdir # Ensure cwd is used
+
             # For Windows PowerShell commands, we need special handling
-            if self._is_windows and isinstance(args, list) and args[0] == 'powershell.exe':
+            if self.__is_windows and isinstance(args, list) and args[0] == 'powershell.exe':
                 proc = subprocess.Popen(
                     args,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    cwd=cwd or self._workdir,
+                    cwd=effective_cwd,
                     env=subprocess_env,
                     shell=False,  # Don't use shell=True with PowerShell args
-                    encoding='utf-8',  # Explicitly set encoding
-                    errors='replace',  # Handle encoding errors gracefully
+                    encoding='utf-8',
+                    errors='replace',
                 )
             else:
                 proc = subprocess.Popen(
@@ -200,11 +136,11 @@ class LocalSandbox(Sandbox):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    cwd=cwd or self._workdir,
+                    cwd=effective_cwd,
                     env=subprocess_env,
                     shell=shell,
-                    encoding='utf-8',  # Explicitly set encoding
-                    errors='replace',  # Handle encoding errors gracefully
+                    encoding='utf-8',
+                    errors='replace',
                 )
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
@@ -230,12 +166,12 @@ class LocalSandbox(Sandbox):
         """Execute code in the sandbox."""
         if not code and not file_path:
             return ExecResult(stdout='', stderr='Either code or file_path must be provided', exit_code=1)
-
         if code and file_path:
             return ExecResult(stdout='', stderr='Cannot provide both code and file_path', exit_code=1)
 
-        # Install dependencies first if provided
+        # 1. Install dependencies using the inherited _install_dependencies
         if dependencies:
+            # _install_dependencies calls self.run_cmd, which uses self._workdir as default cwd.
             dep_result = await self._install_dependencies(dependencies, language)
             if dep_result.exit_code != 0:
                 return ExecResult(
@@ -244,197 +180,235 @@ class LocalSandbox(Sandbox):
                     exit_code=dep_result.exit_code,
                 )
 
-        # Handle direct code execution
+        # 2. Handle direct code execution
         if code:
-            try:
-                if language.lower() in ('c', 'cpp', 'c++'):
-                    # Compile then execute C/C++ code
-                    ext = '.c' if language.lower() == 'c' else '.cpp'
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        src_file = Path(tmpdir) / f'code{ext}'
-                        src_file.write_text(code, encoding='utf-8')
-                        exe_file = Path(tmpdir) / 'a.out'
-                        compiler = 'gcc' if language.lower() == 'c' else 'g++'
-                        compile_result = await self.run_cmd(
-                            [compiler, str(src_file), '-o', str(exe_file)],
-                            timeout=timeout,
-                            env=env,
-                        )
-                        if compile_result.exit_code != 0:
-                            return ExecResult(
-                                stdout=compile_result.stdout,
-                                stderr=f'Compilation failed: {compile_result.stderr}',
-                                exit_code=compile_result.exit_code,
-                            )
-                        return await self.run_cmd([str(exe_file)], timeout=timeout, env=env)
-                executor = self._get_language_executor(language)
-                if language.lower() in ('python', 'py'):
-                    cmd = executor + ['-c', code]
-                elif language.lower() in ('javascript', 'js', 'node'):
-                    # For Node.js, we need to write to a temp file
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as f:
-                        f.write(code)
-                        temp_file = f.name
-                    try:
-                        cmd = executor + [temp_file]
-                        return await self.run_cmd(cmd, timeout=timeout, env=env)
-                    finally:
-                        os.unlink(temp_file)
-                elif language.lower() in ('bash', 'sh'):
-                    if self._is_windows:
-                        cmd = ['powershell.exe', '-Command', code]
-                    else:
-                        cmd = ['/bin/bash', '-c', code]
-                elif language.lower() in ('powershell', 'ps1'):
-                    cmd = ['powershell.exe', '-Command', code]
-                else:
-                    # For other languages, write to temp file
-                    ext_map = {
-                        'go': '.go',
-                        'rust': '.rs',
-                        'java': '.java',
-                    }
-                    ext = ext_map.get(language.lower(), '.txt')
-                    with tempfile.NamedTemporaryFile(mode='w', suffix=ext, delete=False) as f:
-                        f.write(code)
-                        temp_file = f.name
-                    try:
-                        cmd = executor + [temp_file]
-                        return await self.run_cmd(cmd, timeout=timeout, env=env)
-                    finally:
-                        os.unlink(temp_file)
+            lang_lower = language.lower()
+            if lang_lower in ('c', 'cpp', 'c++'):
+                ext = '.c' if lang_lower == 'c' else '.cpp'
+                # Create temp dir within self._workdir for C/C++ compilation
+                with tempfile.TemporaryDirectory(dir=self._workdir) as tmpdir_str:
+                    tmpdir = Path(tmpdir_str)
+                    src_file = tmpdir / f'code{ext}'
+                    src_file.write_text(code, encoding='utf-8')
+                    exe_name = 'a.out' if not self.__is_windows else 'a.exe'
+                    exe_file = tmpdir / exe_name
+                    compiler = 'gcc' if lang_lower == 'c' else 'g++'
+                    compile_cmd = [compiler, str(src_file), '-o', str(exe_file)]
+                    if lang_lower in ('cpp', 'c++'): compile_cmd.extend(['-std=c++17'])
 
-                return await self.run_cmd(cmd, timeout=timeout, env=env)
+                    compile_result = await self.run_cmd(compile_cmd, cwd=str(tmpdir), timeout=timeout, env=env)
+                    if compile_result.exit_code != 0:
+                        return ExecResult(stdout=compile_result.stdout,
+                                          stderr=f'Compilation failed: {compile_result.stderr}',
+                                          exit_code=compile_result.exit_code)
+                    return await self.run_cmd([str(exe_file)], cwd=str(tmpdir), timeout=timeout, env=env)
 
-            except (ValueError, NotImplementedError) as e:
-                return ExecResult(stdout='', stderr=str(e), exit_code=1)
+            # For other languages, delegate to common logic.
+            # self.write_file (called by mixin if needed for temp script) will place files in self._workdir.
+            return await self._common_run_code_logic(code=code, file_path=None, language=language,
+                                                     dependencies=None, # Already handled
+                                                     timeout=timeout, env=env)
 
-        # Handle file path execution
+        # 3. Handle file path execution
         if file_path:
-            file_path = Path(file_path)
+            source_path = Path(file_path) # User-provided path, could be relative or absolute
 
-            if not file_path.exists():
-                return ExecResult(stdout='', stderr=f'File not found: {file_path}', exit_code=1)
+            # Before checking existence, if source_path is relative, resolve it against CWD or a sensible default.
+            # Assuming source_path if relative, is relative to current os.getcwd() or similar context.
+            # For robustness, absolute paths are preferred for file_path argument if ambiguity exists.
+            if not source_path.is_absolute():
+                 source_path = Path(os.getcwd()) / source_path # Or some other defined base for relative paths
 
-            # Create a temporary directory for execution
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
+            if not source_path.exists():
+                return ExecResult(stdout='', stderr=f'File or directory not found: {source_path}', exit_code=1)
 
-                if file_path.is_file():
-                    if file_path.suffix == '.zip':
-                        # Extract zip file
+            # Create a temporary directory within self._workdir to stage and run files
+            with tempfile.TemporaryDirectory(dir=self._workdir) as temp_exec_dir_str:
+                temp_exec_dir = Path(temp_exec_dir_str)
+
+                target_exec_file_abs: Path # Absolute path to the file to run, inside temp_exec_dir
+                execution_cwd_abs: Path    # Absolute CWD for the command, inside temp_exec_dir
+
+                if source_path.is_file():
+                    if source_path.suffix == '.zip':
                         try:
-                            with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                                zip_ref.extractall(temp_path)
-
-                            # Find main file
-                            all_files = []
-                            for root, _dirs, files in os.walk(temp_path):
-                                for file in files:
-                                    rel_path = os.path.relpath(os.path.join(root, file), temp_path)
-                                    all_files.append(rel_path)
-
-                            main_file = self._get_main_file_for_language(language, all_files)
-                            if not main_file:
-                                return ExecResult(
-                                    stdout='',
-                                    stderr=f'No main file found for language {language}',
-                                    exit_code=1,
-                                )
-
-                            exec_path = temp_path / main_file
+                            with zipfile.ZipFile(source_path, 'r') as zipf:
+                                zipf.extractall(temp_exec_dir)
+                            # List files relative to temp_exec_dir for main file detection
+                            extracted_files = [str(p.relative_to(temp_exec_dir)) for p in temp_exec_dir.rglob('*') if p.is_file()]
+                            main_file_rel = self._get_main_file_for_language(language, extracted_files)
+                            if not main_file_rel:
+                                return ExecResult(stdout='', stderr=f'No main file found for {language} in zip {source_path.name}', exit_code=1)
+                            target_exec_file_abs = temp_exec_dir / main_file_rel
+                            execution_cwd_abs = target_exec_file_abs.parent
                         except zipfile.BadZipFile:
-                            return ExecResult(stdout='', stderr=f'Invalid zip file: {file_path}', exit_code=1)
-                    else:
-                        # Copy single file
-                        exec_path = temp_path / file_path.name
-                        exec_path.write_text(file_path.read_text(encoding='utf-8'), encoding='utf-8')
+                            return ExecResult(stdout='', stderr=f'Invalid zip file: {source_path}', exit_code=1)
+                    else: # Single regular file
+                        # Copy the file into temp_exec_dir
+                        target_exec_file_abs = temp_exec_dir / source_path.name
+                        shutil.copy2(source_path, target_exec_file_abs) # Use shutil.copy2 to preserve metadata
+                        execution_cwd_abs = temp_exec_dir
+                elif source_path.is_dir():
+                    # Copy contents of source_path directory into temp_exec_dir
+                    for item in source_path.iterdir(): # Iterate over items in source_path
+                        dest_path = temp_exec_dir / item.name
+                        if item.is_dir():
+                            shutil.copytree(item, dest_path, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(item, dest_path) # Copy file
 
-                elif file_path.is_dir():
-                    # Copy entire directory
-                    import shutil
-
-                    shutil.copytree(file_path, temp_path / file_path.name)
-
-                    # Find main file
-                    all_files = []
-                    search_path = temp_path / file_path.name
-                    for root, _dirs, files in os.walk(search_path):
-                        for file in files:
-                            rel_path = os.path.relpath(os.path.join(root, file), search_path)
-                            all_files.append(rel_path)
-
-                    main_file = self._get_main_file_for_language(language, all_files)
-                    if not main_file:
-                        return ExecResult(stdout='', stderr=f'No main file found for language {language}', exit_code=1)
-
-                    exec_path = search_path / main_file
-
+                    # List files relative to the new root (temp_exec_dir) for main file detection
+                    copied_files = [str(p.relative_to(temp_exec_dir)) for p in temp_exec_dir.rglob('*') if p.is_file()]
+                    main_file_rel = self._get_main_file_for_language(language, copied_files)
+                    if not main_file_rel:
+                        return ExecResult(stdout='', stderr=f'No main file found for {language} in dir {source_path.name}', exit_code=1)
+                    target_exec_file_abs = temp_exec_dir / main_file_rel
+                    execution_cwd_abs = target_exec_file_abs.parent
                 else:
-                    return ExecResult(stdout='', stderr=f'Invalid file path: {file_path}', exit_code=1)
+                    return ExecResult(stdout='', stderr=f'Unsupported path type: {source_path}', exit_code=1)
 
-                # Execute the file
-                try:
-                    if language.lower() in ('c', 'cpp', 'c++'):
-                        compiler = 'gcc' if language.lower() == 'c' else 'g++'
-                        exe_file = exec_path.parent / 'a.out'
-                        compile_res = await self.run_cmd(
-                            [compiler, str(exec_path), '-o', str(exe_file)],
-                            cwd=str(exec_path.parent),
-                            timeout=timeout,
-                            env=env,
-                        )
-                        if compile_res.exit_code != 0:
-                            return ExecResult(
-                                stdout=compile_res.stdout,
-                                stderr=f'Compilation failed: {compile_res.stderr}',
-                                exit_code=compile_res.exit_code,
-                            )
-                        return await self.run_cmd([str(exe_file)], cwd=str(exec_path.parent), timeout=timeout, env=env)
+                # Now, target_exec_file_abs and execution_cwd_abs are set.
+                # These are absolute paths within the temp_exec_dir (which is itself in self._workdir).
 
-                    executor = self._get_language_executor(language)
-                    cmd = executor + [str(exec_path)]
-                    return await self.run_cmd(cmd, cwd=str(exec_path.parent), timeout=timeout, env=env)
-                except (ValueError, NotImplementedError) as e:
-                    return ExecResult(stdout='', stderr=str(e), exit_code=1)
+                lang_lower = language.lower()
+                if lang_lower in ('c', 'cpp', 'c++'):
+                    exe_name = 'a.out' if not self.__is_windows else 'a.exe'
+                    # Place executable in the execution_cwd_abs (e.g., alongside main source file)
+                    exe_file = execution_cwd_abs / exe_name
+                    compiler = 'gcc' if lang_lower == 'c' else 'g++'
+                    compile_cmd = [compiler, str(target_exec_file_abs), '-o', str(exe_file)]
+                    if lang_lower in ('cpp', 'c++'): compile_cmd.extend(['-std=c++17'])
+
+                    compile_result = await self.run_cmd(compile_cmd, cwd=str(execution_cwd_abs), timeout=timeout, env=env)
+                    if compile_result.exit_code != 0:
+                        return ExecResult(stdout=compile_result.stdout,
+                                          stderr=f'Compilation failed: {compile_result.stderr}',
+                                          exit_code=compile_result.exit_code)
+                    return await self.run_cmd([str(exe_file)], cwd=str(execution_cwd_abs), timeout=timeout, env=env)
+
+                # For other languages, call _common_run_code_logic.
+                # Pass the absolute path (target_exec_file_abs) within the temp sandbox dir.
+                # The _common_run_code_logic's run_cmd will use its parent as cwd if not otherwise specified.
+                # However, our _common_run_code_logic sets cwd based on file_path.parent.
+                # So, it will use execution_cwd_abs correctly.
+                return await self._common_run_code_logic(
+                    code=None,
+                    file_path=str(target_exec_file_abs), # This is an absolute path for run_cmd
+                    language=language,
+                    dependencies=None, # Already handled
+                    timeout=timeout,
+                    env=env
+                )
+
+        # Fallback if neither code nor file_path is provided (should be caught by initial checks)
+        return ExecResult(stdout='', stderr='Internal error in run_code logic: No path or code provided.', exit_code=1)
+
 
     # Filesystem -----------------------------------------------------------
     def _abs(self, path: str) -> str:
-        """Get absolute path within the sandbox working directory."""
-        return os.path.join(self._workdir, path)
+        """Get absolute path within the sandbox working directory, ensuring it's safe."""
+        resolved_workdir = Path(self._workdir).resolve()
+
+        # Treat 'path' as relative to 'resolved_workdir'
+        # Path.joinpath can handle if 'path' is already absolute, but behavior might be unexpected.
+        # Normalizing 'path' first helps simplify ".." etc.
+        normalized_path_segment = Path(path).normalize()
+
+        # If normalized_path_segment is absolute, it might try to escape.
+        # This check is tricky. For now, we assume 'path' is intended to be relative.
+        # If 'path' could be absolute and outside 'resolved_workdir', it should be an error.
+        if normalized_path_segment.is_absolute():
+            # This means 'path' is an absolute path. We must check if it's within workdir.
+            # This scenario is less common if 'path' is always meant to be relative to sandbox root.
+            abs_path_candidate = normalized_path_segment.resolve()
+        else:
+            abs_path_candidate = (resolved_workdir / normalized_path_segment).resolve()
+
+        # Final check: is the resolved path within the working directory?
+        # Using os.path.commonprefix for a string-based check after resolving,
+        # or Path.is_relative_to for Python 3.9+
+        try: # Python 3.9+
+            if not abs_path_candidate.is_relative_to(resolved_workdir):
+                raise ValueError(f"Attempted to access path '{abs_path_candidate}' outside of working directory '{resolved_workdir}'.")
+        except AttributeError: # Fallback for Python < 3.9
+            if os.path.commonprefix([str(resolved_workdir), str(abs_path_candidate)]) != str(resolved_workdir):
+                raise ValueError(f"Attempted to access path '{abs_path_candidate}' outside of working directory '{resolved_workdir}'.")
+
+        return str(abs_path_candidate)
+
 
     async def list_files(self, path: str = '.') -> list[str]:
-        """List files in a directory."""
+        """List files in a directory relative to self._workdir.
+        Paths returned are relative to the 'path' argument itself.
+        e.g., list_files('sub') for a file 'sub/file.txt' returns ['file.txt']
+        """
         loop = asyncio.get_event_loop()
+        try:
+            # 'path' is relative to self._workdir. _abs resolves it safely.
+            base_abs_path_str = self._abs(path)
+        except ValueError: # Path outside workdir or invalid
+            return [] # Or raise an error, matching original more closely might mean no error here
 
-        def _list_files():
-            root = self._abs(path)
-            files: list[str] = []
-            for dirpath, _dirnames, filenames in os.walk(root):
-                for f in filenames:
-                    files.append(os.path.relpath(os.path.join(dirpath, f), root))
-            return files
+        base_abs_path = Path(base_abs_path_str)
 
-        return await loop.run_in_executor(None, _list_files)
+        def _list_files_sync():
+            if not base_abs_path.is_dir():
+                # Original os.walk on a non-dir path wouldn't error but yield nothing.
+                return []
+
+            found_files: list[str] = []
+            for item in base_abs_path.rglob('*'): # Recursive globbing
+                if item.is_file():
+                    # Make path relative to base_abs_path (the original 'path' argument)
+                    relative_file_path = str(item.relative_to(base_abs_path))
+                    found_files.append(relative_file_path)
+            return found_files
+
+        return await loop.run_in_executor(None, _list_files_sync)
 
     async def read_file(self, path: str) -> str:
-        """Read a file from the filesystem."""
+        """Read a file from the filesystem relative to self._workdir."""
         loop = asyncio.get_event_loop()
+        try:
+            abs_file_path_str = self._abs(path) # path is relative to self._workdir
+        except ValueError as e: # Path was outside workdir or invalid
+             # Raise FileNotFoundError to be consistent with file system errors
+             raise FileNotFoundError(f"Cannot read file: Invalid path '{path}'. {e}") from e
 
-        def _read_file():
-            with open(self._abs(path), encoding='utf-8') as f:
+        abs_file_path = Path(abs_file_path_str)
+
+        def _read_file_sync():
+            if not abs_file_path.is_file():
+                # Use the original relative path in the error for user clarity
+                raise FileNotFoundError(f"File not found at '{path}' (resolved to '{abs_file_path}')")
+            with open(abs_file_path, 'r', encoding='utf-8') as f:
                 return f.read()
 
-        return await loop.run_in_executor(None, _read_file)
+        try:
+            return await loop.run_in_executor(None, _read_file_sync)
+        except FileNotFoundError: # Re-raise to ensure it's from async context if raised in thread
+            raise
+
 
     async def write_file(self, path: str, content: str) -> None:
-        """Write content to a file."""
+        """Write content to a file relative to self._workdir.
+        'path' can be a simple filename like 'temp_code.js' or a relative path like 'subdir/file.txt'.
+        It will be created inside self._workdir.
+        """
         loop = asyncio.get_event_loop()
+        try:
+            # 'path' is relative to self._workdir. _abs resolves it safely.
+            abs_file_path_str = self._abs(path)
+        except ValueError as e: # Path was outside workdir or invalid
+            # Raise PermissionError as writing outside sandbox is a permission issue.
+            raise PermissionError(f"Cannot write file: Invalid path '{path}'. {e}") from e
 
-        def _write_file():
-            abs_path = self._abs(path)
-            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-            with open(abs_path, 'w', encoding='utf-8') as f:
+        abs_file_path = Path(abs_file_path_str)
+
+        def _write_file_sync():
+            # Ensure parent directory of abs_file_path exists.
+            abs_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(abs_file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
 
-        await loop.run_in_executor(None, _write_file)
+        await loop.run_in_executor(None, _write_file_sync)

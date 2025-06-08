@@ -24,7 +24,7 @@ from codin.agent.code_planner import CodePlanner, CodePlannerConfig
 from codin.agent.types import AgentRunInput, RunConfig, ToolCall, Message
 from codin.memory.base import MemMemoryService
 from codin.tool.registry import ToolRegistry
-from codin.tool.sandbox import SandboxToolset
+from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
 from codin.sandbox.local import LocalSandbox
 from codin.model.base import BaseLLM
 

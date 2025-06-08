@@ -225,7 +225,9 @@ class ToolRegistry:
                 final_name = simplified_name
                 self._original_names[simplified_name] = original_name
 
-                # Create a copy with the new name and register it too
+                # Create a new tool instance for the simplified name. This allows the tool to be registered
+                # under both its original and simplified names if the simplified name doesn't cause a conflict,
+                # without altering the original tool instance.
                 tool_copy = type(tool).__new__(type(tool))
                 tool_copy.__dict__.update(tool.__dict__)
                 tool_copy.name = final_name

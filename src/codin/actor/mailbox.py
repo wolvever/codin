@@ -6,8 +6,6 @@ import typing as _t
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from .local_mailbox import LocalMailbox
-from .ray_mailbox import RayMailbox
 
 if TYPE_CHECKING:
 

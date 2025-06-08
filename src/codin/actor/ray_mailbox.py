@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import typing as _t
 
 from ..agent.types import Message
 from .mailbox import Mailbox
+from .queue_mailbox import QueueMailbox
 
 try:  # pragma: no cover - optional dependency
     import ray
@@ -17,30 +17,9 @@ __all__ = ["RayMailbox"]
 if ray:  # pragma: no cover - avoid ray when not installed
 
     @ray.remote
-    class _MailboxActor:
+    class _MailboxActor(QueueMailbox):
         def __init__(self, maxsize: int = 100):
-            self._inbox: asyncio.Queue[Message] = asyncio.Queue(maxsize=maxsize)
-            self._outbox: asyncio.Queue[Message] = asyncio.Queue(maxsize=maxsize)
-
-        async def put_inbox(self, msgs: list[Message]):
-            for m in msgs:
-                await self._inbox.put(m)
-
-        async def put_outbox(self, msgs: list[Message]):
-            for m in msgs:
-                await self._outbox.put(m)
-
-        async def get_inbox(self, n: int, timeout: float | None):
-            res = []
-            for _ in range(n):
-                res.append(await asyncio.wait_for(self._inbox.get(), timeout=timeout))
-            return res
-
-        async def get_outbox(self, n: int, timeout: float | None):
-            res = []
-            for _ in range(n):
-                res.append(await asyncio.wait_for(self._outbox.get(), timeout=timeout))
-            return res
+            super().__init__(maxsize)
 
     class RayMailbox(Mailbox):
         """Mailbox backed by a Ray actor."""

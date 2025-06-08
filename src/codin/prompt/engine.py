@@ -32,10 +32,16 @@ class PromptEngine:
         """Initialize prompt engine.
 
         Args:
-            llm: LLM instance, model name, or None to auto-select
-            endpoint: Storage endpoint (None for default)
+            llm: Optional. An LLM instance, model name (str), or None.
+                 If None or not provided, the `run` method will attempt to create an
+                 LLM from the environment settings. If this creation fails, `run`
+                 will raise a ValueError.
+                 The `render` method does not require an LLM instance.
+            endpoint: Optional. The storage endpoint URL for prompt templates
+                 (e.g., "fs://./prompt_templates"). Defaults to a local filesystem
+                 path derived from environment variables or a standard default.
         """
-        self.llm = self._resolve_llm(llm) if llm else None
+        self.llm = self._resolve_llm(llm) if llm is not None else None
         self.endpoint = endpoint
 
     def _resolve_llm(self, llm: BaseLLM | str) -> BaseLLM:
@@ -80,26 +86,64 @@ class PromptEngine:
         )
 
     async def _prepare_variables(
-        self, variables: dict[str, _t.Any], tools: list[ToolDefinition] | None, **kwargs
+        self, variables: dict[str, _t.Any], **kwargs
     ) -> dict[str, _t.Any]:
-        """Prepare template variables with tools context."""
-        all_vars = (variables or {}) | kwargs
+        """Prepare template variables for rendering by merging and processing tools.
 
-        # Add tool context
-        if tools:
-            tool_dicts = [{"name": t.name, "description": t.description, "parameters": t.parameters} for t in tools]
-            all_vars.update(
+        This method takes an initial `variables` dictionary, merges `kwargs` into it
+        (kwargs take precedence), and then processes a "tools" key expected within
+        the original `variables` dictionary. The processed tool information (such as
+        tool descriptions, names, and a flag indicating presence of tools) is added
+        to the resulting variable set.
+
+        Args:
+            variables: The base dictionary of variables. If it contains a "tools"
+                key, this key is expected to hold a list of `ToolDefinition`
+                objects or dictionaries that can be converted to `ToolDefinition`.
+            **kwargs: Additional keyword arguments to be merged into the variables.
+                These will override any keys with the same name in `variables`.
+
+        Returns:
+            A new dictionary containing the merged variables from `variables` and
+            `kwargs`, augmented with specific context derived from the processed
+            "tools" (e.g., `has_tools`, `tool_names`, `tool_descriptions`, and
+            a representation of "tools" suitable for templates).
+        """
+        # Make a copy of the original variables to avoid modifying it if passed by reference elsewhere
+        processed_vars = variables.copy()
+        processed_vars.update(kwargs) # Merge kwargs. kwargs can override initial variables.
+
+        # Extract tools from the 'variables' dictionary (original ones, before kwargs merge for safety,
+        # or from processed_vars if kwargs are allowed to provide/override tools)
+        # Subtask says "retrieve tools ... from the variables dictionary" (the parameter).
+        # Let's stick to extracting from the original 'variables' parameter.
+        tools_data = variables.get("tools") # This could be List[ToolDefinition] or List[dict]
+
+        if tools_data:
+            # Ensure tools_data is in the ToolDefinition format if it's not already
+            # This logic might need adjustment depending on what format 'tools' is expected in 'variables'
+            # For now, assume it's List[ToolDefinition] or compatible dicts
+            tool_defs = []
+            if isinstance(tools_data, list):
+                for item in tools_data:
+                    if isinstance(item, ToolDefinition):
+                        tool_defs.append(item)
+                    elif isinstance(item, dict): # If tools are passed as dicts
+                        tool_defs.append(ToolDefinition(**item))
+
+            tool_dicts = [{"name": t.name, "description": t.description, "parameters": t.parameters} for t in tool_defs]
+            processed_vars.update(
                 {
-                    "tools": tool_dicts,
+                    "tools": tool_dicts, # This will be list of dicts for the template
                     "has_tools": True,
-                    "tool_descriptions": [f"- {t.name}: {t.description}" for t in tools],
-                    "tool_names": [t.name for t in tools],
+                    "tool_descriptions": [f"- {t.name}: {t.description}" for t in tool_defs],
+                    "tool_names": [t.name for t in tool_defs],
                 }
             )
         else:
-            all_vars.update({"has_tools": False, "tool_descriptions": [], "tool_names": []})
+            processed_vars.update({"has_tools": False, "tool_descriptions": [], "tool_names": []})
 
-        return all_vars
+        return processed_vars
 
     async def run(
         self,
@@ -108,11 +152,8 @@ class PromptEngine:
         *,
         version: str | None = None,
         variables: dict[str, _t.Any] | None = None,
-        tools: list[ToolDefinition] | None = None,
         conditions: dict[str, _t.Any] | None = None,
         stream: bool = False,
-        context_id: str | None = None,
-        task_id: str | None = None,
         **kwargs,
     ) -> PromptResponse:
         """Execute a prompt template with elegant simplicity.
@@ -120,27 +161,54 @@ class PromptEngine:
         Args:
             name: Template name
             version: Template version (optional)
-            variables: Template variables
-            tools: Available tools
+            variables: A dictionary of template variables. This dictionary can
+                optionally include the following special keys:
+                - "tools": A list of `ToolDefinition` objects or dictionaries
+                  that can be converted to `ToolDefinition`. These are used for
+                  providing tool context to the template and for enabling
+                  tool use with the LLM if supported.
+                - "context_id": An optional string identifier for the context
+                  of the A2A message generated by the `run` method.
+                - "task_id": An optional string identifier for the task
+                  associated with the A2A message.
+                Other keys in this dictionary are passed as variables to the
+                prompt template during rendering.
             conditions: Template selection conditions
             stream: Stream response
-            context_id: A2A context ID
-            task_id: A2A task ID
             **kwargs: Additional variables
 
         Returns:
             A2AResponse with result
+
+        Note:
+            If an LLM was not provided during engine initialization, this method
+            will attempt to create one from environment settings. If this fails,
+            a ValueError will be raised.
         """
+        if self.llm is None:
+            # Attempt to create LLM from environment if not provided during construction
+            # and also not explicitly passed to run (though run doesn't accept llm directly)
+            # This logic primarily covers the case where __init__ receives None.
+            # If an LLM is critical, it should be ensured by the caller or by a specific method call.
+            # However, the request is to raise error if self.llm is None at this point.
+            from ..model.factory import create_llm_from_env
+
+            try:
+                self.llm = create_llm_from_env()
+            except Exception as e: # Broad exception to catch if create_llm_from_env fails
+                 raise ValueError(
+                    "LLM instance is required for execution, but none was provided or could be created from environment."
+                 ) from e
+
+        # If after attempting to create from env, llm is still None, then raise error.
+        # This check is now more specific after the attempt above.
+        if self.llm is None:
+            raise ValueError("LLM instance is required for execution, but none was provided.")
+
         try:
             # Load template
             registry = get_registry(self.endpoint)
             template = await registry.get_async(name, version)
-
-            # Get or create LLM
-            if not self.llm:
-                from ..model.factory import create_llm_from_env
-
-                self.llm = create_llm_from_env()
 
             # Prepare LLM if needed
             if hasattr(self.llm, "prepare"):
@@ -162,7 +230,19 @@ class PromptEngine:
                 raise ValueError(f"No suitable variant found for template {name}")
 
             # Prepare all variables
-            all_variables = await self._prepare_variables(variables, tools, **kwargs)
+            # 'variables' here is the parameter to run(), which might be None.
+            # _prepare_variables expects a dict.
+            current_variables = variables or {}
+            all_variables = await self._prepare_variables(current_variables, **kwargs)
+
+            # The 'tools' variable for LLM interaction should come from the processed 'all_variables'
+            # or more directly from what was in the input 'variables' dict.
+            # The 'tools' entry in 'all_variables' is now a list of dicts for the template.
+            # For LLM interaction, we need the original ToolDefinition objects or compatible dicts.
+            # Let's re-fetch from original 'variables' for clarity for the LLM part.
+            llm_tools_source = current_variables.get("tools") # This would be List[ToolDefinition] or List[dict]
+
+
             all_variables.update(
                 {
                     "model": capabilities["model"],
@@ -185,25 +265,29 @@ class PromptEngine:
                 # Use structured message format if available
                 messages = rendered_prompt.to_messages()
 
-                if tools and capabilities["tool_support"] and hasattr(self.llm, "generate_with_tools"):
-                    # Convert tools for LLM
-                    llm_tools = [
-                        {
-                            "type": "function",
-                            "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
-                        }
-                        for t in tools
-                    ]
+                # 'llm_tools_source' was extracted above from current_variables.get("tools")
+                if llm_tools_source and capabilities["tool_support"] and hasattr(self.llm, "generate_with_tools"):
+                    # Convert tools for LLM if they are ToolDefinition objects
+                    llm_api_tools = []
+                    if isinstance(llm_tools_source, list):
+                        for tool_item in llm_tools_source:
+                            if isinstance(tool_item, ToolDefinition):
+                                llm_api_tools.append({
+                                    "type": "function",
+                                    "function": {"name": tool_item.name, "description": tool_item.description, "parameters": tool_item.parameters},
+                                })
+                            elif isinstance(tool_item, dict): # Assume it's already in LLM API format or compatible
+                                llm_api_tools.append(tool_item)
 
                     # Check if LLM supports message-based generation with tools
                     if hasattr(self.llm, "generate_messages_with_tools"):
                         completion = await self.llm.generate_messages_with_tools(
-                            messages, tools=llm_tools, stream=stream, **model_options
+                            messages, tools=llm_api_tools, stream=stream, **model_options
                         )
                     else:
                         # Fallback to text-based generation
                         completion = await self.llm.generate_with_tools(
-                            rendered_prompt.text, tools=llm_tools, stream=stream, **model_options
+                            rendered_prompt.text, tools=llm_api_tools, stream=stream, **model_options
                         )
                 # Check if LLM supports message-based generation
                 elif hasattr(self.llm, "generate_messages"):
@@ -212,18 +296,21 @@ class PromptEngine:
                     # Fallback to text-based generation
                     completion = await self.llm.generate(rendered_prompt.text, stream=stream, **model_options)
             # Use traditional single text approach
-            elif tools and capabilities["tool_support"] and hasattr(self.llm, "generate_with_tools"):
-                # Convert tools for LLM
-                llm_tools = [
-                    {
-                        "type": "function",
-                        "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
-                    }
-                    for t in tools
-                ]
+            # 'llm_tools_source' was extracted above from current_variables.get("tools")
+            elif llm_tools_source and capabilities["tool_support"] and hasattr(self.llm, "generate_with_tools"):
+                llm_api_tools = []
+                if isinstance(llm_tools_source, list):
+                    for tool_item in llm_tools_source:
+                        if isinstance(tool_item, ToolDefinition):
+                            llm_api_tools.append({
+                                "type": "function",
+                                "function": {"name": tool_item.name, "description": tool_item.description, "parameters": tool_item.parameters},
+                            })
+                        elif isinstance(tool_item, dict):
+                             llm_api_tools.append(tool_item)
 
                 completion = await self.llm.generate_with_tools(
-                    rendered_prompt.text, tools=llm_tools, stream=stream, **model_options
+                    rendered_prompt.text, tools=llm_api_tools, stream=stream, **model_options
                 )
             else:
                 completion = await self.llm.generate(rendered_prompt.text, stream=stream, **model_options)
@@ -235,8 +322,11 @@ class PromptEngine:
                 response.content = completion
             else:
                 content_str = str(completion)
+                # Get context_id and task_id from all_variables
+                _context_id = all_variables.get("context_id")
+                _task_id = all_variables.get("task_id")
                 response.message = self._create_message(
-                    content=content_str, role=Role.agent, context_id=context_id, task_id=task_id
+                    content=content_str, role=Role.agent, context_id=_context_id, task_id=_task_id
                 )
                 response.content = content_str
 
@@ -248,7 +338,7 @@ class PromptEngine:
                 error={"type": "execution_error", "message": str(e), "timestamp": datetime.now().isoformat()}
             )
 
-    async def render_only(
+    async def render(
         self,
         name: str,
         /,
@@ -257,8 +347,8 @@ class PromptEngine:
         variables: dict[str, _t.Any] | None = None,
         conditions: dict[str, _t.Any] | None = None,
         **kwargs,
-    ) -> RenderedPrompt:
-        """Render a template without executing LLM.
+    ) -> str:
+        """Render a template's text content without executing LLM.
 
         Args:
             name: Template name
@@ -268,10 +358,11 @@ class PromptEngine:
             **kwargs: Additional variables
 
         Returns:
-            RenderedPrompt instance
+            The rendered text content of the prompt.
         """
         registry = get_registry(self.endpoint)
         template = await registry.get_async(name, version)
 
         all_variables = (variables or {}) | kwargs
-        return template.render(conditions=conditions, **all_variables)
+        rendered_prompt = template.render(conditions=conditions, **all_variables)
+        return rendered_prompt.text

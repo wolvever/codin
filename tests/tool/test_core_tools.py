@@ -27,7 +27,7 @@ def tool_context():
 
 
 @pytest.fixture
-def sandbox_toolset(sandbox):
+async def sandbox_toolset(sandbox):
     """Create SandboxToolset for tests."""
     return SandboxToolset(sandbox)
 

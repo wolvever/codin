@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 
 # Import a2a types that we need
-from a2a.types import Role, TextPart
+from a2a.types import Role, TextPart, TaskState, TaskStatus
 
 from ..actor.mailbox import LocalMailbox, Mailbox
 from ..memory.base import MemMemoryService, Memory
@@ -295,6 +295,8 @@ class BaseAgent(Agent):
                 task = Task(
                     id=input_data.message.messageId or str(uuid.uuid4()),
                     query=query,
+                    contextId=session_id,
+                    status=TaskStatus(state=TaskState.submitted),
                     metadata={'session_id': session_id, 'agent_id': self.id},
                     parts=[],
                 )

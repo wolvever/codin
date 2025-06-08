@@ -41,6 +41,7 @@ codin = "codin.cli.commands:main"
 dev = [
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
+    "tenacity>=8.0.0",
     "black>=23.0.0",
     "isort>=5.12.0",
     "mypy>=1.0.0",
@@ -98,4 +99,5 @@ disallow_incomplete_defs = true
 dev = [
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
+    "tenacity>=8.0.0",
 ]

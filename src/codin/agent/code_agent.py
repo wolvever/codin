@@ -42,6 +42,11 @@ from ..sandbox.local import LocalSandbox
 from ..tool.base import ToolContext, Toolset, to_tool_definitions
 from ..tool.executor import ToolExecutor
 from ..tool.registry import ToolRegistry
+from ..utils.message import (
+    extract_text_from_message,
+    format_history_for_prompt,
+    format_tool_results_for_conversation,
+)
 from .types import Message, TextPart
 
 __all__: list[str] = [
@@ -565,17 +570,17 @@ class CodeAgent(Agent):
                 history_messages.append(
                     {
                         'role': 'user' if msg.role == Role.user else 'assistant',
-                        'content': self._extract_text_from_message(msg),
+                        'content': extract_text_from_message(msg),
                     }
                 )
 
             # Get the current user input
-            current_input = self._extract_text_from_message(turn_input[-1]) if turn_input else ''
+            current_input = extract_text_from_message(turn_input[-1]) if turn_input else ''
 
             # Format tool results from previous turn if any
             tool_results_text = ''
             if hasattr(self, '_last_tool_results') and self._last_tool_results:
-                tool_results_text = self._format_tool_results_for_conversation(self._last_tool_results)
+                tool_results_text = format_tool_results_for_conversation(self._last_tool_results)
 
             # Get task_id and task_list from run_context
             task_id = run_context.get('task_id', 'default')
@@ -589,7 +594,7 @@ class CodeAgent(Agent):
                 'has_tools': len(tool_definitions) > 0,
                 'tools': tool_definitions,
                 'has_history': len(history_messages) > 0,
-                'history_text': self._format_history_for_prompt(history_messages),
+                'history_text': format_history_for_prompt(history_messages),
                 'user_input': current_input if current_input else None,
                 'tool_results': bool(tool_results_text),
                 'tool_results_text': tool_results_text,
@@ -845,7 +850,7 @@ class CodeAgent(Agent):
             # Add tool results to conversation if any
             if tool_results:
                 # Create a tool results message
-                tool_results_text = self._format_tool_results_for_conversation(tool_results)
+                tool_results_text = format_tool_results_for_conversation(tool_results)
                 tool_results_message = self._create_agent_message(
                     f'Tool execution results:\n{tool_results_text}', task_id
                 )
@@ -892,46 +897,6 @@ class CodeAgent(Agent):
 
         return tool_calls
 
-    def _extract_text_from_message(self, message: Message) -> str:
-        """Extract text content from a Message object."""
-        text_parts = []
-        for part in message.parts:
-            if hasattr(part, 'root') and hasattr(part.root, 'text'):
-                text_parts.append(part.root.text)
-            elif hasattr(part, 'text'):
-                text_parts.append(part.text)
-        return '\n'.join(text_parts)
-
-    def _format_history_for_prompt(self, history_messages: list[dict]) -> str:
-        """Format conversation history for the prompt."""
-        if not history_messages:
-            return ''
-
-        formatted = []
-        for msg in history_messages:
-            role = msg['role'].title()
-            content = msg['content']
-            formatted.append(f'{role}: {content}')
-
-        return '\n\n'.join(formatted)
-
-    def _format_tool_results_for_conversation(self, tool_results: list[ToolCallResult]) -> str:
-        """Format tool results for inclusion in conversation."""
-        if not tool_results:
-            return ''
-
-        formatted = []
-        for result in tool_results:
-            status = '✅ Success' if result.success else '❌ Failed'
-            formatted.append(f'**Tool Call {result.call_id}** {status}')
-            if result.output:
-                # Keep complete outputs instead of truncating
-                formatted.append(f'Output: {result.output}')
-            if result.error:
-                formatted.append(f'Error: {result.error}')
-            formatted.append('')  # Empty line between results
-
-        return '\n'.join(formatted)
 
     async def run(self, input_data: AgentRunInput) -> AgentRunOutput:
         """Run the agent with iterative execution until task completion."""
@@ -964,7 +929,7 @@ class CodeAgent(Agent):
                 'session_id': self._context_id,
                 'iteration': 0,
                 'elapsed_time': 0.0,
-                'user_input': self._extract_text_from_message(input_data.message),
+                'user_input': extract_text_from_message(input_data.message),
             },
         )
 
@@ -1111,7 +1076,7 @@ class CodeAgent(Agent):
         if not tool_results:
             # Check if the last message indicates completion
             if response_messages:
-                last_message_text = self._extract_text_from_message(response_messages[-1]).lower()
+                last_message_text = extract_text_from_message(response_messages[-1]).lower()
 
                 # Look for completion indicators
                 completion_indicators = [

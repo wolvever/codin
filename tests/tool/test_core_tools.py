@@ -256,16 +256,27 @@ async def test_delete_file_tool(sandbox_toolset, sandbox, tool_context):
 @pytest.mark.asyncio
 async def test_reapply_tool(sandbox_toolset, sandbox, tool_context):
     """Test ReapplyTool functionality."""
-    tool = sandbox_toolset.get_tool("reapply")
+    edit_tool = sandbox_toolset.get_tool("edit_file")
+    reapply_tool = sandbox_toolset.get_tool("reapply")
 
-    args = {"target_file": "test.txt"}
-
-    result = await tool.run(args, tool_context)
-
-    assert "target_file" in result
-    assert "success" in result
-    # Should be False since it's not implemented
+    # No previous edit - should fail
+    result = await reapply_tool.run({"target_file": "missing.txt"}, tool_context)
     assert result["success"] is False
+
+    # Apply an edit
+    await edit_tool.run(
+        {
+            "target_file": "test_reapply.txt",
+            "instructions": "create file",
+            "code_edit": "int main(){return 0;}",
+        },
+        tool_context,
+    )
+
+    result = await reapply_tool.run({"target_file": "test_reapply.txt"}, tool_context)
+    assert result["success"] is True
+    content = await sandbox.read_file("test_reapply.txt")
+    assert "int main" in content
 
 
 @pytest.mark.asyncio

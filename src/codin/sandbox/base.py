@@ -146,6 +146,10 @@ class Sandbox(LifecycleMixin, ABC):
     def __init__(self, *, env_policy: ShellEnvironmentPolicy | None = None) -> None:
         super().__init__()
         self._env_policy = env_policy or ShellEnvironmentPolicy()
+        # Track the last edit applied to files so `tool_reapply` can repeat it
+        # if the initial application failed or was incorrect.
+        # Mapping of file path -> last written content
+        self._last_edits: dict[str, str] = {}
 
     def _prepare_env(self, env: dict[str, str] | None = None) -> dict[str, str]:
         base_env = create_env(self._env_policy)
@@ -469,6 +473,8 @@ class Sandbox(LifecycleMixin, ABC):
                 }
 
             await self.write_file(target_file, write_content)
+            # Remember last edit so `tool_reapply` can attempt it again later
+            self._last_edits[target_file] = write_content
 
             return {
                 'target_file': target_file,
@@ -500,6 +506,8 @@ class Sandbox(LifecycleMixin, ABC):
             # Replace only the first occurrence
             new_content = content.replace(old_string, new_string, 1)
             await self.write_file(file_path, new_content)
+            # Remember last edit for potential reapplication
+            self._last_edits[file_path] = new_content
 
             return {'file_path': file_path, 'success': True, 'message': 'Search and replace completed successfully'}
 
@@ -571,13 +579,25 @@ class Sandbox(LifecycleMixin, ABC):
         the diff is not what you expected, indicating the model applying the changes
         was not smart enough to follow your instructions.
         """
-        # This is a placeholder implementation
-        # In a real system, this would track the last edit and reapply it
-        return {
-            'target_file': target_file,
-            'success': False,
-            'message': 'Reapply functionality not yet implemented - no previous edit to reapply',
-        }
+        # Attempt to reapply the last recorded edit for the file
+        last = self._last_edits.get(target_file)
+        if last is None:
+            return {
+                'target_file': target_file,
+                'success': False,
+                'message': 'No previous edit recorded for this file',
+            }
+
+        try:
+            await self.write_file(target_file, last)
+            return {
+                'target_file': target_file,
+                'success': True,
+                'message': 'Reapplied last edit successfully',
+            }
+        except Exception as e:
+            logger.error(f'Error reapplying last edit to {target_file}: {e}')
+            return {'target_file': target_file, 'success': False, 'error': str(e)}
 
     async def tool_web_search(
         self,

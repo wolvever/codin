@@ -12,6 +12,8 @@ from ..tool.base import Tool
 from .base import Agent, Planner
 from .concurrent_runner import ConcurrentRunner
 from .runner import AgentRunner
+from .plan_execute_agent import PlanExecuteAgent
+from .plan_execute_planner import PlanExecutePlanner
 
 # Import new architecture types
 from .types import (
@@ -92,6 +94,8 @@ __all__ = [
     'Tool',
     'AgentRunner',
     'ConcurrentRunner',
+    'PlanExecuteAgent',
+    'PlanExecutePlanner',
     # Lazy access functions
     'get_base_agent',
     'get_base_planner',

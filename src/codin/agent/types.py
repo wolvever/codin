@@ -3,27 +3,16 @@
 from __future__ import annotations
 
 import typing as _t
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
 import pydantic as _pyd
-from a2a.types import (
-    DataPart,
-    FilePart,
-    Role,
-    TaskArtifactUpdateEvent,
-    TaskStatusUpdateEvent,
-    TextPart,
-)
-from a2a.types import (
-    Message as A2AMessage,
-)
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+Any = _t.Any
 
 # Re-export core A2A types for compatibility
-from a2a.types import (
-    Task as A2ATask,
-)
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 if _t.TYPE_CHECKING:
     from ..artifact.base import ArtifactService
@@ -34,6 +23,14 @@ __all__ = [
     # Core types (A2A compatible)
     'Task',
     'Message',
+    'Role',
+    'TextPart',
+    'DataPart',
+    'FilePart',
+    'TaskState',
+    'TaskStatus',
+    'TaskStatusUpdateEvent',
+    'TaskArtifactUpdateEvent',
     'ToolUsePart',
     'ToolCall',
     'ToolCallResult',
@@ -69,18 +66,135 @@ __all__ = [
 # =============================================================================
 
 
-# Alias A2A types for convenience while maintaining compatibility
-class Task(A2ATask):
-    """A2A-compatible task with additional codin features."""
+# -----------------------------------------------------------------------------
+# A2A protocol compatible dataclasses
+# -----------------------------------------------------------------------------
 
 
+class Role(str, Enum):
+    """Simple role enumeration used across the codebase."""
 
-class Message(A2AMessage):
-    """A2A-compatible message with additional codin features."""
+    user = "user"
+    agent = "agent"
+    assistant = "assistant"
 
-    sender_id: str = ""
-    recipient_ids: list[str] = Field(default_factory=list)
-    parts: list[TextPart | FilePart | DataPart | ToolUsePart]
+
+@dataclass
+class TextPart:
+    text: str
+    kind: str = "text"
+    metadata: dict[str, _t.Any] | None = None
+
+
+@dataclass
+class DataPart:
+    data: dict[str, _t.Any]
+    kind: str = "data"
+    metadata: dict[str, _t.Any] | None = None
+
+
+@dataclass
+class FilePart:
+    uri: str | None = None
+    path: str | None = None
+    kind: str = "file"
+    metadata: dict[str, _t.Any] | None = None
+
+
+@dataclass
+class Message:
+    messageId: str
+    role: Role
+    parts: list[_t.Any]
+    contextId: str | None = None
+    kind: str = "message"
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+    taskId: str | None = None
+    referenceTaskIds: list[str] | None = None
+
+    def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
+        """Append a TextPart to the message."""
+        self.parts.append(TextPart(text=text, metadata=metadata))
+
+    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
+        """Append a DataPart to the message."""
+        self.parts.append(DataPart(data=data, metadata=metadata))
+
+    def add_tool_call_part(self, call: ToolCall) -> None:
+        """Append a tool call as a ToolUsePart."""
+        self.parts.append(
+            ToolUsePart(
+                type="call",
+                id=call.call_id,
+                name=call.name,
+                input=call.arguments,
+            )
+        )
+
+    def add_tool_result_part(self, result: ToolCallResult, name: str) -> None:
+        """Append a tool result as a ToolUsePart."""
+        self.parts.append(
+            ToolUsePart(
+                type="result",
+                id=result.call_id,
+                name=name,
+                output=result.output,
+                metadata={"error": result.error} if result.error else None,
+            )
+        )
+
+
+class TaskState(str, Enum):
+    QUEUED = "queued"
+    SUBMITTED = "submitted"
+    WORKING = "working"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    queued = QUEUED
+    submitted = SUBMITTED
+    working = WORKING
+    completed = COMPLETED
+    failed = FAILED
+
+
+@dataclass
+class TaskStatus:
+    state: TaskState
+    message: Message | None = None
+    timestamp: str | None = None
+
+
+@dataclass
+class TaskStatusUpdateEvent:
+    contextId: str
+    taskId: str
+    status: TaskStatus
+    final: bool = False
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+
+
+@dataclass
+class TaskArtifactUpdateEvent:
+    """Event representing artifact updates for a task."""
+
+    contextId: str
+    taskId: str
+    artifact: _t.Any
+    append: bool = False
+    lastChunk: bool = False
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+
+
+@dataclass
+class Task:
+    id: str
+    contextId: str
+    status: TaskStatus
+    query: str | None = None
+    parts: list[_t.Any] = field(default_factory=list)
+    message: Message | None = None
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
 
     def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
         """Convenience helper to append a TextPart."""
@@ -88,8 +202,6 @@ class Message(A2AMessage):
 
     def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
         """Convenience helper to append a DataPart."""
-        from a2a.types import DataPart
-
         self.parts.append(DataPart(data=data, metadata=metadata))
 
     def add_tool_call_part(self, call: ToolCall) -> None:
@@ -586,8 +698,6 @@ class FinishStep(Step):
 
     def create_completion_event(self, task_id: str, context_id: str) -> TaskStatusUpdateEvent:
         """Create a task completion event."""
-        from a2a.types import TaskState, TaskStatus
-
         completion_status = TaskStatus(
             state=TaskState.completed, message=self.message, timestamp=datetime.now().isoformat()
         )
@@ -614,3 +724,22 @@ class Planner:
     async def next(self, state: State) -> _t.AsyncGenerator[Step]:
         """Generate next steps based on current state."""
         raise NotImplementedError('Subclasses must implement next method')
+
+
+# Rebuild step models to resolve forward references used in tests
+for _model in (Step, MessageStep, EventStep, ToolCallStep, ThinkStep, FinishStep, ErrorStep):
+    _model.model_rebuild(
+        _types_namespace={
+            'Message': Message,
+            'Task': Task,
+            'TaskStatusUpdateEvent': TaskStatusUpdateEvent,
+            'TaskArtifactUpdateEvent': TaskArtifactUpdateEvent,
+            'RunEvent': RunEvent,
+            'ToolUsePart': ToolUsePart,
+            'ToolCall': ToolCall,
+            'ToolCallResult': ToolCallResult,
+            'TextPart': TextPart,
+            'Role': Role,
+            'Any': _t.Any,
+        }
+    )

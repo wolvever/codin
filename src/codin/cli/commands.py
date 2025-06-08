@@ -656,6 +656,62 @@ def debug_sandbox_cmd(full_auto: bool, permissions: tuple[str, ...], command: tu
     asyncio.run(_run())
 
 
+@cli.command("swe-benchmark")
+@click.option("--dataset", default="SWE-bench/SWE-bench_Lite", help="Dataset name or path")
+@click.option("--split", default="test", help="Dataset split")
+@click.option("--predictions", "predictions_path", required=True, type=click.Path(exists=True), help="Path to predictions file")
+@click.option("--instance-id", "instance_ids", multiple=True, help="Instance IDs to run")
+@click.option("--run-id", default=None, help="Run identifier")
+@click.option("--report-dir", default=".", type=click.Path(), help="Directory for reports")
+@click.option("--max-workers", default=4, type=int, help="Maximum worker processes")
+@click.option("--force-rebuild", is_flag=True, help="Force rebuild images")
+@click.option("--cache-level", default="env", help="Image cache level")
+@click.option("--clean", is_flag=True, help="Clean images above cache level")
+@click.option("--open-file-limit", default=4096, type=int, help="Open file descriptor limit")
+@click.option("--timeout", default=1800, type=int, help="Per-instance timeout in seconds")
+@click.option("--namespace", default="swebench", help="Docker namespace")
+@click.option("--rewrite-reports", is_flag=True, help="Only rewrite existing reports")
+@click.option("--modal", is_flag=True, help="Run using Modal")
+def swe_benchmark_cmd(
+    dataset: str,
+    split: str,
+    predictions_path: str,
+    instance_ids: tuple[str, ...],
+    run_id: str | None,
+    report_dir: str,
+    max_workers: int,
+    force_rebuild: bool,
+    cache_level: str,
+    clean: bool,
+    open_file_limit: int,
+    timeout: int,
+    namespace: str | None,
+    rewrite_reports: bool,
+    modal: bool,
+) -> None:
+    """Run the SWE-bench evaluation harness."""
+
+    from codin.evaluate import run_swe_benchmark
+
+    run_swe_benchmark(
+        dataset_name=dataset,
+        split=split,
+        instance_ids=list(instance_ids),
+        predictions_path=predictions_path,
+        max_workers=max_workers,
+        force_rebuild=force_rebuild,
+        cache_level=cache_level,
+        clean=clean,
+        open_file_limit=open_file_limit,
+        run_id=run_id,
+        timeout=timeout,
+        namespace=namespace,
+        rewrite_reports=rewrite_reports,
+        modal=modal,
+        report_dir=report_dir,
+    )
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     import atexit

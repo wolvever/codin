@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import typing as _t
+import asyncio
 from datetime import datetime
 
 from .supervisor import ActorInfo, ActorSupervisor
@@ -19,6 +20,16 @@ except Exception:  # pragma: no cover
 
 __all__ = ["RayActorManager"]
 
+# When running under Ray we store ``ActorHandle`` objects in ``ActorInfo``. The
+# default annotation for the ``agent`` field expects an ``Agent`` instance which
+# causes validation errors. Relax the annotation so Pydantic accepts the handle
+# without attempting to validate it.
+if ray is not None:
+    ActorInfo.__annotations__["agent"] = _t.Any
+    if "agent" in ActorInfo.__pydantic_fields__:
+        ActorInfo.__pydantic_fields__["agent"].annotation = _t.Any
+    ActorInfo.model_rebuild(force=True)
+
 
 class _RayAgentWrapper:
     """Ray remote wrapper executing an Agent."""
@@ -28,8 +39,15 @@ class _RayAgentWrapper:
 
     def run(self, input_data: dict) -> list[dict]:  # pragma: no cover - executed on ray worker
         import asyncio
+        from ..agent.types import AgentRunInput, State, Message
+        from ..tool.base import Tool
+        from ..artifact.base import ArtifactService
 
-        from ..agent.types import AgentRunInput
+        # Ensure Pydantic models are fully defined on the worker
+        State.model_rebuild(
+            force=True,
+            _types_namespace={"Tool": Tool, "ArtifactService": ArtifactService, "Message": Message},
+        )
 
         data = AgentRunInput(**input_data)
         outputs: list[dict] = []
@@ -45,7 +63,14 @@ class _RayAgentWrapper:
         import asyncio
 
         if hasattr(self._agent, "cleanup"):
-            asyncio.run(self._agent.cleanup())
+            coro = self._agent.cleanup()
+            if asyncio.iscoroutine(coro):
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    asyncio.run(coro)
+                else:
+                    loop.run_until_complete(coro)
 
 
 if ray:  # pragma: no cover - avoid ray usage when not available
@@ -89,7 +114,9 @@ class RayActorManager(ActorSupervisor):
         if info is None:
             return
         try:
-            await info.agent.cleanup.remote()
+            # ``cleanup`` is a synchronous actor method so run it in a thread to
+            # avoid blocking the event loop.
+            await asyncio.to_thread(lambda: ray.get(info.agent.cleanup.remote()))
         finally:  # pragma: no cover - best effort
             ray.kill(info.agent)
 

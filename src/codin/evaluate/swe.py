@@ -1,18 +1,25 @@
 """Helpers for running the SWE-bench evaluation harness."""
 
-from __future__ import annotations
-
-from collections.abc import Iterable
 from datetime import datetime
+from typing import Iterable
 
 from swebench.harness.run_evaluation import main as swe_run_main
 
-__all__ = ["run_swe_benchmark"]
+__all__ = ["SWE_BENCH_LITE_DATASET", "run_swe_benchmark"]
 
+# Default dataset names
+SWE_BENCH_LITE_DATASET: str = "SWE-bench/SWE-bench_Lite"
+
+_ALIASES: dict[str, str] = {
+    "lite": SWE_BENCH_LITE_DATASET,
+    "swe-bench-lite": SWE_BENCH_LITE_DATASET,
+    "swebench-lite": SWE_BENCH_LITE_DATASET,
+}
 
 def run_swe_benchmark(
     *,
     dataset_name: str = "SWE-bench/SWE-bench_Lite",
+
     split: str = "test",
     instance_ids: Iterable[str] | None = None,
     predictions_path: str,
@@ -34,6 +41,9 @@ def run_swe_benchmark(
     This is a thin wrapper around :func:`swebench.harness.run_evaluation.main`.
     All arguments map directly to the underlying harness.
     """
+
+    if dataset_name in _ALIASES:
+        dataset_name = _ALIASES[dataset_name]
 
     if run_id is None:
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S")

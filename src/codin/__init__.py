@@ -5,11 +5,23 @@ that interoperate via the A2A protocol.
 """
 
 from .config import get_api_key, get_config, load_config
-from .utils.message import (
-    extract_text_from_message,
-    format_history_for_prompt,
-    format_tool_results_for_conversation,
-)
+
+def extract_text_from_message(*args, **kwargs):
+    from .utils.message import extract_text_from_message as _f
+
+    return _f(*args, **kwargs)
+
+
+def format_history_for_prompt(*args, **kwargs):
+    from .utils.message import format_history_for_prompt as _f
+
+    return _f(*args, **kwargs)
+
+
+def format_tool_results_for_conversation(*args, **kwargs):
+    from .utils.message import format_tool_results_for_conversation as _f
+
+    return _f(*args, **kwargs)
 
 __all__: list[str] = [
     'get_api_key',

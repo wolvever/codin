@@ -1,35 +1,35 @@
 """Type definitions for agent system."""
 
-from __future__ import annotations
-
 import typing as _t
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
 import pydantic as _pyd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+Any = _t.Any
+
+
 if _t.TYPE_CHECKING:
     from ..artifact.base import ArtifactService
     from ..tool.base import Tool
 
-
 __all__ = [
     # Core types (A2A compatible)
-    "Role",
-    "TextPart",
-    "DataPart",
-    "FilePart",
-    "Task",
-    "Message",
-    "Artifact",
-    "TaskState",
-    "TaskStatus",
-    "TaskStatusUpdateEvent",
-    "TaskArtifactUpdateEvent",
-    "ToolUsePart",
-    "ToolCall",
-    "ToolCallResult",
+    'Task',
+    'Message',
+    'Role',
+    'TextPart',
+    'DataPart',
+    'FilePart',
+    'TaskState',
+    'TaskStatus',
+    'TaskStatusUpdateEvent',
+    'TaskArtifactUpdateEvent',
+    'ToolUsePart',
+    'ToolCall',
+    'ToolCallResult',
     # Enhanced types for internal use
     "RunEvent",
     "Event",
@@ -56,103 +56,136 @@ __all__ = [
     "EventType",
 ]
 
-
-# =============================================================================
-# Core A2A-compatible types
-# =============================================================================
-
-
-# A2A compatible primitive parts
 class Role(str, Enum):
-    system = "system"
+    """Simple role enumeration used across the codebase."""
+
     user = "user"
     agent = "agent"
     assistant = "assistant"
 
 
-class TextPart(BaseModel):
-    kind: str = "text"
+@dataclass
+class TextPart:
     text: str
+    kind: str = "text"
     metadata: dict[str, _t.Any] | None = None
 
 
-class DataPart(BaseModel):
-    kind: str = "data"
+@dataclass
+class DataPart:
     data: dict[str, _t.Any]
+    kind: str = "data"
     metadata: dict[str, _t.Any] | None = None
 
 
-class FilePart(BaseModel):
-    kind: str = "file"
+@dataclass
+class FilePart:
     uri: str | None = None
-    name: str | None = None
+    path: str | None = None
+    kind: str = "file"
     metadata: dict[str, _t.Any] | None = None
 
 
-Part = TextPart | DataPart | FilePart
-
-
-class ToolCall(_pyd.BaseModel):
-    """Represents a tool call request."""
-
-    call_id: str
-    name: str
-    arguments: dict[str, _t.Any]
-
-
-class ToolCallResult(_pyd.BaseModel):
-    """Represents the result of a tool call."""
-
-    call_id: str
-    success: bool
-    output: _t.Any = None
-    error: str | None = None
-
-
-class ToolUsePart(_pyd.BaseModel):
-    """Represents a tool use (call and/or result) segment within message parts."""
-
-    kind: _t.Literal["tool-use"] = "tool-use"
-    """Part type - tool-use for ToolUseParts"""
-
-    type: _t.Literal["call", "result"] = "call"
-    """Whether this is a tool call or tool result"""
-
-    id: str
-    """Unique identifier for the tool use"""
-
-    name: str
-    """Name of the tool being called"""
-
-    input: dict[str, _t.Any] | None = None
-    """Tool input/arguments (for calls)"""
-
-    output: _t.Any | None = None
-    """Tool output/result (for results) - can be string, dict, or any serializable type"""
-
-    metadata: dict[str, _t.Any] | None = None
-    """Additional metadata for this tool use"""
-
-
-class Message(BaseModel):
+@dataclass
+class Message:
     messageId: str
     role: Role
-    parts: list[Part | ToolUsePart] = Field(default_factory=list)
+    parts: list[_t.Any]
     contextId: str | None = None
     kind: str = "message"
-    metadata: dict[str, _t.Any] | None = None
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
     taskId: str | None = None
     referenceTaskIds: list[str] | None = None
-    sender_id: str = ""
-    recipient_ids: list[str] = Field(default_factory=list)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
+        """Append a TextPart to the message."""
+        self.parts.append(TextPart(text=text, metadata=metadata))
 
+    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
+        """Append a DataPart to the message."""
+        self.parts.append(DataPart(data=data, metadata=metadata))
+
+    def add_tool_call_part(self, call: ToolCall) -> None:
+        """Append a tool call as a ToolUsePart."""
+        self.parts.append(
+            ToolUsePart(
+                type="call",
+                id=call.call_id,
+                name=call.name,
+                input=call.arguments,
+            )
+        )
+
+    def add_tool_result_part(self, result: ToolCallResult, name: str) -> None:
+        """Append a tool result as a ToolUsePart."""
+        self.parts.append(
+            ToolUsePart(
+                type="result",
+                id=result.call_id,
+                name=name,
+                output=result.output,
+                metadata={"error": result.error} if result.error else None,
+            )
+        )
+
+
+class TaskState(str, Enum):
+    QUEUED = "queued"
+    SUBMITTED = "submitted"
+    WORKING = "working"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    queued = QUEUED
+    submitted = SUBMITTED
+    working = WORKING
+    completed = COMPLETED
+    failed = FAILED
+
+
+@dataclass
+class TaskStatus:
+    state: TaskState
+    message: Message | None = None
+    timestamp: str | None = None
+
+
+@dataclass
+class TaskStatusUpdateEvent:
+    contextId: str
+    taskId: str
+    status: TaskStatus
+    final: bool = False
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+
+
+@dataclass
+class TaskArtifactUpdateEvent:
+    """Event representing artifact updates for a task."""
+
+    contextId: str
+    taskId: str
+    artifact: _t.Any
+    append: bool = False
+    lastChunk: bool = False
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
+
+
+@dataclass
+class Task:
+    id: str
+    contextId: str
+    status: TaskStatus
+    query: str | None = None
+    parts: list[_t.Any] = field(default_factory=list)
+    message: Message | None = None
+    metadata: dict[str, _t.Any] = field(default_factory=dict)
 
     def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
         self.parts.append(TextPart(text=text, metadata=metadata))
 
     def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
+        """Convenience helper to append a DataPart."""
         self.parts.append(DataPart(data=data, metadata=metadata))
 
     def add_tool_call_part(self, call: ToolCall) -> None:
@@ -691,22 +724,9 @@ class FinishStep(Step):
             contextId=context_id, taskId=task_id, status=completion_status, final=True, metadata=self.metadata
         )
 
-
 class ErrorStep(Step):
     """Step emitted when planning fails."""
 
     step_type: StepType = StepType.ERROR
     error: str | None = None
 
-
-# =============================================================================
-# Base Planner interface
-# =============================================================================
-
-
-class Planner:
-    """Base planner interface."""
-
-    async def next(self, state: State) -> _t.AsyncGenerator[Step]:
-        """Generate next steps based on current state."""
-        raise NotImplementedError("Subclasses must implement next method")

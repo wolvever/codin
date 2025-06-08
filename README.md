@@ -9,6 +9,7 @@ A modern, extensible framework for building AI coding agents with support for mu
 - **Sandbox Environments**: Local and containerized execution
 - **Memory Management**: Conversation history and context management
 - **Agent Architecture**: Modular agent design with planners and executors
+- **Plan-Execute Agent**: Simple planner that generates a plan then executes each step
 - **A2A Protocol**: Compatible with Agent-to-Agent communication standards
 
 ## Quick Start

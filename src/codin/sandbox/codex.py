@@ -4,15 +4,14 @@ This module provides a sandbox implementation that integrates with
 the Codex CLI for secure code execution and file operations.
 """
 
+import logging
 import platform
 import shutil
 import typing as _t
 from pathlib import Path
-import logging
-
-from .local import LocalSandbox
 
 from .base import ExecResult, ShellEnvironmentPolicy
+from .local import LocalSandbox
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +21,26 @@ __all__ = ['CodexSandbox']
 class CodexSandbox(LocalSandbox):
     """Sandbox that routes commands through the Codex CLI sandbox helpers."""
 
-    def __init__(self, workdir: str | None = None, *, codex_cmd: str = 'codex', env_policy: ShellEnvironmentPolicy | None = None, **_kwargs):
+    def __init__(
+        self,
+        workdir: str | None = None,
+        *,
+        codex_cmd: str = "codex",
+        env_policy: ShellEnvironmentPolicy | None = None,
+        **_kwargs: _t.Any,
+    ) -> None:
         super().__init__(workdir=workdir, env_policy=env_policy)
         self._codex_cmd = codex_cmd
         self._codex_available = shutil.which(codex_cmd) is not None
-        self._cmd_prefix = ['debug', 'landlock'] if platform.system().lower() == 'linux' else ['debug', 'seatbelt']
+        self._cmd_prefix = (
+            ["debug", "landlock"]
+            if platform.system().lower() == "linux"
+            else ["debug", "seatbelt"]
+        )
         if not self._codex_available:
-            logger.warning('Codex CLI not found – falling back to LocalSandbox behaviour')
+            logger.warning(
+                "Codex CLI not found – falling back to LocalSandbox behaviour"
+            )
 
     async def _up(self) -> None:
         """Set up the Codex sandbox."""

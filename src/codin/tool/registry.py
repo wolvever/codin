@@ -5,12 +5,12 @@ supporting loading from various sources including filesystem and HTTP endpoints.
 It handles tool name resolution, conflict detection, and lifecycle management.
 """
 
+import importlib.util
 import json
 import logging
 import typing as _t
 from pathlib import Path
 from urllib.parse import urlparse
-import importlib.util
 
 import httpx
 import pydantic as _pyd

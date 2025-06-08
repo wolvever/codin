@@ -664,7 +664,13 @@ def debug_sandbox_cmd(full_auto: bool, permissions: tuple[str, ...], command: tu
     help="Dataset name or path (use 'lite' for SWE-bench Lite)",
 )
 @click.option("--split", default="test", help="Dataset split")
-@click.option("--predictions", "predictions_path", required=True, type=click.Path(exists=True), help="Path to predictions file")
+@click.option(
+    "--predictions",
+    "predictions_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to predictions file",
+)
 @click.option("--instance-id", "instance_ids", multiple=True, help="Instance IDs to run")
 @click.option("--run-id", default=None, help="Run identifier")
 @click.option("--report-dir", default=".", type=click.Path(), help="Directory for reports")

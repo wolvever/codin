@@ -99,7 +99,7 @@ agent = BaseAgent(
 
 # Execute task
 from codin.agent.types import AgentRunInput, Message
-from a2a.types import Role, TextPart
+from codin.agent.types import Role, TextPart
 
 task_message = Message(
     messageId="task-1",

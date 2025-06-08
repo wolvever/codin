@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from a2a.types import Message
+from codin.agent.types import Message
 
 __all__ = [
     "extract_text_from_message",

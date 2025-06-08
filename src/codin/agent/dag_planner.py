@@ -13,18 +13,14 @@ import logging
 import time
 from datetime import datetime
 
-from a2a.types import (
+from .types import (
     Artifact,
     DataPart,
     Message,
     TaskState,
     TextPart,
-)
-from a2a.types import (
-    Task as A2ATask,
-)
-from a2a.types import (
-    TaskStatus as A2ATaskStatus,
+    Task,
+    TaskStatus,
 )
 
 from ..id import new_id
@@ -49,9 +45,9 @@ class DAGPlanner(Agent):
         *,
         llm: BaseLLM,
         id: str | None = None,
-        name: str = 'DAG Planner',
-        description: str = 'Creates directed acyclic graph plans for coding tasks',
-        version: str = '1.0.0',
+        name: str = "DAG Planner",
+        description: str = "Creates directed acyclic graph plans for coding tasks",
+        version: str = "1.0.0",
         tools: list[Tool] | None = None,
         max_retries: int = 3,
     ) -> None:
@@ -83,50 +79,50 @@ class DAGPlanner(Agent):
             query = inp.message.parts[0].text
 
             # Generate a plan based on the query
-            plan_id = new_id(prefix='plan')
+            plan_id = new_id(prefix="plan")
             plan = await self._create_plan(plan_id, query)
 
             # Return the plan as output
-            response_text = f'Created plan: {plan.name}\n\nDescription: {plan.description}\n\nTasks:\n'
+            response_text = f"Created plan: {plan.name}\n\nDescription: {plan.description}\n\nTasks:\n"
 
             for i, task in enumerate(plan.tasks.values(), 1):
-                dependencies = ', '.join(task.requires) if task.requires else 'None'
-                response_text += f'{i}. {task.name}: {task.description} (Dependencies: {dependencies})\n'
+                dependencies = ", ".join(task.requires) if task.requires else "None"
+                response_text += f"{i}. {task.name}: {task.description} (Dependencies: {dependencies})\n"
 
             # Create response message
-            response_message = Message(role='assistant', parts=[TextPart(text=response_text)])
+            response_message = Message(role="assistant", parts=[TextPart(text=response_text)])
 
             # Create A2A task
-            a2a_task = A2ATask(
-                id=inp.id or new_id(prefix='task'),
-                status=A2ATaskStatus(state=TaskState.COMPLETED),
+            a2a_task = Task(
+                id=inp.id or new_id(prefix="task"),
+                status=TaskStatus(state=TaskState.COMPLETED),
                 message=response_message,
             )
 
             # Serialize the plan to JSON and add as an artifact
             artifact = Artifact(
-                id=new_id(prefix='artifact'),
-                name='plan.json',
-                description='DAG plan for the coding task',
-                parts=[DataPart(type='data', data={'plan': plan.to_dict()})],
+                id=new_id(prefix="artifact"),
+                name="plan.json",
+                description="DAG plan for the coding task",
+                parts=[DataPart(data={"plan": plan.to_dict()})],
             )
 
-            return AgentRunOutput(id=inp.id, result=a2a_task, artifacts=[artifact], metadata={'plan_id': plan.id})
+            return AgentRunOutput(id=inp.id, result=a2a_task, artifacts=[artifact], metadata={"plan_id": plan.id})
 
         except Exception as e:
-            logger.exception('Error in DAG planner')
+            logger.exception("Error in DAG planner")
 
             # Create error response
-            error_message = Message(role='assistant', parts=[TextPart(text=f'Error creating plan: {e!s}')])
+            error_message = Message(role="assistant", parts=[TextPart(text=f"Error creating plan: {e!s}")])
 
             # Create A2A task with error
-            a2a_task = A2ATask(
-                id=inp.id or new_id(prefix='task'),
-                status=A2ATaskStatus(state=TaskState.FAILED),
+            a2a_task = Task(
+                id=inp.id or new_id(prefix="task"),
+                status=TaskStatus(state=TaskState.FAILED),
                 message=error_message,
             )
 
-            return AgentRunOutput(id=inp.id, result=a2a_task, artifacts=None, metadata={'error': str(e)})
+            return AgentRunOutput(id=inp.id, result=a2a_task, artifacts=None, metadata={"error": str(e)})
 
     async def _create_plan(self, plan_id: str, query: str) -> Plan:
         """Create a plan by calling the LLM with the query.
@@ -141,18 +137,18 @@ class DAGPlanner(Agent):
         # Call the LLM to generate a plan using template
         for attempt in range(self.max_retries):
             try:
-                response = await prompt_run('dag_planner', variables={'query': query})
+                response = await prompt_run("dag_planner", variables={"query": query})
 
                 # Extract content from response
-                content = ''
-                if hasattr(response, 'message') and response.message:
+                content = ""
+                if hasattr(response, "message") and response.message:
                     # Extract text from A2A message parts
                     for part in response.message.parts:
-                        if hasattr(part, 'root') and hasattr(part.root, 'text'):
+                        if hasattr(part, "root") and hasattr(part.root, "text"):
                             content += part.root.text
-                        elif hasattr(part, 'text'):
+                        elif hasattr(part, "text"):
                             content += part.text
-                elif hasattr(response, 'content'):
+                elif hasattr(response, "content"):
                     content = str(response.content)
                 else:
                     content = str(response)
@@ -161,33 +157,33 @@ class DAGPlanner(Agent):
                 try:
                     # Extract JSON from the response (handling potential markdown code blocks)
                     json_str = content
-                    if '```json' in json_str:
-                        json_str = json_str.split('```json')[1].split('```')[0].strip()
-                    elif '```' in json_str:
-                        json_str = json_str.split('```')[1].split('```')[0].strip()
+                    if "```json" in json_str:
+                        json_str = json_str.split("```json")[1].split("```")[0].strip()
+                    elif "```" in json_str:
+                        json_str = json_str.split("```")[1].split("```")[0].strip()
 
                     plan_data = json.loads(json_str)
 
                     # Create the Plan object
                     plan = Plan(
                         id=plan_id,
-                        name=plan_data['name'],
-                        description=plan_data['description'],
+                        name=plan_data["name"],
+                        description=plan_data["description"],
                         status=TaskStatus.PENDING,
                         created_at=datetime.utcnow(),
                     )
 
                     # Create Task objects
-                    for task_data in plan_data['tasks']:
+                    for task_data in plan_data["tasks"]:
                         # Handle both requires and dependencies fields for backward compatibility
-                        requires = task_data.get('requires', [])
-                        if 'dependencies' in task_data and not requires:
-                            requires = task_data['dependencies']
+                        requires = task_data.get("requires", [])
+                        if "dependencies" in task_data and not requires:
+                            requires = task_data["dependencies"]
 
                         task = Task(
-                            id=task_data['id'],
-                            name=task_data['name'],
-                            description=task_data['description'],
+                            id=task_data["id"],
+                            name=task_data["name"],
+                            description=task_data["description"],
                             requires=requires,
                             depends_on_results=True,  # Default to requiring results
                             status=TaskStatus.PENDING,
@@ -198,17 +194,17 @@ class DAGPlanner(Agent):
                     return plan
 
                 except json.JSONDecodeError as e:
-                    logger.error(f'Failed to parse JSON response: {e}, attempt {attempt + 1}/{self.max_retries}')
+                    logger.error(f"Failed to parse JSON response: {e}, attempt {attempt + 1}/{self.max_retries}")
                     if attempt == self.max_retries - 1:
-                        raise ValueError(f'Failed to parse planner output as JSON: {e}') from e
+                        raise ValueError(f"Failed to parse planner output as JSON: {e}") from e
 
             except Exception as e:
-                logger.error(f'Error during plan creation: {e}, attempt {attempt + 1}/{self.max_retries}')
+                logger.error(f"Error during plan creation: {e}, attempt {attempt + 1}/{self.max_retries}")
                 if attempt == self.max_retries - 1:
                     raise
 
         # This should never be reached due to the exception in the loop
-        raise RuntimeError('Failed to create plan after maximum retries')
+        raise RuntimeError("Failed to create plan after maximum retries")
 
 
 class DAGExecutor(Agent):
@@ -223,9 +219,9 @@ class DAGExecutor(Agent):
         *,
         llm: BaseLLM,
         id: str | None = None,
-        name: str = 'DAG Executor',
-        description: str = 'Executes directed acyclic graph plans for coding tasks',
-        version: str = '1.0.0',
+        name: str = "DAG Executor",
+        description: str = "Executes directed acyclic graph plans for coding tasks",
+        version: str = "1.0.0",
         tools: list[Tool] | None = None,
         max_retries: int = 3,
         max_concurrent_tasks: int = 5,
@@ -264,71 +260,69 @@ class DAGExecutor(Agent):
                 # First look for DataPart with plan data
                 for part in message_parts:
                     if (
-                        part.type == 'data'
-                        and hasattr(part, 'data')
+                        part.type == "data"
+                        and hasattr(part, "data")
                         and isinstance(part.data, dict)
-                        and 'plan' in part.data
+                        and "plan" in part.data
                     ):
-                        plan_data = part.data['plan']
+                        plan_data = part.data["plan"]
                         break
 
                 # If not found, check if the message text is JSON
                 if not plan_data:
-                    text_part = next((p for p in message_parts if p.type == 'text'), None)
-                    if text_part and hasattr(text_part, 'text'):
+                    text_part = next((p for p in message_parts if p.type == "text"), None)
+                    if text_part and hasattr(text_part, "text"):
                         try:
                             json_data = json.loads(text_part.text)
-                            if 'plan' in json_data:
-                                plan_data = json_data['plan']
+                            if "plan" in json_data:
+                                plan_data = json_data["plan"]
                             else:
                                 plan_data = json_data
                         except json.JSONDecodeError as err:
                             # Not JSON, check if there's plan_id in metadata
-                            if inp.metadata and 'plan_id' in inp.metadata:
-                                raise ValueError(
-                                    f"Plan with ID {inp.metadata['plan_id']} not found in input"
-                                ) from err
-                            raise ValueError('No plan data found in input') from err
+                            if inp.metadata and "plan_id" in inp.metadata:
+                                raise ValueError(f"Plan with ID {inp.metadata['plan_id']} not found in input") from err
+                            raise ValueError("No plan data found in input") from err
 
                 if not plan_data:
-                    raise ValueError('No plan data found in input')
+                    raise ValueError("No plan data found in input")
 
                 # Create Plan object
                 plan = Plan.from_dict(plan_data)
 
             except (KeyError, json.JSONDecodeError, ValueError) as e:
-                logger.error(f'Failed to parse plan data: {e}')
-                raise ValueError(f'Invalid plan data: {e!s}') from e
+                logger.error(f"Failed to parse plan data: {e}")
+                raise ValueError(f"Invalid plan data: {e!s}") from e
 
             # Execute the plan
             result = await self._execute_plan(plan)
 
             # Create response message based on execution result
             if result.success:
-                response_text = f'Successfully executed plan: {result.plan.name}\n\nAll tasks completed successfully.'
+                response_text = f"Successfully executed plan: {result.plan.name}\n\nAll tasks completed successfully."
             else:
                 response_text = (
-                    f'Failed to execute plan: {result.plan.name}\n\n'
-                    f'Error: {result.error_message}\n\n'
-                    f'Completed tasks: {len(result.plan.get_successful_tasks())}/{len(result.plan.tasks)}'
+                    f"Failed to execute plan: {result.plan.name}\n\n"
+                    f"Error: {result.error_message}\n\n"
+                    f"Completed tasks: {len(result.plan.get_successful_tasks())}/{len(result.plan.tasks)}"
                 )
 
             # Create response message
-            response_message = Message(role='assistant', parts=[TextPart(text=response_text)])
+            response_message = Message(role="assistant", parts=[TextPart(text=response_text)])
 
             # Create A2A task
-            a2a_task = A2ATask(
-                id=inp.id or new_id(prefix='task'),
-                status=A2ATaskStatus(state=TaskState.COMPLETED if result.success else TaskState.FAILED),
+            a2a_task = Task(
+                id=inp.id or new_id(prefix="task"),
+                status=TaskStatus(state=TaskState.COMPLETED if result.success else TaskState.FAILED),
                 message=response_message,
             )
 
             # Serialize the plan to JSON and add as an artifact
             artifact = Artifact(
-                id=new_id(prefix='artifact'),
-                name='executed_plan.json',
-                description='Executed DAG plan for the coding task',
-                parts=[DataPart(type='data', data={'plan': result.plan.to_dict()})],
+                id=new_id(prefix="artifact"),
+                name="executed_plan.json",
+                description="Executed DAG plan for the coding task",
+                parts=[DataPart(data={"plan": result.plan.to_dict()})],
             )
 
             # Combine our artifact with any artifacts created during plan execution
@@ -341,26 +335,26 @@ class DAGExecutor(Agent):
                 result=a2a_task,
                 artifacts=artifacts,
                 metadata={
-                    'plan_id': result.plan.id,
-                    'success': result.success,
-                    'execution_time': result.execution_time,
+                    "plan_id": result.plan.id,
+                    "success": result.success,
+                    "execution_time": result.execution_time,
                 },
             )
 
         except Exception as e:
-            logger.exception('Error in DAG executor')
+            logger.exception("Error in DAG executor")
 
             # Create error response
-            error_message = Message(role='assistant', parts=[TextPart(text=f'Error executing plan: {e!s}')])
+            error_message = Message(role="assistant", parts=[TextPart(text=f"Error executing plan: {e!s}")])
 
             # Create A2A task with error
-            a2a_task = A2ATask(
-                id=inp.id or new_id(prefix='task'),
-                status=A2ATaskStatus(state=TaskState.FAILED),
+            a2a_task = Task(
+                id=inp.id or new_id(prefix="task"),
+                status=TaskStatus(state=TaskState.FAILED),
                 message=error_message,
             )
 
-            return AgentRunOutput(id=inp.id, result=a2a_task, artifacts=None, metadata={'error': str(e)})
+            return AgentRunOutput(id=inp.id, result=a2a_task, artifacts=None, metadata={"error": str(e)})
 
     async def _execute_plan(self, plan: Plan) -> PlanResult:
         """Execute a DAG plan.
@@ -405,7 +399,7 @@ class DAGExecutor(Agent):
                         try:
                             await task_obj  # Retrieve any exceptions
                         except Exception as e:
-                            logger.error(f'Task {task_id} failed: {e}')
+                            logger.error(f"Task {task_id} failed: {e}")
                             # The task should have updated its own status
 
                         done_task_ids.append(task_id)
@@ -420,14 +414,14 @@ class DAGExecutor(Agent):
                     if blocked_tasks:
                         blocked_ids = [t.id for t in blocked_tasks]
                         error_message = (
-                            f'Plan execution blocked. The following tasks are blocked: {", ".join(blocked_ids)}'
+                            f"Plan execution blocked. The following tasks are blocked: {', '.join(blocked_ids)}"
                         )
                         logger.error(error_message)
 
                         # Mark blocked tasks as failed
                         for task in blocked_tasks:
                             task.status = TaskStatus.FAILED
-                            task.error_message = 'Task blocked due to dependency cycle or failed dependencies'
+                            task.error_message = "Task blocked due to dependency cycle or failed dependencies"
 
                         # Update plan status
                         plan.update_status()
@@ -442,7 +436,7 @@ class DAGExecutor(Agent):
             if not success:
                 failed_tasks = plan.get_failed_tasks()
                 failed_ids = [t.id for t in failed_tasks]
-                error_message = f'Plan execution failed. The following tasks failed: {", ".join(failed_ids)}'
+                error_message = f"Plan execution failed. The following tasks failed: {', '.join(failed_ids)}"
                 logger.error(error_message)
 
             # Mark plan as completed
@@ -461,7 +455,7 @@ class DAGExecutor(Agent):
         except Exception as e:
             # If an exception occurs during execution, mark the plan as failed
             execution_time = time.time() - start_time
-            logger.exception('Error executing plan')
+            logger.exception("Error executing plan")
 
             plan.status = TaskStatus.FAILED
             plan.completed_at = datetime.utcnow()
@@ -493,16 +487,16 @@ class DAGExecutor(Agent):
                 # 3. The available tools
 
                 # Build context from dependencies
-                dependency_context = ''
+                dependency_context = ""
                 for dep_id in task.requires:
                     dep_task = plan.get_task(dep_id)
                     if dep_task:
-                        dependency_context += f'Dependency: {dep_task.name}\n'
-                        dependency_context += f'Description: {dep_task.description}\n'
+                        dependency_context += f"Dependency: {dep_task.name}\n"
+                        dependency_context += f"Description: {dep_task.description}\n"
                         if dep_task.output_data:
                             dep_output = json.dumps(dep_task.output_data, indent=2)
-                            dependency_context += f'Output: {dep_output}\n'
-                        dependency_context += '\n'
+                            dependency_context += f"Output: {dep_output}\n"
+                        dependency_context += "\n"
 
                 # Build the system prompt
                 system_prompt = f"""
@@ -537,17 +531,17 @@ class DAGExecutor(Agent):
                         if self.tools:
                             tool_definitions = [
                                 {
-                                    'name': tool.name,
-                                    'description': tool.description,
-                                    'parameters': tool.to_openai_schema().get('function', {}).get('parameters', {}),
+                                    "name": tool.name,
+                                    "description": tool.description,
+                                    "parameters": tool.to_openai_schema().get("function", {}).get("parameters", {}),
                                 }
                                 for tool in self.tools
                             ]
 
                             response = await self.llm.generate_with_tools(
                                 [
-                                    {'role': 'system', 'content': system_prompt},
-                                    {'role': 'user', 'content': f'Execute task: {task.name}'},
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": f"Execute task: {task.name}"},
                                 ],
                                 tools=tool_definitions,
                                 temperature=0.2,
@@ -556,12 +550,12 @@ class DAGExecutor(Agent):
                             # Process the response (tool calls and/or content)
                             if isinstance(response, dict):
                                 # Process tool calls if any
-                                if response.get('tool_calls'):
+                                if response.get("tool_calls"):
                                     # Implement tool call handling
                                     tool_call_results = []
-                                    for tool_call in response['tool_calls']:
-                                        tool_name = tool_call.get('name')
-                                        tool_args = tool_call.get('arguments', {})
+                                    for tool_call in response["tool_calls"]:
+                                        tool_name = tool_call.get("name")
+                                        tool_args = tool_call.get("arguments", {})
 
                                         # Find the tool
                                         tool = next((t for t in self.tools if t.name == tool_name), None)
@@ -571,121 +565,121 @@ class DAGExecutor(Agent):
                                                 result = await tool.run(tool_args, None)
                                                 tool_call_results.append(
                                                     {
-                                                        'tool': tool_name,
-                                                        'args': tool_args,
-                                                        'result': result,
-                                                        'success': True,
+                                                        "tool": tool_name,
+                                                        "args": tool_args,
+                                                        "result": result,
+                                                        "success": True,
                                                     }
                                                 )
                                             except Exception as e:
                                                 tool_call_results.append(
                                                     {
-                                                        'tool': tool_name,
-                                                        'args': tool_args,
-                                                        'error': str(e),
-                                                        'success': False,
+                                                        "tool": tool_name,
+                                                        "args": tool_args,
+                                                        "error": str(e),
+                                                        "success": False,
                                                     }
                                                 )
 
                                     # Add tool call results to task output
-                                    task.output_data['tool_calls'] = tool_call_results
+                                    task.output_data["tool_calls"] = tool_call_results
 
                                 # Process content
-                                if 'content' in response:
-                                    content = response['content']
+                                if "content" in response:
+                                    content = response["content"]
                                     # Try to parse as JSON
                                     try:
-                                        if '```json' in content:
-                                            content = content.split('```json')[1].split('```')[0].strip()
-                                        elif '```' in content:
-                                            content = content.split('```')[1].split('```')[0].strip()
+                                        if "```json" in content:
+                                            content = content.split("```json")[1].split("```")[0].strip()
+                                        elif "```" in content:
+                                            content = content.split("```")[1].split("```")[0].strip()
 
                                         result_data = json.loads(content)
                                         task.output_data.update(result_data)
 
                                         # Update task status based on result
-                                        if result_data.get('status') == 'failed':
+                                        if result_data.get("status") == "failed":
                                             task.status = TaskStatus.FAILED
-                                            task.error_message = result_data.get('observations', 'Task failed')
+                                            task.error_message = result_data.get("observations", "Task failed")
                                         else:
                                             task.status = TaskStatus.COMPLETED
 
                                     except (json.JSONDecodeError, ValueError):
                                         # Not JSON, just use the content as is
-                                        task.output_data['content'] = content
+                                        task.output_data["content"] = content
                                         task.status = TaskStatus.COMPLETED
 
                             else:
                                 # Response is a string, try to parse as JSON
                                 try:
-                                    if '```json' in response:
-                                        response = response.split('```json')[1].split('```')[0].strip()
-                                    elif '```' in response:
-                                        response = response.split('```')[1].split('```')[0].strip()
+                                    if "```json" in response:
+                                        response = response.split("```json")[1].split("```")[0].strip()
+                                    elif "```" in response:
+                                        response = response.split("```")[1].split("```")[0].strip()
 
                                     result_data = json.loads(response)
                                     task.output_data.update(result_data)
 
                                     # Update task status based on result
-                                    if result_data.get('status') == 'failed':
+                                    if result_data.get("status") == "failed":
                                         task.status = TaskStatus.FAILED
-                                        task.error_message = result_data.get('observations', 'Task failed')
+                                        task.error_message = result_data.get("observations", "Task failed")
                                     else:
                                         task.status = TaskStatus.COMPLETED
 
                                 except (json.JSONDecodeError, ValueError):
                                     # Not JSON, just use the response as is
-                                    task.output_data['content'] = response
+                                    task.output_data["content"] = response
                                     task.status = TaskStatus.COMPLETED
 
                         else:
                             # No tools, just use the generate method
                             response = await self.llm.generate(
                                 [
-                                    {'role': 'system', 'content': system_prompt},
-                                    {'role': 'user', 'content': f'Execute task: {task.name}'},
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": f"Execute task: {task.name}"},
                                 ],
                                 temperature=0.2,
                             )
 
                             # Try to parse the response as JSON
                             try:
-                                if '```json' in response:
-                                    response = response.split('```json')[1].split('```')[0].strip()
-                                elif '```' in response:
-                                    response = response.split('```')[1].split('```')[0].strip()
+                                if "```json" in response:
+                                    response = response.split("```json")[1].split("```")[0].strip()
+                                elif "```" in response:
+                                    response = response.split("```")[1].split("```")[0].strip()
 
                                 result_data = json.loads(response)
                                 task.output_data.update(result_data)
 
                                 # Update task status based on result
-                                if result_data.get('status') == 'failed':
+                                if result_data.get("status") == "failed":
                                     task.status = TaskStatus.FAILED
-                                    task.error_message = result_data.get('observations', 'Task failed')
+                                    task.error_message = result_data.get("observations", "Task failed")
                                 else:
                                     task.status = TaskStatus.COMPLETED
 
                             except (json.JSONDecodeError, ValueError):
                                 # Not JSON, just use the response as is
-                                task.output_data['content'] = response
+                                task.output_data["content"] = response
                                 task.status = TaskStatus.COMPLETED
 
                         # Task completed successfully
                         break
 
                     except Exception as e:
-                        logger.error(f'Error during task execution: {e}, attempt {attempt + 1}/{self.max_retries}')
+                        logger.error(f"Error during task execution: {e}, attempt {attempt + 1}/{self.max_retries}")
                         if attempt == self.max_retries - 1:
                             # Max retries reached, mark task as failed
                             task.status = TaskStatus.FAILED
-                            task.error_message = f'Failed after {self.max_retries} attempts: {e!s}'
+                            task.error_message = f"Failed after {self.max_retries} attempts: {e!s}"
 
                 # Record task completion time
                 task.completed_at = datetime.utcnow()
 
             except Exception as e:
                 # If an exception occurs, mark the task as failed
-                logger.exception(f'Error executing task {task.id}: {e}')
+                logger.exception(f"Error executing task {task.id}: {e}")
 
                 task.status = TaskStatus.FAILED
                 task.error_message = str(e)

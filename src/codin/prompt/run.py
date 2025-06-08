@@ -11,14 +11,14 @@ from __future__ import annotations
 import typing as _t
 import uuid
 
-# Use a2a SDK types directly
-from a2a.types import Message, Role, TextPart
+# Use agent protocol types directly
+from codin.agent.types import Message, Role, TextPart
 
 from .base import PromptResponse, ToolDefinition
 from .engine import PromptEngine
 from .registry import set_endpoint
 
-__all__ = ['prompt_run', 'render_only', 'set_endpoint']
+__all__ = ["prompt_run", "render_only", "set_endpoint"]
 
 # Global engine instance for convenience
 _engine: PromptEngine | None = None
@@ -42,10 +42,10 @@ def _convert_tools(tools: list[ToolDefinition | dict] | None) -> list[ToolDefini
         if isinstance(tool, dict):
             converted.append(
                 ToolDefinition(
-                    name=tool.get('name', ''),
-                    description=tool.get('description', ''),
-                    parameters=tool.get('parameters', {}),
-                    metadata=tool.get('metadata'),
+                    name=tool.get("name", ""),
+                    description=tool.get("description", ""),
+                    parameters=tool.get("parameters", {}),
+                    metadata=tool.get("metadata"),
                 )
             )
         else:
@@ -61,16 +61,16 @@ def _convert_history(history: list[Message | dict] | None) -> list[Message] | No
     converted = []
     for msg in history:
         if isinstance(msg, dict):
-            role = Role.user if msg.get('role') == 'user' else Role.agent
-            content = msg.get('content', '')
+            role = Role.user if msg.get("role") == "user" else Role.agent
+            content = msg.get("content", "")
 
             a2a_msg = Message(
-                message_id=msg.get('message_id', str(uuid.uuid4())),
+                message_id=msg.get("message_id", str(uuid.uuid4())),
                 role=role,
                 parts=[TextPart(text=content)],
-                context_id=msg.get('context_id'),
-                task_id=msg.get('task_id'),
-                metadata=msg.get('metadata'),
+                context_id=msg.get("context_id"),
+                task_id=msg.get("task_id"),
+                metadata=msg.get("metadata"),
             )
             converted.append(a2a_msg)
         else:
@@ -118,7 +118,7 @@ async def prompt_run(
     engine = _get_engine()
 
     # Extract history from kwargs if provided
-    history = kwargs.pop('history', None)
+    history = kwargs.pop("history", None)
 
     return await engine.run(
         name,

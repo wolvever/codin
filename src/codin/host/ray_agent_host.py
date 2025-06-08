@@ -100,10 +100,15 @@ def run_agent(agent_state_dict: dict, agent_input_dict: dict) -> dict:
     # Track execution time
     start_time = time.time()
 
-    # Run the agent
+    # Run the agent and collect all outputs
     try:
-        # Since Ray doesn't support asyncio directly, we need to run using asyncio.run
-        output = asyncio.run(agent.run(agent_input))
+        async def _collect() -> list[AgentRunOutput]:
+            outs: list[AgentRunOutput] = []
+            async for out in agent.run(agent_input):
+                outs.append(out)
+            return outs
+
+        output = asyncio.run(_collect())
         status = 'success'
     except Exception as e:
         # Create error output
@@ -111,7 +116,7 @@ def run_agent(agent_state_dict: dict, agent_input_dict: dict) -> dict:
 
         error_message = Message(role='assistant', parts=[TextPart(text=f'Error: {e!s}')])
         status = TaskStatus(state=TaskState.FAILED, message=error_message, timestamp=time.time())
-        output = AgentRunOutput(status=status, artifacts=None, metadata={'error': str(e)})
+        output = [AgentRunOutput(status=status, artifacts=None, metadata={'error': str(e)})]
         status = 'error'
 
     # Calculate duration
@@ -119,7 +124,7 @@ def run_agent(agent_state_dict: dict, agent_input_dict: dict) -> dict:
 
     # Return output as dict with metadata
     return {
-        'output': output.dict() if hasattr(output, 'dict') else vars(output),
+        'output': [o.dict() if hasattr(o, 'dict') else vars(o) for o in output],
         'execution_time': duration,
         'status': status,
         'agent_id': agent.id,
@@ -301,8 +306,8 @@ class RayAgentHost:
                 # Reconstruct output from result
                 from ..protocol.types import AgentRunOutput
 
-                output_dict = ray_result['output']
-                output = AgentRunOutput(**output_dict)
+                output_dicts = ray_result['output']
+                outputs = [AgentRunOutput(**od) for od in output_dicts]
 
                 # Record in history
                 self.history.append(
@@ -310,11 +315,11 @@ class RayAgentHost:
                         'timestamp': datetime.utcnow().isoformat(),
                         'direction': 'from_agent',
                         'agent_id': agent_id,
-                        'output': output,
+                        'output': outputs,
                     }
                 )
 
-                return output
+                return outputs
 
             except Exception as e:
                 # Log the error
@@ -356,7 +361,7 @@ class RayAgentHost:
         message: str | Message,
         exclude_agents: list[str] | None = None,
         metadata: dict[str, _t.Any] | None = None,
-    ) -> dict[str, AgentRunOutput]:
+    ) -> dict[str, list[AgentRunOutput]]:
         """Broadcast a message to all agents using Ray.
 
         Args:
@@ -365,7 +370,7 @@ class RayAgentHost:
             metadata: Optional metadata to include with the message
 
         Returns:
-            Dictionary mapping agent IDs to their responses
+            Dictionary mapping agent IDs to their list of responses
         """
         with tracer.start_as_current_span('ray_broadcast_message') as span:
             exclude_agents = exclude_agents or []

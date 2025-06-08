@@ -256,8 +256,7 @@ class BaseAgent(Agent):
             # Ensure message has correct contextId for this session
             if input_data.message.contextId != session_id:
                 # Create a copy with the correct contextId
-                from .types import Message
-
+                # from .types import Message # This line is removed
                 corrected_message = Message(
                     messageId=input_data.message.messageId,
                     role=input_data.message.role,
@@ -289,20 +288,37 @@ class BaseAgent(Agent):
         # Create task from input message
         task = None
         if input_data.message:
-            query = ""
+            # Try to get a query/summary from the input message to form the Task's primary message
+            query_text = ""
             if input_data.message.parts:
                 for part in input_data.message.parts:
                     if isinstance(part, TextPart) and hasattr(part, "text"):
-                        query = part.text
+                        query_text = part.text
                         break
-            if query:
+
+            if query_text: # If we successfully extracted some text
+                # Create a new Message object for the task
+                task_message = Message(
+                    messageId=f"task_msg_{input_data.message.messageId or uuid.uuid4().hex[:8]}",
+                    role=Role.user,
+                    parts=[TextPart(text=query_text)],
+                    contextId=session_id,
+                    taskId=input_data.message.messageId # Link to original message ID
+                )
                 task = Task(
-                    id=input_data.message.messageId or str(uuid.uuid4()),
-                    query=query,
+                    id=input_data.message.messageId or str(uuid.uuid4()), # Task ID can be same as original message ID
+                    message=task_message, # Assign the created message here
                     contextId=session_id,
                     status=TaskStatus(state=TaskState.submitted),
-                    metadata={"session_id": session_id, "agent_id": self.id},
-                    parts=[],
+                    metadata={"session_id": session_id, "agent_id": self.id, "original_message_id": input_data.message.messageId}
+                )
+            else: # If no query text could be formed, maybe create a task without a message or with a generic one
+                task = Task(
+                    id=input_data.message.messageId or str(uuid.uuid4()),
+                    message=None,
+                    contextId=session_id,
+                    status=TaskStatus(state=TaskState.submitted),
+                    metadata={"session_id": session_id, "agent_id": self.id, "original_message_id": input_data.message.messageId}
                 )
 
         return State(

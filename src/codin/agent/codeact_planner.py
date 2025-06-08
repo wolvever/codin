@@ -9,10 +9,10 @@ import uuid
 
 from ..id import new_id
 from ..sandbox.local import LocalSandbox
-from ..utils.message import extract_text_from_message
+# from ..utils.message import extract_text_from_message # Removed
 from .base import Planner
 
-# Avoid external dependency on `a2a` by reusing our internal Role enum
+# Uses Role enum from .types
 from .types import FinishStep, Message, MessageStep, Role, State, Step, TextPart
 
 
@@ -48,9 +48,9 @@ class CodeActPlanner(Planner):
 
     async def next(self, state: State) -> _t.AsyncGenerator[Step]:
         lc_messages: list[dict[str, str]] = []
-        for msg in state.history:
-            text = extract_text_from_message(msg)
-            if msg.role == Role.user:
+        for hist_msg in state.history: # Renamed msg to hist_msg to avoid conflict
+            text = hist_msg.get_text_content() # Updated
+            if hist_msg.role == Role.user:
                 lc_messages.append({"role": "user", "content": text})
             else:
                 lc_messages.append({"role": "assistant", "content": text})
@@ -61,28 +61,29 @@ class CodeActPlanner(Planner):
                 content = result["content"]
             else:
                 content = str(result)
-            msg = Message(
-                messageId=new_id("msg"),
+
+            msg = Message.from_text( # Updated
+                text=str(content),
                 role=Role.agent,
-                parts=[TextPart(text=str(content))],
                 contextId=state.session_id,
-                kind="message",
+                messageId=new_id("msg")
             )
 
             code_blocks = self._CODE_RE.findall(str(content))
             if code_blocks:
                 # Yield the code block as a message
                 yield MessageStep(step_id=str(uuid.uuid4()), message=msg)
-                lc_messages.append({"role": "assistant", "content": str(content)})
+                # Use the already created msg's text content for lc_messages
+                lc_messages.append({"role": "assistant", "content": msg.get_text_content()})
+
 
                 for block in code_blocks:
                     output = await self._eval_code(block)
-                    out_msg = Message(
-                        messageId=new_id("msg"),
+                    out_msg = Message.from_text( # Updated
+                        text=output,
                         role=Role.agent,
-                        parts=[TextPart(text=output)],
                         contextId=state.session_id,
-                        kind="message",
+                        messageId=new_id("msg")
                     )
                     yield MessageStep(step_id=str(uuid.uuid4()), message=out_msg)
                     lc_messages.append({"role": "assistant", "content": output})

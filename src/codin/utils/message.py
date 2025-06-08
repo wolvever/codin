@@ -11,6 +11,8 @@ __all__ = [
 ]
 
 
+# DEPRECATED: This function is deprecated. Use Message.get_text_content() instead.
+# TODO: Refactor usages outside of src/codin/agent/ (e.g. in src/codin/__init__.py) and then remove this function.
 def extract_text_from_message(message: Message) -> str:
     """Extract concatenated text from all parts of a message."""
     text_parts: list[str] = []

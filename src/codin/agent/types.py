@@ -19,7 +19,7 @@ if _t.TYPE_CHECKING:
 
 
 __all__ = [
-    # Core types (A2A compatible)
+    # Core data types
     "Task",
     "Message",
     "Role",
@@ -85,11 +85,14 @@ class FilePart(BaseModel):
     kind: str = "file"
     metadata: dict[str, _t.Any] | None = None
 
+# Union type for message parts - defined early so Message can use it.
+Part = TextPart | DataPart | FilePart | ToolUsePart
+
 
 class Message(BaseModel):
     messageId: str = Field(default_factory=lambda: str(uuid4()))
     role: Role
-    parts: list[_t.Any]
+    parts: list[Part]  # Updated type hint
     contextId: str | None = None
     kind: str = "message"
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
@@ -129,6 +132,37 @@ class Message(BaseModel):
             )
         )
 
+    def get_text_content(self, separator: str = "\n") -> str:
+        """Extracts and concatenates text from all TextParts in the message."""
+        text_parts_content: list[str] = []
+        for part in self.parts:
+            if isinstance(part, TextPart):
+                text_parts_content.append(part.text)
+        return separator.join(text_parts_content)
+
+    @classmethod
+    def from_text(
+        cls,
+        text: str,
+        role: Role,
+        contextId: str | None = None,
+        taskId: str | None = None,
+        messageId: str | None = None,
+        metadata: dict[str, _t.Any] | None = None,
+        kind: str = "message"
+    ) -> Message:
+        """Creates a Message instance with a single TextPart."""
+        return cls(
+            messageId=messageId or str(uuid4()),
+            role=role,
+            parts=[TextPart(text=text)],
+            contextId=contextId,
+            kind=kind,
+            metadata=metadata or {},
+            taskId=taskId,
+            referenceTaskIds=None
+        )
+
 
 class TaskState(str, Enum):
     QUEUED = "queued"
@@ -136,12 +170,6 @@ class TaskState(str, Enum):
     WORKING = "working"
     COMPLETED = "completed"
     FAILED = "failed"
-
-    queued = QUEUED
-    submitted = SUBMITTED
-    working = WORKING
-    completed = COMPLETED
-    failed = FAILED
 
 
 
@@ -159,7 +187,7 @@ class TaskStatusUpdateEvent(BaseModel):
 class TaskArtifactUpdateEvent(BaseModel):
     contextId: str
     taskId: str
-    artifact: dict[str, _t.Any] | None = None
+    artifact: Artifact | None = None # Updated type hint
     final: bool = False
 
 
@@ -221,10 +249,6 @@ class ToolUsePart(_pyd.BaseModel):
     """Additional metadata about the tool call or result"""
 
 
-# Union type for message parts
-Part = TextPart | DataPart | FilePart | ToolUsePart
-
-
 # =============================================================================
 # Internal events and control types
 # =============================================================================
@@ -233,7 +257,7 @@ Part = TextPart | DataPart | FilePart | ToolUsePart
 class EventType(str, Enum):
     """Types of events for EventStep."""
 
-    # A2A Events
+    # Standard event types
     TASK_STATUS_UPDATE = "task_status_update"
     TASK_ARTIFACT_UPDATE = "task_artifact_update"
 
@@ -304,7 +328,7 @@ class RunnerInput(BaseModel):
 
 
 # =============================================================================
-# Agent Types (from base.py) - Updated for A2A compatibility
+# Agent Types (from base.py)
 # =============================================================================
 
 
@@ -432,7 +456,7 @@ class State(BaseModel):
 
     ## Dynamic updated members
 
-    # Current task (A2A compatible)
+    # Current task definition
     task: Task | None = None
     parent_task_id: str | None = None
     iteration: int = 0
@@ -457,8 +481,8 @@ class State(BaseModel):
 class StepType(Enum):
     """Types of steps a planner can emit."""
 
-    MESSAGE = "message"  # A2A Message (streaming or non-streaming)
-    EVENT = "event"  # A2A Event + internal events
+    MESSAGE = "message"  # Message step (streaming or non-streaming)
+    EVENT = "event"  # Event step (standard and internal events)
     TOOL_CALL = "tool_call"  # Tool execution
     THINK = "think"  # Internal reasoning
     FINISH = "finish"  # Task completion
@@ -519,7 +543,7 @@ class Step(BaseModel):
         return types
 
     def is_a2a_event(self) -> bool:
-        """Return True if the event is an A2A event."""
+        """Return True if the event is a standard event type."""
         return isinstance(self.event, TaskStatusUpdateEvent | TaskArtifactUpdateEvent)
 
     def is_internal_event(self) -> bool:
@@ -528,7 +552,7 @@ class Step(BaseModel):
 
 
 class MessageStep(Step):
-    """A2A compatible message step with enhanced support for mixed content."""
+    """Standard message step with enhanced support for mixed content."""
 
     is_streaming: bool = False
     message_stream: _t.AsyncIterator[str] | None = None
@@ -609,7 +633,7 @@ class ToolCallStep(Step):
 
 
 class EventStep(Step):
-    """Step for handling A2A events with enhanced content support."""
+    """Step for handling standard events with enhanced content support."""
 
     step_type: StepType = StepType.EVENT
 
@@ -667,5 +691,3 @@ class ErrorStep(Step):
 
     step_type: StepType = StepType.ERROR
     error: str | None = None
-
-

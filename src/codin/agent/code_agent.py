@@ -27,8 +27,6 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-# Use protocol types directly
-from .types import Role
 from pydantic import BaseModel
 
 from ..agent.base import Agent, AgentRunInput, AgentRunOutput
@@ -47,7 +45,9 @@ from ..utils.message import (
     format_history_for_prompt,
     format_tool_results_for_conversation,
 )
-from .types import Message, TextPart
+
+# Use protocol types directly
+from .types import Message, Role, TextPart
 
 __all__: list[str] = [
     "AgentEvent",

@@ -18,14 +18,23 @@ import hashlib
 import typing as _t
 from datetime import datetime
 
+from pydantic import BaseModel, ConfigDict
+
 from codin.agent.types import (
     DataPart as A2ADataPart,
+)
+from codin.agent.types import (
     FilePart as A2AFilePart,
+)
+from codin.agent.types import (
     Message as A2AMessage,
+)
+from codin.agent.types import (
     Role as A2ARole,
+)
+from codin.agent.types import (
     TextPart as A2ATextPart,
 )
-from pydantic import BaseModel, ConfigDict
 
 try:
     from jinja2 import Template as _JinjaTemplate

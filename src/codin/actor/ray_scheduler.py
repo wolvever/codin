@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import typing as _t
 import asyncio
+import typing as _t
 from datetime import datetime
 
 from .supervisor import ActorInfo, ActorSupervisor
@@ -39,9 +39,10 @@ class _RayAgentWrapper:
 
     def run(self, input_data: dict) -> list[dict]:  # pragma: no cover - executed on ray worker
         import asyncio
-        from ..agent.types import AgentRunInput, State, Message
-        from ..tool.base import Tool
+
+        from ..agent.types import AgentRunInput, Message, State
         from ..artifact.base import ArtifactService
+        from ..tool.base import Tool
 
         # Ensure Pydantic models are fully defined on the worker
         State.model_rebuild(

@@ -4,7 +4,12 @@ This package exposes high-level helpers for building agents, tools and runtimes
 that interoperate via the A2A protocol.
 """
 
+import sys as _sys
+
+import codin.agent.types as _agent_types
+
 from .config import get_api_key, get_config, load_config
+
 
 def extract_text_from_message(*args, **kwargs):
     from .utils.message import extract_text_from_message as _f
@@ -36,6 +41,7 @@ __all__: list[str] = [
 version: str = '0.1.0'
 
 # Provide backward-compatible imports for `src.codin` paths used in tests
-import sys as _sys
+
+_sys.modules.setdefault('src', _sys.modules[__name__])
 _sys.modules.setdefault('src.codin', _sys.modules[__name__])
-_sys.modules.setdefault('src.codin.agent.types', _sys.modules.get('codin.agent.types'))
+_sys.modules.setdefault('src.codin.agent.types', _agent_types)

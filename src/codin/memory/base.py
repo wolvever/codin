@@ -7,8 +7,9 @@ import typing as _t
 from datetime import datetime
 from enum import Enum
 
-from codin.agent.types import Message, Role, TextPart
 from pydantic import BaseModel, Field
+
+from codin.agent.types import Message, Role, TextPart
 
 __all__ = [
     "ChunkType",

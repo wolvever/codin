@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .base import Planner
 from .base_agent import BaseAgent
 from .plan_execute_planner import PlanExecutePlanner
 from .base import Planner

@@ -15,6 +15,9 @@ from ..utils.message import (
     format_history_for_prompt,
     format_tool_results_for_conversation,
 )
+
+from .base import Planner
+
 from .types import (
     ErrorStep,
     FinishStep,

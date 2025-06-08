@@ -10,6 +10,11 @@ from datetime import datetime
 from ..id import new_id
 from ..prompt.run import prompt_run
 from ..tool.base import to_tool_definitions
+from ..utils.message import (
+    extract_text_from_message,
+    format_history_for_prompt,
+    format_tool_results_for_conversation,
+)
 from .types import (
     ErrorStep,
     FinishStep,
@@ -221,19 +226,19 @@ class BasePlanner(Planner):
             history_messages.append(
                 {
                     'role': 'user' if msg.role == Role.user else 'assistant',
-                    'content': self._extract_text_from_message(msg),
+                    'content': extract_text_from_message(msg),
                 }
             )
 
         # Get current user input (last message if it's from user)
         current_input = ''
         if state.history and state.history[-1].role == Role.user:
-            current_input = self._extract_text_from_message(state.history[-1])
+            current_input = extract_text_from_message(state.history[-1])
 
         # Format tool results from previous turn if any
         tool_results_text = ''
         if state.last_tool_results:
-            tool_results_text = self._format_tool_results_for_conversation(state.last_tool_results)
+            tool_results_text = format_tool_results_for_conversation(state.last_tool_results)
 
         return {
             'agent_name': 'BasePlanner',
@@ -242,7 +247,7 @@ class BasePlanner(Planner):
             'has_tools': len(tool_definitions) > 0,
             'tools': tool_definitions,
             'has_history': len(history_messages) > 0,
-            'history_text': self._format_history_for_prompt(history_messages),
+            'history_text': format_history_for_prompt(history_messages),
             'user_input': current_input if current_input else None,
             'tool_results': bool(tool_results_text),
             'tool_results_text': tool_results_text,
@@ -371,50 +376,6 @@ class BasePlanner(Planner):
 
         return clean_value(parameters)
 
-    def _extract_text_from_message(self, message: Message) -> str:
-        """Extract text content from a Message object."""
-        text_parts = []
-        for part in message.parts:
-            if hasattr(part, 'root') and hasattr(part.root, 'text'):
-                text_parts.append(part.root.text)
-            elif hasattr(part, 'text'):
-                text_parts.append(part.text)
-        return '\n'.join(text_parts)
-
-    def _format_history_for_prompt(self, history_messages: list[dict]) -> str:
-        """Format conversation history for the prompt."""
-        if not history_messages:
-            return ''
-
-        formatted = []
-        for msg in history_messages:
-            role = msg['role'].title()
-            content = msg['content']
-            formatted.append(f'{role}: {content}')
-
-        return '\n\n'.join(formatted)
-
-    def _format_tool_results_for_conversation(self, tool_results: list) -> str:
-        """Format tool results for inclusion in conversation."""
-        if not tool_results:
-            return ''
-
-        formatted = []
-        for result in tool_results:
-            if hasattr(result, 'success'):
-                # It's a ToolResult
-                status = '✅ Success' if result.success else '❌ Failed'
-                formatted.append(f'**Tool Call {result.call_id}** {status}')
-                if result.output:
-                    formatted.append(f'Output: {result.output}')
-                if result.error:
-                    formatted.append(f'Error: {result.error}')
-            else:
-                # Generic result
-                formatted.append(f'Result: {result!s}')
-            formatted.append('')  # Empty line between results
-
-        return '\n'.join(formatted)
 
     def get_config(self) -> dict[str, _t.Any]:
         """Get planner configuration."""

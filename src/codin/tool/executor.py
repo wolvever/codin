@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 
 # Prometheus imports
 import prometheus_client as prom
-from a2a.types import Message, TextPart
+from codin.agent.types import Message, TextPart
 
 # OpenTelemetry imports
 from opentelemetry import metrics, trace
@@ -27,75 +27,75 @@ from .base import Tool, ToolContext
 from .registry import ToolRegistry
 
 __all__ = [
-    'ApprovalHook',
-    'ToolExecutionHook',
-    'ToolExecutor',
+    "ApprovalHook",
+    "ToolExecutionHook",
+    "ToolExecutor",
 ]
 
 # Create tracer and metrics
-tracer = trace.get_tracer('codin.tool.executor')
-meter = metrics.get_meter('codin.tool.executor')
+tracer = trace.get_tracer("codin.tool.executor")
+meter = metrics.get_meter("codin.tool.executor")
 
 # Define metrics
 tool_execution_counter = meter.create_counter(
-    name='tool_executions',
-    description='Number of tool executions',
-    unit='1',
+    name="tool_executions",
+    description="Number of tool executions",
+    unit="1",
 )
 
 tool_execution_duration = meter.create_histogram(
-    name='tool_execution_duration',
-    description='Duration of tool executions',
-    unit='s',
+    name="tool_execution_duration",
+    description="Duration of tool executions",
+    unit="s",
 )
 
 tool_execution_errors = meter.create_counter(
-    name='tool_execution_errors',
-    description='Number of tool execution errors',
-    unit='1',
+    name="tool_execution_errors",
+    description="Number of tool execution errors",
+    unit="1",
 )
 
 # Define Prometheus metrics - use try/except to avoid duplicate registration
 try:
     prom_tool_executions = prom.Counter(
-        'codin_tool_executions_total',
-        'Number of tool executions',
-        ['tool', 'status'],
+        "codin_tool_executions_total",
+        "Number of tool executions",
+        ["tool", "status"],
     )
 except ValueError:
     # Metric already exists, reuse it
-    prom_tool_executions = prom.REGISTRY._names_to_collectors['codin_tool_executions_total']
+    prom_tool_executions = prom.REGISTRY._names_to_collectors["codin_tool_executions_total"]
 
 try:
     prom_tool_execution_duration = prom.Histogram(
-        'codin_tool_execution_duration_seconds',
-        'Duration of tool executions',
-        ['tool'],
+        "codin_tool_execution_duration_seconds",
+        "Duration of tool executions",
+        ["tool"],
         buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0),
     )
 except ValueError:
     # Metric already exists, reuse it
-    prom_tool_execution_duration = prom.REGISTRY._names_to_collectors['codin_tool_execution_duration_seconds']
+    prom_tool_execution_duration = prom.REGISTRY._names_to_collectors["codin_tool_execution_duration_seconds"]
 
 try:
     prom_tool_errors = prom.Counter(
-        'codin_tool_errors_total',
-        'Number of tool execution errors',
-        ['tool', 'error_type'],
+        "codin_tool_errors_total",
+        "Number of tool execution errors",
+        ["tool", "error_type"],
     )
 except ValueError:
     # Metric already exists, reuse it
-    prom_tool_errors = prom.REGISTRY._names_to_collectors['codin_tool_errors_total']
+    prom_tool_errors = prom.REGISTRY._names_to_collectors["codin_tool_errors_total"]
 
 try:
     prom_tool_retries = prom.Counter(
-        'codin_tool_retries_total',
-        'Number of tool execution retries',
-        ['tool'],
+        "codin_tool_retries_total",
+        "Number of tool execution retries",
+        ["tool"],
     )
 except ValueError:
     # Metric already exists, reuse it
-    prom_tool_retries = prom.REGISTRY._names_to_collectors['codin_tool_retries_total']
+    prom_tool_retries = prom.REGISTRY._names_to_collectors["codin_tool_retries_total"]
 
 
 class ToolExecutionHook:
@@ -104,9 +104,7 @@ class ToolExecutionHook:
     async def before_execution(self, tool: Tool, args: dict[str, _t.Any], context: ToolContext) -> None:
         """Called before tool execution."""
 
-    async def after_execution(
-        self, tool: Tool, args: dict[str, _t.Any], result: _t.Any, context: ToolContext
-    ) -> None:
+    async def after_execution(self, tool: Tool, args: dict[str, _t.Any], result: _t.Any, context: ToolContext) -> None:
         """Called after successful tool execution."""
 
     async def on_error(self, tool: Tool, args: dict[str, _t.Any], error: Exception, context: ToolContext) -> None:
@@ -122,19 +120,19 @@ class ApprovalHook(ToolExecutionHook):
     async def before_execution(self, tool: Tool, args: dict[str, _t.Any], context: ToolContext) -> None:
         if self.approval_mode == ApprovalMode.ALWAYS:
             # Implementation for manual approval, e.g. waiting for human confirmation
-            await context.get_user_approval(f'Approve tool execution: {tool.name}')
+            await context.get_user_approval(f"Approve tool execution: {tool.name}")
         elif self.approval_mode == ApprovalMode.NEVER:
             # Auto-approve, no action needed
             pass
         elif self.approval_mode == ApprovalMode.UNSAFE_ONLY:
             # Check if tool is potentially unsafe and ask for approval if needed
             if self._is_unsafe_tool(tool):
-                await context.get_user_approval(f'Approve potentially unsafe tool execution: {tool.name}')
+                await context.get_user_approval(f"Approve potentially unsafe tool execution: {tool.name}")
 
     def _is_unsafe_tool(self, tool: Tool) -> bool:
         """Determine if a tool is potentially unsafe and requires approval."""
         # This is a simple heuristic - in practice, you might want more sophisticated logic
-        unsafe_keywords = ['delete', 'remove', 'rm', 'kill', 'terminate', 'destroy', 'format']
+        unsafe_keywords = ["delete", "remove", "rm", "kill", "terminate", "destroy", "format"]
         tool_name_lower = tool.name.lower()
         return any(keyword in tool_name_lower for keyword in unsafe_keywords)
 
@@ -175,30 +173,30 @@ class ToolExecutor:
         retries: int | None = None,
     ) -> _t.Any:
         """Execute a tool by name."""
-        with tracer.start_as_current_span(f'execute_{tool_name}') as span:
-            span.set_attribute('tool.name', tool_name)
-            span.set_attribute('tool.args', str(args))
+        with tracer.start_as_current_span(f"execute_{tool_name}") as span:
+            span.set_attribute("tool.name", tool_name)
+            span.set_attribute("tool.args", str(args))
 
             tool = self.registry.get_tool(tool_name)
             if not tool:
-                self.logger.error(f'Tool not found: {tool_name}')
-                span.set_status(Status(StatusCode.ERROR, f'Tool not found: {tool_name}'))
-                prom_tool_errors.labels(tool=tool_name, error_type='not_found').inc()
-                raise ValueError(f'Tool not found: {tool_name}')
+                self.logger.error(f"Tool not found: {tool_name}")
+                span.set_status(Status(StatusCode.ERROR, f"Tool not found: {tool_name}"))
+                prom_tool_errors.labels(tool=tool_name, error_type="not_found").inc()
+                raise ValueError(f"Tool not found: {tool_name}")
 
-            span.set_attribute('tool.description', tool.description)
+            span.set_attribute("tool.description", tool.description)
 
             timeout = timeout or self.default_timeout
             retries = retries if retries is not None else self.max_retries
 
             try:
                 result = await self._execute_with_retry(tool, args, context, timeout, retries)
-                prom_tool_executions.labels(tool=tool.name, status='success').inc()
+                prom_tool_executions.labels(tool=tool.name, status="success").inc()
                 return result
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
-                prom_tool_executions.labels(tool=tool.name, status='error').inc()
+                prom_tool_executions.labels(tool=tool.name, status="error").inc()
                 raise
 
     async def _execute_with_retry(
@@ -215,26 +213,26 @@ class ToolExecutor:
         while True:
             attempt += 1
             try:
-                with tracer.start_as_current_span(f'execute_attempt_{attempt}') as span:
-                    span.set_attribute('tool.attempt', attempt)
-                    span.set_attribute('tool.max_attempts', retries + 1)
+                with tracer.start_as_current_span(f"execute_attempt_{attempt}") as span:
+                    span.set_attribute("tool.attempt", attempt)
+                    span.set_attribute("tool.max_attempts", retries + 1)
 
                     return await self._execute_once(tool, args, context, timeout)
             except TimeoutError:
                 if attempt > retries:
-                    self.logger.error(f'Tool {tool.name} timed out after {retries} retries')
-                    tool_execution_errors.add(1, {'tool': tool.name, 'error': 'timeout'})
-                    prom_tool_errors.labels(tool=tool.name, error_type='timeout').inc()
+                    self.logger.error(f"Tool {tool.name} timed out after {retries} retries")
+                    tool_execution_errors.add(1, {"tool": tool.name, "error": "timeout"})
+                    prom_tool_errors.labels(tool=tool.name, error_type="timeout").inc()
                     raise
-                self.logger.warning(f'Tool {tool.name} timed out, retrying ({attempt}/{retries})')
+                self.logger.warning(f"Tool {tool.name} timed out, retrying ({attempt}/{retries})")
                 prom_tool_retries.labels(tool=tool.name).inc()
             except Exception as e:
                 if attempt > retries:
-                    self.logger.error(f'Tool {tool.name} failed after {retries} retries: {e!s}')
-                    tool_execution_errors.add(1, {'tool': tool.name, 'error': str(e)[:100]})
-                    prom_tool_errors.labels(tool=tool.name, error_type='exception').inc()
+                    self.logger.error(f"Tool {tool.name} failed after {retries} retries: {e!s}")
+                    tool_execution_errors.add(1, {"tool": tool.name, "error": str(e)[:100]})
+                    prom_tool_errors.labels(tool=tool.name, error_type="exception").inc()
                     raise
-                self.logger.warning(f'Tool {tool.name} failed, retrying ({attempt}/{retries}): {e!s}')
+                self.logger.warning(f"Tool {tool.name} failed, retrying ({attempt}/{retries}): {e!s}")
                 prom_tool_retries.labels(tool=tool.name).inc()
 
     async def _execute_once(
@@ -253,32 +251,30 @@ class ToolExecutor:
         try:
             validated_args = tool.validate_input(args)
         except Exception as e:
-            self.logger.error(f'Input validation failed for tool {tool.name}: {e!s}')
+            self.logger.error(f"Input validation failed for tool {tool.name}: {e!s}")
             for hook in self.hooks:
                 await hook.on_error(tool, args, e, context)
-            tool_execution_errors.add(1, {'tool': tool.name, 'error': 'validation_error'})
-            prom_tool_errors.labels(tool=tool.name, error_type='validation_error').inc()
+            tool_execution_errors.add(1, {"tool": tool.name, "error": "validation_error"})
+            prom_tool_errors.labels(tool=tool.name, error_type="validation_error").inc()
             raise
 
         # Execute with timeout and concurrency limit
         start_time = time.time()
-        tool_execution_counter.add(1, {'tool': tool.name})
+        tool_execution_counter.add(1, {"tool": tool.name})
 
         try:
             async with self._concurrency_limit():
                 # Get the result from tool.run - can be a coroutine or async generator
                 run_call = tool.run(validated_args, context)
-                
+
                 # Check if the result is directly an async generator
                 if isinstance(run_call, types.AsyncGeneratorType):
                     # This is an async generator returned directly
-                    result = await asyncio.wait_for(
-                        self._process_async_generator(tool, run_call), timeout=timeout
-                    )
+                    result = await asyncio.wait_for(self._process_async_generator(tool, run_call), timeout=timeout)
                 else:
                     # This is a coroutine, await it first
                     run_result = await asyncio.wait_for(run_call, timeout=timeout)
-                    
+
                     # Check if the awaited result is an async generator
                     if isinstance(run_result, types.AsyncGeneratorType):
                         result = await self._process_async_generator(tool, run_result)
@@ -289,10 +285,10 @@ class ToolExecutor:
                 result = self._try_convert_to_protocol_types(result)
         except Exception as e:
             elapsed = time.time() - start_time
-            self.logger.error(f'Tool {tool.name} failed after {elapsed:.2f}s: {e!s}')
-            tool_execution_duration.record(elapsed, {'tool': tool.name, 'status': 'error'})
+            self.logger.error(f"Tool {tool.name} failed after {elapsed:.2f}s: {e!s}")
+            tool_execution_duration.record(elapsed, {"tool": tool.name, "status": "error"})
             prom_tool_execution_duration.labels(tool=tool.name).observe(elapsed)
-            prom_tool_errors.labels(tool=tool.name, error_type='execution_error').inc()
+            prom_tool_errors.labels(tool=tool.name, error_type="execution_error").inc()
 
             for hook in self.hooks:
                 await hook.on_error(tool, args, e, context)
@@ -300,8 +296,8 @@ class ToolExecutor:
 
         # Run after execution hooks
         elapsed = time.time() - start_time
-        self.logger.info(f'Tool {tool.name} completed in {elapsed:.2f}s')
-        tool_execution_duration.record(elapsed, {'tool': tool.name, 'status': 'success'})
+        self.logger.info(f"Tool {tool.name} completed in {elapsed:.2f}s")
+        tool_execution_duration.record(elapsed, {"tool": tool.name, "status": "success"})
         prom_tool_execution_duration.labels(tool=tool.name).observe(elapsed)
 
         for hook in self.hooks:
@@ -311,10 +307,10 @@ class ToolExecutor:
 
     async def _process_async_generator(self, tool: Tool, generator: _t.AsyncGenerator) -> _t.Any:
         """Process an async generator result from a tool."""
-        with tracer.start_as_current_span('process_async_generator') as span:
-            span.set_attribute('tool.is_generative', True)
+        with tracer.start_as_current_span("process_async_generator") as span:
+            span.set_attribute("tool.is_generative", True)
 
-            self.logger.debug(f'Processing async generator from tool {tool.name}')
+            self.logger.debug(f"Processing async generator from tool {tool.name}")
 
             # For simple implementation, collect all items
             collected_items = []
@@ -322,9 +318,9 @@ class ToolExecutor:
                 async for item in generator:
                     collected_items.append(item)
             except Exception as e:
-                self.logger.error(f'Error processing generator from tool {tool.name}: {e!s}')
+                self.logger.error(f"Error processing generator from tool {tool.name}: {e!s}")
                 span.record_exception(e)
-                prom_tool_errors.labels(tool=tool.name, error_type='generator_error').inc()
+                prom_tool_errors.labels(tool=tool.name, error_type="generator_error").inc()
                 raise
 
             # If we have a single item, return it directly
@@ -339,19 +335,19 @@ class ToolExecutor:
             return None
 
         # If already a protocol type, return as is
-        from a2a.types import DataPart, FilePart
+        from codin.agent.types import DataPart, FilePart
 
         if isinstance(result, Message | TextPart | DataPart | FilePart):
             return result
 
         # Check if result is from MCP
-        if hasattr(result, 'get') and isinstance(result, dict):
+        if hasattr(result, "get") and isinstance(result, dict):
             try:
                 from ..tool.mcp.conversion_utils import convert_mcp_to_protocol_types
 
                 return convert_mcp_to_protocol_types(result)
             except (ImportError, Exception) as e:
-                self.logger.debug(f'Could not convert MCP result: {e}')
+                self.logger.debug(f"Could not convert MCP result: {e}")
 
         # If string, convert to TextPart
         if isinstance(result, str):

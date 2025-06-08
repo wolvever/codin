@@ -60,6 +60,13 @@ def get_code_agent():
     return CodeAgent
 
 
+def get_search_agent():
+    """Lazy import SearchAgent to avoid circular imports."""
+    from .search_agent import SearchAgent
+
+    return SearchAgent
+
+
 __all__ = [
     # Base agent interface
     'Agent',
@@ -96,5 +103,6 @@ __all__ = [
     'get_base_agent',
     'get_base_planner',
     'get_code_agent',
+    'get_search_agent',
 ]
 

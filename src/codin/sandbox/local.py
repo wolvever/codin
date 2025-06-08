@@ -92,6 +92,9 @@ class LocalSandbox(Sandbox):
             'java': ['Main.java', 'App.java'],
             'bash': ['main.sh', 'run.sh', 'start.sh'],
             'powershell': ['main.ps1', 'run.ps1', 'start.ps1'],
+            'c': ['main.c'],
+            'cpp': ['main.cpp', 'main.cc', 'main.cxx'],
+            'c++': ['main.cpp', 'main.cc', 'main.cxx'],
         }
 
         patterns = main_patterns.get(language, [])
@@ -111,6 +114,9 @@ class LocalSandbox(Sandbox):
             'java': ['.java'],
             'bash': ['.sh'],
             'powershell': ['.ps1'],
+            'c': ['.c'],
+            'cpp': ['.cpp', '.cc', '.cxx'],
+            'c++': ['.cpp', '.cc', '.cxx'],
         }
 
         if language in extensions:
@@ -241,6 +247,26 @@ class LocalSandbox(Sandbox):
         # Handle direct code execution
         if code:
             try:
+                if language.lower() in ('c', 'cpp', 'c++'):
+                    # Compile then execute C/C++ code
+                    ext = '.c' if language.lower() == 'c' else '.cpp'
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        src_file = Path(tmpdir) / f'code{ext}'
+                        src_file.write_text(code, encoding='utf-8')
+                        exe_file = Path(tmpdir) / 'a.out'
+                        compiler = 'gcc' if language.lower() == 'c' else 'g++'
+                        compile_result = await self.run_cmd(
+                            [compiler, str(src_file), '-o', str(exe_file)],
+                            timeout=timeout,
+                            env=env,
+                        )
+                        if compile_result.exit_code != 0:
+                            return ExecResult(
+                                stdout=compile_result.stdout,
+                                stderr=f'Compilation failed: {compile_result.stderr}',
+                                exit_code=compile_result.exit_code,
+                            )
+                        return await self.run_cmd([str(exe_file)], timeout=timeout, env=env)
                 executor = self._get_language_executor(language)
                 if language.lower() in ('python', 'py'):
                     cmd = executor + ['-c', code]
@@ -349,6 +375,23 @@ class LocalSandbox(Sandbox):
 
                 # Execute the file
                 try:
+                    if language.lower() in ('c', 'cpp', 'c++'):
+                        compiler = 'gcc' if language.lower() == 'c' else 'g++'
+                        exe_file = exec_path.parent / 'a.out'
+                        compile_res = await self.run_cmd(
+                            [compiler, str(exec_path), '-o', str(exe_file)],
+                            cwd=str(exec_path.parent),
+                            timeout=timeout,
+                            env=env,
+                        )
+                        if compile_res.exit_code != 0:
+                            return ExecResult(
+                                stdout=compile_res.stdout,
+                                stderr=f'Compilation failed: {compile_res.stderr}',
+                                exit_code=compile_res.exit_code,
+                            )
+                        return await self.run_cmd([str(exe_file)], cwd=str(exec_path.parent), timeout=timeout, env=env)
+
                     executor = self._get_language_executor(language)
                     cmd = executor + [str(exec_path)]
                     return await self.run_cmd(cmd, cwd=str(exec_path.parent), timeout=timeout, env=env)

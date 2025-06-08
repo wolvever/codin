@@ -10,6 +10,7 @@ import logging
 import typing as _t
 from pathlib import Path
 from urllib.parse import urlparse
+import importlib.util
 
 import httpx
 import pydantic as _pyd
@@ -118,10 +119,44 @@ class ToolRegistry:
             raise ValueError(f'Unsupported endpoint scheme: {parsed.scheme}')
 
     async def _load_from_filesystem(self, path: str) -> None:
-        """Load tools from filesystem path."""
-        # This would load tools from a directory structure
-        # For now, just log that it's not implemented
-        self.logger.warning(f'Filesystem tool loading not yet implemented: {path}')
+        """Load tools from filesystem path.
+
+        Each Python file in the directory is imported. Any ``Tool`` or ``Toolset``
+        objects defined at module level are registered automatically.  Modules
+        may also provide ``get_tools()`` or ``get_toolsets()`` callables which
+        should return iterables of tools or toolsets respectively.
+        """
+
+        root = Path(path).expanduser()
+        if not root.exists():
+            self.logger.error(f'Tools path does not exist: {root}')
+            return
+
+        for file in root.rglob('*.py'):
+            try:
+                module_name = file.stem
+                spec = importlib.util.spec_from_file_location(module_name, file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+
+                    if hasattr(module, 'get_toolsets'):
+                        for ts in module.get_toolsets():
+                            if isinstance(ts, Toolset):
+                                self.register_toolset(ts)
+
+                    if hasattr(module, 'get_tools'):
+                        for t in module.get_tools():
+                            if isinstance(t, Tool):
+                                self.register_tool(t)
+
+                    for attr in vars(module).values():
+                        if isinstance(attr, Toolset):
+                            self.register_toolset(attr)
+                        elif isinstance(attr, Tool):
+                            self.register_tool(attr)
+            except Exception as e:  # pragma: no cover - loading errors
+                self.logger.error(f'Failed to load tools from {file}: {e}')
 
     async def _load_from_http(self, endpoint_config: ToolEndpoint) -> None:
         """Load tools from HTTP endpoint."""

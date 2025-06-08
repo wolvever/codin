@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 import click
-from a2a.types import Message, Role, TextPart
+from codin.agent.types import Message, Role, TextPart
 from dotenv import load_dotenv
 
 from ..agent.base import AgentRunInput
@@ -51,9 +51,7 @@ def validate_approval_mode(mode: str) -> ApprovalMode:
         return ApprovalMode(mode)
     except ValueError as err:
         available = ", ".join([m.value for m in ApprovalMode])
-        raise click.BadParameter(
-            f"Unknown approval mode '{mode}'. Available: {available}"
-        ) from err
+        raise click.BadParameter(f"Unknown approval mode '{mode}'. Available: {available}") from err
 
 
 async def run_quiet_mode(

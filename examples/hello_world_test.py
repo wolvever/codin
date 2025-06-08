@@ -17,7 +17,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from a2a.types import Role, TextPart
+from codin.agent.types import Role, TextPart
 
 from codin.agent.base_agent import BaseAgent
 from codin.agent.code_planner import CodePlanner, CodePlannerConfig

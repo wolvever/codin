@@ -22,3 +22,8 @@ __all__: list[str] = [
 ]
 
 version: str = '0.1.0'
+
+# Provide backward-compatible imports for `src.codin` paths used in tests
+import sys as _sys
+_sys.modules.setdefault('src.codin', _sys.modules[__name__])
+_sys.modules.setdefault('src.codin.agent.types', _sys.modules.get('codin.agent.types'))

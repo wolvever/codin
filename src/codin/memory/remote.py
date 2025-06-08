@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typing as _t
 
-from a2a.types import Message
+from codin.agent.types import Message
 
 from ..client import Client, ClientConfig
 from .base import Memory, MemoryChunk

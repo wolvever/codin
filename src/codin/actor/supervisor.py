@@ -13,6 +13,11 @@ from pydantic import BaseModel, Field
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
+else:  # pragma: no cover - runtime fallback for forward refs
+    try:  # avoid import cycle during runtime import
+        from ..agent.base import Agent
+    except Exception:  # noqa: BLE001 - best effort fallback
+        Agent = _t.Any
 
 __all__ = [
     'ActorInfo',

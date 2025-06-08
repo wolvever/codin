@@ -11,6 +11,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+# Provide a runtime definition for ``Agent`` so Pydantic can resolve the
+# forward reference on import. This avoids the need for tests to patch in the
+# ``Agent`` type before calling ``ActorInfo.model_rebuild``.
+from ..agent.base_agent import BaseAgent as Agent
+
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
 

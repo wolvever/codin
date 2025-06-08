@@ -10,8 +10,9 @@ import sys
 from pathlib import Path
 
 import click
-from codin.agent.types import Message, Role, TextPart
 from dotenv import load_dotenv
+
+from codin.agent.types import Message, Role, TextPart
 
 from ..agent.base import AgentRunInput
 from ..agent.code_agent import CodeAgent
@@ -659,7 +660,13 @@ def debug_sandbox_cmd(full_auto: bool, permissions: tuple[str, ...], command: tu
 @cli.command("swe-benchmark")
 @click.option("--dataset", default="SWE-bench/SWE-bench_Lite", help="Dataset name or path")
 @click.option("--split", default="test", help="Dataset split")
-@click.option("--predictions", "predictions_path", required=True, type=click.Path(exists=True), help="Path to predictions file")
+@click.option(
+    "--predictions",
+    "predictions_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to predictions file",
+)
 @click.option("--instance-id", "instance_ids", multiple=True, help="Instance IDs to run")
 @click.option("--run-id", default=None, help="Run identifier")
 @click.option("--report-dir", default=".", type=click.Path(), help="Directory for reports")

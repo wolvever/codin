@@ -13,14 +13,13 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-# Import protocol types that we need
-from .types import Role, TextPart, TaskState, TaskStatus
-
 from ..actor.mailbox import LocalMailbox, Mailbox
 from ..memory.base import MemMemoryService, Memory
 from ..model.base import BaseLLM
 from ..tool.base import Tool, ToolContext
 from .base import Agent, Planner
+
+# Import protocol types that we need
 from .types import (
     AgentRunInput,
     AgentRunOutput,
@@ -30,12 +29,16 @@ from .types import (
     Message,  # Use Message from codin.agent.types
     MessageStep,
     Metrics,
+    Role,
     RunConfig,
     RunnerControl,
     State,
     Step,
     StepType,
     Task,
+    TaskState,
+    TaskStatus,
+    TextPart,
     ThinkStep,
     ToolCallStep,
     ToolUsePart,

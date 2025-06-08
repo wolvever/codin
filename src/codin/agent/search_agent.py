@@ -8,9 +8,8 @@ functionality from :class:`BaseAgent` and only overrides the planning loop.
 from __future__ import annotations
 
 import time
-import uuid
 import typing as _t
-
+import uuid
 
 from .base_agent import BaseAgent
 from .types import (
@@ -116,8 +115,16 @@ class SearchAgent(BaseAgent):
                         break
 
                 steps_executed += 1
-                if step.step_type == StepType.MESSAGE and isinstance(step, MessageStep) and step.message:
-                    if not any(h.messageId == step.message.messageId for h in state.history if h.messageId and step.message.messageId):
+                if (
+                    step.step_type == StepType.MESSAGE
+                    and isinstance(step, MessageStep)
+                    and step.message
+                ):
+                    if not any(
+                        h.messageId == step.message.messageId
+                        for h in state.history
+                        if h.messageId and step.message.messageId
+                    ):
                         await self.memory.add_message(step.message)
                         state.history.append(step.message)
 

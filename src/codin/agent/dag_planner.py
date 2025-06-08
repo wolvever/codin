@@ -13,22 +13,21 @@ import logging
 import time
 from datetime import datetime
 
-from .types import (
-    Artifact,
-    DataPart,
-    Message,
-    TaskState,
-    TextPart,
-    Task,
-    TaskStatus,
-)
-
 from ..id import new_id
 from ..model.base import BaseLLM
 from ..prompt import prompt_run
 from ..tool.base import Tool
 from .base import Agent, AgentRunInput, AgentRunOutput
-from .dag_types import Plan, PlanResult, Task, TaskStatus
+from .dag_types import Plan, PlanResult
+from .types import (
+    Artifact,
+    DataPart,
+    Message,
+    Task,
+    TaskState,
+    TaskStatus,
+    TextPart,
+)
 
 logger = logging.getLogger(__name__)
 

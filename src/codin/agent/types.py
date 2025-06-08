@@ -1,5 +1,7 @@
 """Type definitions for agent system."""
 
+from __future__ import annotations
+
 import typing as _t
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -52,7 +54,6 @@ __all__ = [
     "FinishStep",
     "ErrorStep",
     # Base interfaces
-    "Planner",
     "EventType",
 ]
 
@@ -129,78 +130,6 @@ class Message:
         )
 
 
-class TaskState(str, Enum):
-    QUEUED = "queued"
-    SUBMITTED = "submitted"
-    WORKING = "working"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-    queued = QUEUED
-    submitted = SUBMITTED
-    working = WORKING
-    completed = COMPLETED
-    failed = FAILED
-
-
-@dataclass
-class TaskStatus:
-    state: TaskState
-    message: Message | None = None
-    timestamp: str | None = None
-
-
-@dataclass
-class TaskStatusUpdateEvent:
-    contextId: str
-    taskId: str
-    status: TaskStatus
-    final: bool = False
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-
-
-@dataclass
-class TaskArtifactUpdateEvent:
-    """Event representing artifact updates for a task."""
-
-    contextId: str
-    taskId: str
-    artifact: _t.Any
-    append: bool = False
-    lastChunk: bool = False
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-
-
-@dataclass
-class Task:
-    id: str
-    contextId: str
-    status: TaskStatus
-    query: str | None = None
-    parts: list[_t.Any] = field(default_factory=list)
-    message: Message | None = None
-    metadata: dict[str, _t.Any] = field(default_factory=dict)
-
-    def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
-        self.parts.append(TextPart(text=text, metadata=metadata))
-
-    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
-        """Convenience helper to append a DataPart."""
-        self.parts.append(DataPart(data=data, metadata=metadata))
-
-    def add_tool_call_part(self, call: ToolCall) -> None:
-        self.parts.append(ToolUsePart(type="call", id=call.call_id, name=call.name, input=call.arguments))
-
-    def add_tool_result_part(self, result: ToolCallResult, name: str) -> None:
-        self.parts.append(
-            ToolUsePart(
-                type="result",
-                id=result.call_id,
-                name=name,
-                output=result.output,
-                metadata={"error": result.error} if result.error else None,
-            )
-        )
 
 
 class TaskState(str, Enum):
@@ -285,6 +214,10 @@ class ToolUsePart(_pyd.BaseModel):
 
     metadata: dict[str, _t.Any] | None = None
     """Additional metadata for this tool use"""
+
+
+# Union type for message parts
+Part = TextPart | DataPart | FilePart | ToolUsePart
 
 
 # =============================================================================

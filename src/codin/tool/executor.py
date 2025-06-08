@@ -16,11 +16,12 @@ from contextlib import asynccontextmanager
 
 # Prometheus imports
 import prometheus_client as prom
-from codin.agent.types import Message, TextPart
 
 # OpenTelemetry imports
 from opentelemetry import metrics, trace
 from opentelemetry.trace import Status, StatusCode
+
+from codin.agent.types import Message, TextPart
 
 from ..config import ApprovalMode
 from .base import Tool, ToolContext

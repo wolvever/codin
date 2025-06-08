@@ -7,14 +7,13 @@ import re
 import typing as _t
 import uuid
 
-# Avoid external dependency on `a2a` by reusing our internal Role enum
-from .types import Role
-
 from ..id import new_id
 from ..sandbox.local import LocalSandbox
 from ..utils.message import extract_text_from_message
 from .base import Planner
-from .types import FinishStep, Message, MessageStep, State, Step, TextPart
+
+# Avoid external dependency on `a2a` by reusing our internal Role enum
+from .types import FinishStep, Message, MessageStep, Role, State, Step, TextPart
 
 
 class CodeActPlanner(Planner):

@@ -1,9 +1,10 @@
 """Agent that uses :class:`PlanExecutePlanner` for plan-and-execute control."""
+
 from __future__ import annotations
 
 from .base_agent import BaseAgent
 from .plan_execute_planner import PlanExecutePlanner
-from .types import Planner
+from .base import Planner
 
 
 class PlanExecuteAgent(BaseAgent):

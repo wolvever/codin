@@ -1,5 +1,5 @@
 import pytest
-from a2a.types import Message, TextPart, Role
+from codin.agent.types import Message, TextPart, Role
 from codin.agent.types import ToolCallResult
 from codin.utils.message import (
     extract_text_from_message,

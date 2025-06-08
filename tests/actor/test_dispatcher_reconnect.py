@@ -15,7 +15,7 @@ from codin.agent.types import (
     AgentRunOutput,
     Task,
 )
-from a2a.types import TaskStatusUpdateEvent, TaskStatus, TaskState
+from codin.agent.types import TaskStatusUpdateEvent, TaskStatus, TaskState
 from codin.model.base import BaseLLM
 
 
@@ -103,7 +103,6 @@ async def agent_factory(agent_type: str, key: str) -> BaseAgent:
         planner=DummyPlanner(),
         llm=DummyLLM("mock-llm"),
     )
-
 
 
 @pytest.mark.asyncio

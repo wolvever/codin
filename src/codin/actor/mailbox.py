@@ -6,10 +6,10 @@ import typing as _t
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-
 if TYPE_CHECKING:
-
     from ..agent.types import Message
+    from .local_mailbox import LocalMailbox
+    from .ray_mailbox import RayMailbox
 
 
 __all__ = ["Mailbox", "LocalMailbox", "RayMailbox"]

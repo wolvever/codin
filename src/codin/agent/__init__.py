@@ -61,6 +61,19 @@ def get_code_agent():
 
     return CodeAgent
 
+  
+def get_codeact_planner():
+    """Lazy import CodeActPlanner to avoid circular imports."""
+    from .codeact_planner import CodeActPlanner
+
+    return CodeActPlanner
+
+def get_search_agent():
+    """Lazy import SearchAgent to avoid circular imports."""
+    from .search_agent import SearchAgent
+
+    return SearchAgent
+
 
 __all__ = [
     # Base agent interface
@@ -100,5 +113,8 @@ __all__ = [
     'get_base_agent',
     'get_base_planner',
     'get_code_agent',
+    'get_codeact_planner',
+    'get_search_agent',
 ]
+
 

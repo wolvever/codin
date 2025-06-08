@@ -1,5 +1,5 @@
 import pytest
-from a2a.types import Message, Role, TextPart
+from codin.agent.types import Message, Role, TextPart
 
 from codin.actor.mailbox import RayMailbox
 

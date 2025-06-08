@@ -13,23 +13,23 @@ from __future__ import annotations
 
 import typing as _t
 
-from a2a.types import DataPart, FilePart, TextPart
+from codin.agent.types import DataPart, FilePart, TextPart
 
 __all__ = [
-    'convert_mcp_to_protocol_types',
+    "convert_mcp_to_protocol_types",
 ]
 
 
 def _is_text_part(data: dict[str, _t.Any]) -> bool:
-    return data.get('type') == 'text' and 'text' in data
+    return data.get("type") == "text" and "text" in data
 
 
 def _is_data_part(data: dict[str, _t.Any]) -> bool:
-    return data.get('type') == 'data' and 'data' in data and isinstance(data['data'], dict)
+    return data.get("type") == "data" and "data" in data and isinstance(data["data"], dict)
 
 
 def _is_file_part(data: dict[str, _t.Any]) -> bool:
-    return data.get('type') == 'file' and 'file' in data and isinstance(data['file'], dict)
+    return data.get("type") == "file" and "file" in data and isinstance(data["file"], dict)
 
 
 def _convert_single(obj: _t.Any) -> _t.Any:
@@ -45,15 +45,15 @@ def _convert_single(obj: _t.Any) -> _t.Any:
     # Dictionaries may represent protocol parts.
     if isinstance(obj, dict):
         if _is_text_part(obj):
-            return TextPart(text=_t.cast(str, obj['text']))
+            return TextPart(text=_t.cast(str, obj["text"]))
         if _is_data_part(obj):
-            return DataPart(data=_t.cast(dict[str, _t.Any], obj['data']), mime_type='application/json')
+            return DataPart(data=_t.cast(dict[str, _t.Any], obj["data"]), mime_type="application/json")
         if _is_file_part(obj):
-            file_dict = _t.cast(dict[str, _t.Any], obj['file'])
+            file_dict = _t.cast(dict[str, _t.Any], obj["file"])
             return FilePart(
-                file_id=file_dict.get('uri', file_dict.get('name', 'unknown')),
-                mime_type=file_dict.get('mimeType'),
-                name=file_dict.get('name'),
+                file_id=file_dict.get("uri", file_dict.get("name", "unknown")),
+                mime_type=file_dict.get("mimeType"),
+                name=file_dict.get("name"),
             )
         # Fallback – return a recursively converted dictionary.
         return {key: _convert_single(val) for key, val in obj.items()}

@@ -1,5 +1,7 @@
 """Type definitions for agent system."""
 
+from __future__ import annotations
+
 import typing as _t
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -17,19 +19,19 @@ if _t.TYPE_CHECKING:
 
 __all__ = [
     # Core types (A2A compatible)
-    'Task',
-    'Message',
-    'Role',
-    'TextPart',
-    'DataPart',
-    'FilePart',
-    'TaskState',
-    'TaskStatus',
-    'TaskStatusUpdateEvent',
-    'TaskArtifactUpdateEvent',
-    'ToolUsePart',
-    'ToolCall',
-    'ToolCallResult',
+    "Task",
+    "Message",
+    "Role",
+    "TextPart",
+    "DataPart",
+    "FilePart",
+    "TaskState",
+    "TaskStatus",
+    "TaskStatusUpdateEvent",
+    "TaskArtifactUpdateEvent",
+    "ToolUsePart",
+    "ToolCall",
+    "ToolCallResult",
     # Enhanced types for internal use
     "RunEvent",
     "Event",
@@ -55,6 +57,7 @@ __all__ = [
     "Planner",
     "EventType",
 ]
+
 
 class Role(str, Enum):
     """Simple role enumeration used across the codebase."""
@@ -101,7 +104,9 @@ class Message:
         """Append a TextPart to the message."""
         self.parts.append(TextPart(text=text, metadata=metadata))
 
-    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
+    def add_data_part(
+        self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None
+    ) -> None:
         """Append a DataPart to the message."""
         self.parts.append(DataPart(data=data, metadata=metadata))
 
@@ -184,12 +189,16 @@ class Task:
     def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
         self.parts.append(TextPart(text=text, metadata=metadata))
 
-    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
+    def add_data_part(
+        self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None
+    ) -> None:
         """Convenience helper to append a DataPart."""
         self.parts.append(DataPart(data=data, metadata=metadata))
 
     def add_tool_call_part(self, call: ToolCall) -> None:
-        self.parts.append(ToolUsePart(type="call", id=call.call_id, name=call.name, input=call.arguments))
+        self.parts.append(
+            ToolUsePart(type="call", id=call.call_id, name=call.name, input=call.arguments)
+        )
 
     def add_tool_result_part(self, result: ToolCallResult, name: str) -> None:
         self.parts.append(
@@ -359,7 +368,9 @@ class RunnerInput(BaseModel):
         return cls(message=message)
 
     @classmethod
-    def from_control(cls, signal: ControlSignal, metadata: dict[str, _t.Any] | None = None) -> RunnerInput:
+    def from_control(
+        cls, signal: ControlSignal, metadata: dict[str, _t.Any] | None = None
+    ) -> RunnerInput:
         """Create RunnerInput from a control signal."""
         control = RunnerControl(signal=signal, metadata=metadata or {})
         return cls(control=control)
@@ -513,7 +524,9 @@ class State(BaseModel):
     last_tool_results: list[_t.Any] = Field(default_factory=list)
 
     # Task list for structured planning (matches code_agent.py format)
-    task_list: dict[str, list[str]] = Field(default_factory=lambda: {"completed": [], "pending": []})
+    task_list: dict[str, list[str]] = Field(
+        default_factory=lambda: {"completed": [], "pending": []}
+    )
 
 
 class StepType(Enum):
@@ -560,7 +573,10 @@ class Step(BaseModel):
         """Return True if this step relates to tool usage."""
         if isinstance(self, ToolCallStep):
             return self.tool_call is not None or self.tool_call_result is not None
-        if getattr(self, "tool_call", None) is not None or getattr(self, "tool_call_result", None) is not None:
+        if (
+            getattr(self, "tool_call", None) is not None
+            or getattr(self, "tool_call_result", None) is not None
+        ):
             return True
         if self.message:
             return any(getattr(p, "kind", None) == "tool-use" for p in self.message.parts)
@@ -721,12 +737,16 @@ class FinishStep(Step):
             state=TaskState.completed, message=self.message, timestamp=datetime.now().isoformat()
         )
         return TaskStatusUpdateEvent(
-            contextId=context_id, taskId=task_id, status=completion_status, final=True, metadata=self.metadata
+            contextId=context_id,
+            taskId=task_id,
+            status=completion_status,
+            final=True,
+            metadata=self.metadata,
         )
+
 
 class ErrorStep(Step):
     """Step emitted when planning fails."""
 
     step_type: StepType = StepType.ERROR
     error: str | None = None
-

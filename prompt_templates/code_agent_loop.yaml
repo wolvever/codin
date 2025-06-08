@@ -14,6 +14,7 @@ variants:
       - Respond to the user's specific request - don't assume additional work unless explicitly asked
       - Only call tools when necessary, if the task is general or you already know the answer, respond without calling tools
       - Stop when you've addressed the user's current request
+      - Provide a short summary of actions taken when a task is complete
 
       ## USER INTERACTION
       - Always prepare clarifying questions through thinking before asking the user

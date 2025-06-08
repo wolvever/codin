@@ -10,8 +10,8 @@ from ..memory.base import MemMemoryService, Memory
 from ..model.base import BaseLLM
 from ..tool.base import Tool
 from .base import Agent, Planner
-from .runner import AgentRunner
 from .concurrent_runner import ConcurrentRunner
+from .runner import AgentRunner
 
 # Import new architecture types
 from .types import (

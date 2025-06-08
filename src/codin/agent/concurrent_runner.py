@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List
 
 from .runner import AgentRunner
 
@@ -12,10 +11,10 @@ class ConcurrentRunner:
     """Manage a group of :class:`AgentRunner` instances."""
 
     def __init__(self) -> None:
-        self._runners: List[AgentRunner] = []
+        self._runners: list[AgentRunner] = []
 
     @property
-    def runners(self) -> List[AgentRunner]:
+    def runners(self) -> list[AgentRunner]:
         """Return the managed runners."""
         return self._runners
 

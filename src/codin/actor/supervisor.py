@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
+else:  # pragma: no cover - runtime import for pydantic
+    from ..agent.base import Agent as Agent
 
 __all__ = [
     'ActorInfo',
@@ -35,6 +37,9 @@ class ActorInfo(BaseModel):
         """Pydantic config."""
         arbitrary_types_allowed = True
 
+
+# Ensure pydantic schema resolves forward references at import time
+ActorInfo.model_rebuild(_types_namespace={'Agent': Agent})
 
 class ActorSupervisor(ABC):
     """Abstract actor manager protocol from design document."""

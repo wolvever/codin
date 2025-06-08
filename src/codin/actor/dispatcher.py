@@ -5,21 +5,24 @@ to appropriate agents, managing agent lifecycles, and coordinating
 multi-agent workflows in the codin framework.
 """
 
+from __future__ import annotations
+
 import asyncio
 import typing as _t
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from ..agent.types import Message, Role, TextPart
-from .utils import make_message
 from pydantic import BaseModel, Field
 
+from ..agent.types import Message, Role, TextPart
 from .mailbox import Mailbox
 from .supervisor import ActorSupervisor
+from .utils import make_message
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
+    from ..agent.types import AgentRunInput
 
 __all__ = [
     'DispatchRequest',
@@ -182,8 +185,8 @@ class LocalDispatcher(Dispatcher):
             )
 
             # Start runners for all agents and run them concurrently
-            from ..agent.runner import AgentRunner
             from ..agent.concurrent_runner import ConcurrentRunner
+            from ..agent.runner import AgentRunner
 
             runner_group = ConcurrentRunner()
             for agent in agents:
@@ -228,8 +231,8 @@ class LocalDispatcher(Dispatcher):
 
     async def _run_agent(
         self,
-        agent: 'Agent',
-        run_input: 'AgentRunInput',
+        agent: Agent,
+        run_input: AgentRunInput,
         stream_queue: asyncio.Queue,
         result: DispatchResult,
     ) -> None:
@@ -250,8 +253,8 @@ class LocalDispatcher(Dispatcher):
 
     async def _run_agent_with_semaphore(
         self,
-        agent: 'Agent',
-        run_input: 'AgentRunInput',
+        agent: Agent,
+        run_input: AgentRunInput,
         stream_queue: asyncio.Queue,
         result: DispatchResult,
     ) -> None:

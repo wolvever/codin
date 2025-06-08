@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-import typing as _t
 
 from ..agent.types import Message, Role, TextPart
 

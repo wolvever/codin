@@ -8,7 +8,9 @@ import asyncio
 import typing as _t
 from contextlib import asynccontextmanager
 from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
+
 from codin.replay.base import ReplayService
 
 from ..agent.types import State
@@ -192,7 +194,7 @@ class SessionManager:
     @asynccontextmanager
     async def session(
         self, session_id: str, memory_system: MemoryService | None = None
-    ) -> _t.AsyncGenerator[Session, None]:
+    ) -> _t.AsyncGenerator[Session]:
         """Context manager to manage a session's lifecycle.
 
         Creates or retrieves the session and ensures it is closed when the

@@ -10,149 +10,88 @@ import tempfile
 import typing as _t
 import zipfile
 from pathlib import Path
+import os # For path manipulation
 
 from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
+from .common_exec import CommonCodeExecutionMixin # Added import
 
 __all__ = ['E2BSandbox']
 
 
-class E2BSandbox(Sandbox):
+class E2BSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
     """Adapter around E2B cloud sandbox SDK."""
 
     def __init__(self, *, env_policy: ShellEnvironmentPolicy | None = None, **kwargs):
         super().__init__(env_policy=env_policy)
         try:
-            from e2b import Sandbox as _E2B
+            from e2b import Sandbox as _E2B_SDK
         except ImportError as e:  # pragma: no cover
             raise RuntimeError('e2b package not available – install with `pip install e2b`.') from e
 
-        self._sandbox = _E2B(**kwargs)
+        self._sandbox = _E2B_SDK(**kwargs) # e2b.Sandbox instance
 
-    def _get_language_executor(self, language: str) -> list[str]:
-        """Get the command to execute code for a given language."""
-        language = language.lower()
-
-        if language in ('python', 'py'):
-            return ['python3']
-        if language in ('javascript', 'js', 'node'):
-            return ['node']
-        if language in ('bash', 'sh'):
-            return ['/bin/bash']
-        if language == 'go':
-            return ['go', 'run']
-        if language == 'rust':
-            return ['cargo', 'run', '--']
-        if language in ('java',):
-            return ['java']
-        if language in ('c', 'cpp', 'c++'):
-            raise NotImplementedError(f'Language {language} requires compilation - not yet supported')
-        raise ValueError(f'Unsupported language: {language}')
-
-    def _get_main_file_for_language(self, language: str, files: list[str]) -> str | None:
-        """Determine the main file to execute for a given language."""
-        language = language.lower()
-
-        # Common main file patterns by language
-        main_patterns = {
-            'python': ['main.py', 'app.py', '__main__.py', 'run.py'],
-            'javascript': ['main.js', 'index.js', 'app.js', 'server.js'],
-            'node': ['main.js', 'index.js', 'app.js', 'server.js'],
-            'go': ['main.go'],
-            'rust': ['main.rs', 'src/main.rs'],
-            'java': ['Main.java', 'App.java'],
-            'bash': ['main.sh', 'run.sh', 'start.sh'],
-        }
-
-        patterns = main_patterns.get(language, [])
-
-        # First, look for exact matches
-        for pattern in patterns:
-            if pattern in files:
-                return pattern
-
-        # Then look for files with the right extension
-        extensions = {
-            'python': ['.py'],
-            'javascript': ['.js'],
-            'node': ['.js'],
-            'go': ['.go'],
-            'rust': ['.rs'],
-            'java': ['.java'],
-            'bash': ['.sh'],
-        }
-
-        if language in extensions:
-            for file in files:
-                if any(file.endswith(ext) for ext in extensions[language]):
-                    return file
-
-        return None
-
-    async def _install_dependencies(self, dependencies: list[str], language: str) -> ExecResult:
-        """Install dependencies for the given language."""
-        if not dependencies:
-            return ExecResult('', '', 0)
-
-        language = language.lower()
-
-        if language in ('python', 'py'):
-            # Use pip to install Python dependencies
-            cmd = ['pip', 'install'] + dependencies
-        elif language in ('javascript', 'js', 'node'):
-            # Use npm to install Node.js dependencies
-            cmd = ['npm', 'install'] + dependencies
-        elif language == 'go':
-            # Use go get for Go dependencies
-            cmd = ['go', 'get'] + dependencies
-        elif language == 'rust':
-            # For Rust, dependencies should be in Cargo.toml
-            return ExecResult('', 'Rust dependencies should be specified in Cargo.toml', 1)
-        else:
-            return ExecResult('', f'Dependency installation not supported for {language}', 1)
-
-        return await self.run_cmd(cmd)
+    # _get_language_executor, _get_main_file_for_language, _install_dependencies
+    # are now inherited from CommonCodeExecutionMixin.
+    # The mixin's defaults (e.g. python3) align with E2B's typical environment.
 
     # Lifecycle ------------------------------------------------------------
     async def _up(self) -> None:
         """Set up the E2B sandbox."""
-        # E2B sandbox is created in __init__, so nothing to do
+        # E2B sandbox is typically started on instantiation or first command.
+        # If specific up command is needed, it would be here.
+        # For now, assuming it's managed by the E2B SDK lifecycle.
+        pass
 
     async def _down(self) -> None:
         """Clean up the E2B sandbox."""
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, self._sandbox.kill)
+        # E2B SDK's close() is the method to terminate/clean up the sandbox.
+        await loop.run_in_executor(None, self._sandbox.close)
+
 
     # Exec -----------------------------------------------------------------
     async def run_cmd(
         self,
         cmd: str | _t.Iterable[str],
         *,
-        cwd: str | None = None,
+        cwd: str | None = None, # E2B SDK expects absolute paths for cwd
         timeout: float | None = None,
         env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute a command in the E2B sandbox."""
         loop = asyncio.get_event_loop()
 
-        # E2B expects a single shell string
         cmd_str = cmd if isinstance(cmd, str) else ' '.join(shlex.quote(c) for c in cmd)
 
-        def _exec():
-            result = self._sandbox.commands.run(
-                cmd_str,
-                cwd=cwd,
-                envs=self._prepare_env(env),
-                timeout=timeout,
-            )
-            return ExecResult(result.stdout, result.stderr, result.exit_code)
+        # E2B's cwd defaults to /home/user. If providing, ensure it's absolute.
+        effective_cwd = cwd if cwd else "/home/user" # Default or specified cwd
 
-        return await loop.run_in_executor(None, _exec)
+        def _exec_sync():
+            # E2B SDK's process.start() and awaiting output.
+            proc = self._sandbox.process.start(
+                cmd_str,
+                cwd=effective_cwd,
+                env_vars=self._prepare_env(env), # from Sandbox base
+                timeout_s=timeout,
+            )
+            proc.wait() # Wait for the process to complete
+
+            stdout = "".join(proc.output.stdout_messages)
+            stderr = "".join(proc.output.stderr_messages)
+
+            return ExecResult(stdout, stderr, proc.exit_code if proc.exit_code is not None else -1)
+
+        try:
+            return await loop.run_in_executor(None, _exec_sync)
+        except Exception as e: # Catch exceptions from E2B SDK calls
+             return ExecResult(stdout="", stderr=f"E2B command execution failed: {e}", exit_code=127)
+
 
     async def run_code(
         self,
         code: str | None = None,
         *,
-        file_path: str | Path | None = None,
+        file_path: str | Path | None = None, # Local path to file/dir/zip
         language: str = 'python',
         dependencies: list[str] | None = None,
         timeout: float | None = None,
@@ -161,131 +100,180 @@ class E2BSandbox(Sandbox):
         """Execute code in the E2B sandbox."""
         if not code and not file_path:
             return ExecResult('', 'Either code or file_path must be provided', 1)
-
         if code and file_path:
             return ExecResult('', 'Cannot provide both code and file_path', 1)
 
-        # Install dependencies first if provided
+        # 1. Install dependencies using the inherited _install_dependencies
         if dependencies:
+            # This will call self.run_cmd, using E2B's execution. Cwd will be /home/user by default.
             dep_result = await self._install_dependencies(dependencies, language)
             if dep_result.exit_code != 0:
                 return ExecResult(
                     dep_result.stdout, f'Failed to install dependencies: {dep_result.stderr}', dep_result.exit_code
                 )
 
-        # Handle direct code execution
+        # 2. Handle direct code execution
         if code:
-            try:
-                executor = self._get_language_executor(language)
-                if language.lower() in ('python', 'py'):
-                    cmd = executor + ['-c', code]
-                elif language.lower() in ('bash', 'sh'):
-                    cmd = ['/bin/bash', '-c', code]
-                else:
-                    # For other languages, write to temp file in sandbox
-                    ext_map = {
-                        'javascript': '.js',
-                        'js': '.js',
-                        'node': '.js',
-                        'go': '.go',
-                        'rust': '.rs',
-                        'java': '.java',
-                    }
-                    ext = ext_map.get(language.lower(), '.txt')
-                    temp_filename = f'/tmp/code_{hash(code) % 10000}{ext}'
+            # _common_run_code_logic will use self.write_file to write to a path like /tmp/code_HASH.ext
+            # E2B's self.write_file handles absolute paths correctly.
+            return await self._common_run_code_logic(
+                code=code, file_path=None, language=language,
+                dependencies=None, # Already handled
+                timeout=timeout, env=env
+            )
 
-                    # Write code to file in sandbox
-                    await self.write_file(temp_filename, code)
-
-                    cmd = executor + [temp_filename]
-
-                return await self.run_cmd(cmd, timeout=timeout, env=env)
-
-            except (ValueError, NotImplementedError) as e:
-                return ExecResult('', str(e), 1)
-
-        # Handle file path execution
+        # 3. Handle file path execution (uploading local files/zips/dirs to E2B)
         if file_path:
-            file_path = Path(file_path)
+            local_source_path = Path(file_path) # Path on the system running this agent
+            if not local_source_path.is_absolute(): # Ensure path is absolute for clarity
+                 local_source_path = Path(os.getcwd()) / local_source_path
 
-            if not file_path.exists():
-                return ExecResult('', f'File not found: {file_path}', 1)
+            if not local_source_path.exists():
+                return ExecResult('', f'Local file/directory not found: {local_source_path}', 1)
 
-            # Upload file(s) to sandbox
-            if file_path.is_file():
-                if file_path.suffix == '.zip':
-                    # Extract zip file locally first, then upload
-                    with tempfile.TemporaryDirectory() as temp_dir:
-                        temp_path = Path(temp_dir)
-                        try:
-                            with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                                zip_ref.extractall(temp_path)
+            # Define a base directory in E2B for staging. /home/user is common.
+            # Create a unique subdirectory within /home/user for this execution.
+            remote_base_dir = "/home/user"
+            remote_staging_dir_name = f"codin_run_{os.urandom(4).hex()}"
+            # Full absolute path for the staging directory in E2B
+            e2b_staging_abs_path = str(Path(remote_base_dir) / remote_staging_dir_name)
 
-                            # Upload all extracted files
-                            for root, _dirs, _files in temp_path.rglob('*'):
-                                if root.is_file():
-                                    rel_path = root.relative_to(temp_path)
-                                    content = root.read_text(encoding='utf-8')
-                                    await self.write_file(str(rel_path), content)
+            # E2B's filesystem commands create parent directories if they don't exist.
+            # So, no explicit mkdir needed for e2b_staging_abs_path before writing files into it.
 
-                            # Find main file
-                            all_files = [str(p.relative_to(temp_path)) for p in temp_path.rglob('*') if p.is_file()]
-                            main_file = self._get_main_file_for_language(language, all_files)
-                            if not main_file:
-                                return ExecResult('', f'No main file found for language {language}', 1)
+            staged_files_relative_to_remote_dir: list[str] = []
 
-                            exec_path = main_file
-                        except zipfile.BadZipFile:
-                            return ExecResult('', f'Invalid zip file: {file_path}', 1)
-                else:
-                    # Upload single file
-                    content = file_path.read_text(encoding='utf-8')
-                    exec_path = file_path.name
-                    await self.write_file(exec_path, content)
-
-            elif file_path.is_dir():
-                # Upload entire directory
-                for file in file_path.rglob('*'):
-                    if file.is_file():
-                        rel_path = file.relative_to(file_path)
-                        content = file.read_text(encoding='utf-8')
-                        await self.write_file(str(rel_path), content)
-
-                # Find main file
-                all_files = [str(p.relative_to(file_path)) for p in file_path.rglob('*') if p.is_file()]
-                main_file = self._get_main_file_for_language(language, all_files)
-                if not main_file:
-                    return ExecResult('', f'No main file found for language {language}', 1)
-
-                exec_path = main_file
-
-            else:
-                return ExecResult('', f'Invalid file path: {file_path}', 1)
-
-            # Execute the file
             try:
-                executor = self._get_language_executor(language)
-                cmd = executor + [exec_path]
-                return await self.run_cmd(cmd, timeout=timeout, env=env)
-            except (ValueError, NotImplementedError) as e:
-                return ExecResult('', str(e), 1)
+                if local_source_path.is_file():
+                    if local_source_path.suffix == '.zip':
+                        with tempfile.TemporaryDirectory() as local_temp_extract_dir:
+                            local_extract_path = Path(local_temp_extract_dir)
+                            with zipfile.ZipFile(local_source_path, 'r') as zip_ref:
+                                zip_ref.extractall(local_extract_path)
+
+                            for item in local_extract_path.rglob('*'):
+                                if item.is_file():
+                                    relative_path_in_zip = item.relative_to(local_extract_path)
+                                    # E2B paths should be absolute or relative to /home/user
+                                    e2b_target_abs_path = Path(e2b_staging_abs_path) / relative_path_in_zip
+                                    await self.write_file(str(e2b_target_abs_path), item.read_text(encoding='utf-8'))
+                                    staged_files_relative_to_remote_dir.append(str(relative_path_in_zip))
+                    else: # Single file
+                        e2b_target_abs_path = Path(e2b_staging_abs_path) / local_source_path.name
+                        await self.write_file(str(e2b_target_abs_path), local_source_path.read_text(encoding='utf-8'))
+                        staged_files_relative_to_remote_dir.append(local_source_path.name)
+
+                elif local_source_path.is_dir():
+                    for item in local_source_path.rglob('*'):
+                        if item.is_file():
+                            relative_path_in_dir = item.relative_to(local_source_path)
+                            e2b_target_abs_path = Path(e2b_staging_abs_path) / relative_path_in_dir
+                            await self.write_file(str(e2b_target_abs_path), item.read_text(encoding='utf-8'))
+                            staged_files_relative_to_remote_dir.append(str(relative_path_in_dir))
+                else:
+                    return ExecResult('', f'Unsupported local path type: {local_source_path}', 1)
+
+                if not staged_files_relative_to_remote_dir:
+                     return ExecResult('', f'No files found to execute for path: {local_source_path}', 1)
+
+                main_file_in_remote_dir = self._get_main_file_for_language(language, staged_files_relative_to_remote_dir)
+                if not main_file_in_remote_dir:
+                    return ExecResult('', f'No main file found for lang {language} in uploaded content from {local_source_path.name}', 1)
+
+                # This is the absolute path to the main executable file within E2B.
+                final_exec_path_in_e2b = str(Path(e2b_staging_abs_path) / main_file_in_remote_dir)
+
+                # _common_run_code_logic will derive cwd from final_exec_path_in_e2b's parent.
+                # This derived cwd will be an absolute path in E2B.
+                return await self._common_run_code_logic(
+                    code=None,
+                    file_path=final_exec_path_in_e2b, # Absolute path in E2B
+                    language=language,
+                    dependencies=None, # Already handled
+                    timeout=timeout,
+                    env=env
+                )
+            except Exception as e: # Catch errors during file prep/upload
+                return ExecResult('', f"Error preparing/uploading files to E2B for execution: {e}", 1)
+
+        return ExecResult('', 'Internal error in E2B run_code dispatch', 1)
+
 
     # Filesystem -----------------------------------------------------------
     async def list_files(self, path: str = '.') -> list[str]:
-        """List files in the E2B sandbox."""
+        """List files in the E2B sandbox. Path is absolute or relative to /home/user."""
         loop = asyncio.get_event_loop()
+        # E2B SDK's list method path is typically relative to /home/user or an absolute path.
+        # If path is '.', it lists /home/user.
+        # For consistency, ensure path is treated as absolute or relative to a known root like /home/user.
+        # The mixin doesn't impose a structure, so this method adapts.
+        # If path starts with '/', assume absolute. Otherwise, relative to /home/user.
+        query_path = path
+        if not path.startswith('/'):
+            query_path = str(Path("/home/user") / path) # Default to /home/user if relative
 
-        def _list_files():
-            return [f.path for f in self._sandbox.files.list(path)]
+        def _list_files_sync():
+            try:
+                # E2B SDK returns FileInfo objects
+                return [fi.path for fi in self._sandbox.filesystem.list(query_path)]
+            except Exception as e: # Catch E2B specific errors if any
+                # print(f"E2B list_files error for path '{query_path}': {e}")
+                return [] # Return empty list on error, or re-raise
 
-        return await loop.run_in_executor(None, _list_files)
+        return await loop.run_in_executor(None, _list_files_sync)
 
     async def read_file(self, path: str) -> str:
-        """Read a file from the E2B sandbox."""
+        """Read a file from the E2B sandbox. Path is absolute or relative to /home/user."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, lambda: self._sandbox.files.read(path))
+
+        query_path = path
+        if not path.startswith('/'): # Assuming relative paths are to /home/user
+            query_path = str(Path("/home/user") / path)
+
+        async def _read_file_async_wrapper(): # E2B SDK's read is sync
+            try:
+                return self._sandbox.filesystem.read(query_path)
+            except Exception as e: # Catch E2B specific errors (e.g., file not found)
+                # Map to FileNotFoundError for consistency if possible
+                # This requires knowledge of E2B's specific exception types
+                raise FileNotFoundError(f"File not found or unreadable in E2B at '{query_path}': {e}") from e
+
+        try:
+            return await loop.run_in_executor(None, _read_file_async_wrapper)
+        except FileNotFoundError: # Re-raise to ensure it's from this async context
+            raise
+
 
     async def write_file(self, path: str, content: str) -> None:
-        """Write content to a file in the E2B sandbox."""
+        """Write content to a file in the E2B sandbox. Path is absolute or relative to /home/user."""
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: self._sandbox.files.write(path, content))
+
+        # E2B SDK's write takes an absolute path.
+        # If path for `_common_run_code_logic` (e.g. /tmp/code_...) is absolute, it's used as is.
+        # If it's relative, it needs to be based on a known E2B root.
+        # The mixin uses simple names like "temp_code_HASH.ext" which would be relative.
+        # We must ensure they are written to a sensible place, e.g. /tmp or /home/user.
+        # The mixin's _common_run_code_logic uses `temp_file_name = f"temp_code_{hash(code) % 10000}{ext}"`
+        # for temp scripts. This needs to be an absolute path for E2B.
+
+        effective_path = path
+        if not path.startswith('/'):
+            # If _common_run_code_logic passes "temp_code.js", make it "/tmp/temp_code.js"
+            if "temp_code_" in path and Path(path).parent == Path("."): # Heuristic for mixin's temp files
+                 effective_path = str(Path("/tmp") / path)
+            else: # Otherwise, assume relative to /home/user for general writes
+                 effective_path = str(Path("/home/user") / path)
+
+        async def _write_file_async_wrapper():
+            try:
+                # E2B SDK's write_bytes might be more robust if content can be binary
+                # For string content, `write` should be fine.
+                # It creates parent directories if they don't exist.
+                self._sandbox.filesystem.write(effective_path, content)
+            except Exception as e:
+                raise IOError(f"Failed to write file to E2B at '{effective_path}': {e}") from e
+
+        try:
+            await loop.run_in_executor(None, _write_file_async_wrapper)
+        except IOError: # Re-raise
+            raise

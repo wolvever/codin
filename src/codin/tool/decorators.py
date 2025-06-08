@@ -112,7 +112,8 @@ class ToolDecorator:
         if decorator_registry:
             decorator_registry.register_tool(tool_instance)
 
-        # Store the tool instance on the function for later access
+        # Store the created tool instance on the original function object.
+        # This allows users to access the tool instance directly from the decorated function if needed.
         func._tool = tool_instance
 
         return tool_instance

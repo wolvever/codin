@@ -6,7 +6,7 @@ execution, registry, and MCP (Model Context Protocol) integration.
 
 
 from .base import Tool, ToolContext, Toolset, ToolSpec  # type: ignore F401 – re-export
-from .core_tools import FetchTool
+# FetchTool import removed: from .core_tools import FetchTool
 from .decorators import ToolDecorator, tool
 from .executor import ToolExecutor
 from .generic import GenericTool, create_tool_from_function
@@ -21,7 +21,7 @@ from .mcp import (
     StdioServerParams,
 )
 from .registry import ToolEndpoint, ToolRegistry, ToolRegistryConfig
-from .sandbox import (
+from .sandbox_tools import ( # Changed from .sandbox to .sandbox_tools
     SandboxTool,
     SandboxToolset,
 )
@@ -42,7 +42,7 @@ __all__ = [
     "tool",
     "ToolDecorator",
     # Core tools
-    "FetchTool",
+    # "FetchTool", # FetchTool removed from __all__
     # Sandbox tools
     "SandboxTool",
     "SandboxToolset",

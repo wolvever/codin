@@ -245,6 +245,7 @@ class Toolset(LifecycleMixin):
             try:
                 await tool.down()
             except Exception:
+                # Attempt to bring down all tools in the toolset, even if some individual tool.down() calls fail.
                 pass  # Continue cleanup even if individual tools fail
 
 

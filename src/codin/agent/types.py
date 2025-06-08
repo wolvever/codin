@@ -138,13 +138,16 @@ class Message(BaseModel):
     messageId: str
     role: Role
     parts: list[Part | ToolUsePart] = Field(default_factory=list)
-    contextId: str
+    contextId: str | None = None
     kind: str = "message"
     metadata: dict[str, _t.Any] | None = None
     taskId: str | None = None
     referenceTaskIds: list[str] | None = None
     sender_id: str = ""
     recipient_ids: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
 
     def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
         self.parts.append(TextPart(text=text, metadata=metadata))

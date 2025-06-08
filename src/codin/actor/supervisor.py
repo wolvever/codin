@@ -41,6 +41,9 @@ class ActorInfo(BaseModel):
         arbitrary_types_allowed = True
 
 
+# Ensure pydantic schema resolves forward references at import time
+ActorInfo.model_rebuild(_types_namespace={'Agent': Agent})
+
 class ActorSupervisor(ABC):
     """Abstract actor manager protocol from design document."""
 

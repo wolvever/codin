@@ -32,13 +32,17 @@ class BaseModel(abc.ABC):
     model_type: ModelType
 
     def __init__(self, model: str):
-        """Initialize the model and prepare it for use.
+        """Initialize the model with its name.
+
+        Actual client initialization and I/O-bound setup should be deferred
+        to an asynchronous `prepare()` method in concrete subclasses. This
+        constructor should focus on light-weight, non-I/O configuration.
 
         Args:
-            model: The model name or identifier
+            model: The model name or identifier.
         """
         self.model = model
-        # Subclasses should perform their preparation steps here
+        # Subclasses typically define an async `prepare()` method for I/O-bound setup.
 
     @classmethod
     @abc.abstractmethod

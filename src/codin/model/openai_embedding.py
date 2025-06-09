@@ -7,10 +7,13 @@ for text vectorization and similarity search capabilities.
 import asyncio
 import logging
 import os
+import typing as _t # Ensure _t is imported if not already for ModelConfig hint
 
 from ..client import Client, ClientConfig, LoggingTracer
 from .base import BaseEmbedding
-from .registry import ModelRegistry
+from .config import ModelConfig
+from .registry import register # Changed
+from .http_utils import make_post_request, ContentExtractionError, ModelResponseParsingError, StreamProcessingError
 
 __all__ = [
     'OpenAIEmbedding',
@@ -19,7 +22,7 @@ __all__ = [
 logger = logging.getLogger('codin.model.openai_embedding')
 
 
-@ModelRegistry.register
+@register # Changed
 class OpenAIEmbedding(BaseEmbedding):
     """Implementation of BaseEmbedding for OpenAI API and compatible services.
 
@@ -28,17 +31,57 @@ class OpenAIEmbedding(BaseEmbedding):
         OPENAI_API_BASE: Base URL for the API (defaults to https://api.openai.com/v1)
     """
 
-    def __init__(self, model: str):
+    DEFAULT_BASE_URL = 'https://api.openai.com/v1'
+    DEFAULT_TIMEOUT = 30.0
+    # Note: OpenAIEmbedding often uses a specific model like 'text-embedding-ada-002'
+    # The `model` parameter in __init__ is usually provided directly.
+
+    async def __init__(self, model: str, config: _t.Optional[ModelConfig] = None): # Changed to async
+        """Initialize and prepare the OpenAI Embedding model.
+
+        Args:
+            model: The specific embedding model name (e.g., "text-embedding-ada-002").
+            config: Optional ModelConfig instance. If None, a default config is used,
+                    and settings are primarily sourced from environment variables.
+        """
         super().__init__(model)
+        self.config = config or ModelConfig()
 
-        self.api_key = os.environ.get('OPENAI_API_KEY')
-        self.api_base = os.environ.get('OPENAI_API_BASE', 'https://api.openai.com/v1')
+        # Client initialization logic moved from prepare()
+        # API Key: config > env (specific OPENAI_API_KEY)
+        api_key = self.config.api_key or os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            raise ValueError(
+                'API key not found. Set in ModelConfig or OPENAI_API_KEY environment variable.'
+            )
 
-        # Remove trailing slash if present
-        if self.api_base.endswith('/'):
-            self.api_base = self.api_base[:-1]
+        # Base URL: config > env (specific OPENAI_API_BASE) > default
+        base_url = self.config.base_url or \
+                   os.getenv('OPENAI_API_BASE') or \
+                   self.DEFAULT_BASE_URL
+        if base_url.endswith('/'): # Ensure no trailing slash
+            base_url = base_url[:-1]
 
-        self._client: Client | None = None
+        client_kwargs = self.config.get_client_config_kwargs()
+        client_kwargs.setdefault('timeout', self.DEFAULT_TIMEOUT)
+        client_kwargs['default_headers'] = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+        }
+        client_kwargs['base_url'] = base_url
+
+        if logger.isEnabledFor(logging.DEBUG) and 'tracers' not in client_kwargs:
+            client_kwargs['tracers'] = [LoggingTracer()]
+        elif 'tracers' not in client_kwargs:
+             client_kwargs['tracers'] = []
+
+        client_config_obj = ClientConfig(**client_kwargs)
+        self._client = Client(client_config_obj)
+        # await self._client.prepare() # Removed, Client.__init__ now handles full setup
+
+        logger.info(f'OpenAI Embedding client initialized and prepared for model {self.model} at {base_url}')
+
+    # prepare() method is now removed
 
     @classmethod
     def supported_models(cls) -> list[str]:
@@ -48,36 +91,10 @@ class OpenAIEmbedding(BaseEmbedding):
             r'text-embedding-ada-.*',
         ]
 
-    async def prepare(self) -> None:
-        """Prepare the OpenAI embedding client."""  
-        if not self.api_key:
-            raise ValueError('OPENAI_API_KEY environment variable not set')
-
-        if self._client is None:
-            # Configure the HTTP client
-            config = ClientConfig(
-                base_url=self.api_base,
-                default_headers={
-                    'Authorization': f'Bearer {self.api_key}',
-                    'Content-Type': 'application/json',
-                },
-                timeout=30.0,
-                # Add tracing in debug mode
-                tracers=[LoggingTracer()] if logger.isEnabledFor(logging.DEBUG) else [],
-            )
-            self._client = Client(config)
-            await self._client.prepare()
-
-    async def _ensure_client(self) -> Client:
-        """Ensure the HTTP client is prepared and return it."""
-        await self.prepare()
-        if not self._client:
-            raise RuntimeError('Failed to initialize OpenAI embedding client')
-        return self._client
-
     async def embed(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings for a list of texts."""
-        client = await self._ensure_client()
+        if not self._client: # Should not happen if __init__ completes successfully
+            raise RuntimeError('OpenAI Embedding client not initialized. This should not happen after async __init__.')
 
         # Prepare request payload
         payload = {
@@ -85,17 +102,54 @@ class OpenAIEmbedding(BaseEmbedding):
             'input': texts,
         }
 
-        # Send request
-        response = await client.post('/embeddings', json=payload)
-        response.raise_for_status()
+        try:
+            response = await make_post_request(
+                self._client,
+                '/embeddings',
+                payload,
+                error_message_prefix=f"OpenAI Embedding API request for model {self.model} failed"
+            )
+            response_data = response.json()
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON response from OpenAI Embedding for model {self.model}: {e}. Response text: {response.text}")
+            raise ModelResponseParsingError(f"Failed to decode JSON response for model {self.model}: {e}") from e
+        except Exception as e: # Catch other errors from make_post_request (like HTTPStatusError)
+            logger.error(f"OpenAI Embedding request for model {self.model} failed: {e}")
+            # Re-raise directly as make_post_request already logs and handles retries/status errors
+            raise
 
-        data = response.json()
+        try:
+            embedding_data = response_data.get('data')
+            if not isinstance(embedding_data, list):
+                logger.error(f"OpenAI Embedding response for model {self.model} missing 'data' list or not a list.")
+                logger.debug(f"Problematic embedding data for model {self.model}: {response_data}")
+                raise ModelResponseParsingError(f"Invalid response format from model {self.model}: 'data' field missing or not a list.")
 
-        # Sort by index to ensure embeddings are returned in the same order as input
-        sorted_data = sorted(data['data'], key=lambda x: x['index'])
-        embeddings = [item['embedding'] for item in sorted_data]
+            # Sort by index to ensure embeddings are returned in the same order as input
+            # Use .get('embedding') for safer access, though it should ideally be present.
+            embeddings = []
+            for item in sorted(embedding_data, key=lambda x: x.get('index', -1)):
+                if isinstance(item, dict) and 'embedding' in item:
+                    embeddings.append(item['embedding'])
+                else:
+                    logger.warning(f"Skipping item in embedding response for model {self.model} due to missing 'embedding' key or wrong type: {item}")
 
-        return embeddings
+            if len(embeddings) != len(texts):
+                logger.warning(
+                    f"Number of embeddings received ({len(embeddings)}) from model {self.model} "
+                    f"does not match number of input texts ({len(texts)})."
+                )
+
+            return embeddings
+        except (KeyError, TypeError, IndexError) as e_parse: # More specific parsing errors
+            logger.error(f"OpenAI Embedding response parsing error for model {self.model}: {type(e_parse).__name__} - {e_parse}.")
+            logger.debug(f"Problematic data for model {self.model}: {response_data}")
+            raise ModelResponseParsingError(f"Invalid response format from model {self.model}, parsing error: {e_parse}") from e_parse
+        except Exception as e_other: # Catch any other unexpected error during processing
+            logger.error(f"Unexpected error processing OpenAI Embedding response for model {self.model}: {e_other}.", exc_info=True)
+            logger.debug(f"Problematic data for model {self.model}: {response_data}")
+            raise ContentExtractionError(f"Unexpected error processing embeddings for model {self.model}: {e_other}") from e_other
+
 
     async def close(self):
         """Close the client."""
@@ -106,4 +160,4 @@ class OpenAIEmbedding(BaseEmbedding):
     def __del__(self):
         """Ensure client is closed on garbage collection."""
         if self._client:
-            asyncio.create_task(self.close())
+            logger.warning('OpenAIEmbedding was deleted without calling close(). This may leak resources.')

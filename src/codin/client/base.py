@@ -95,39 +95,41 @@ class Client:
             config: Configuration for the client
         """
         self.config = config or ClientConfig()
-        self._client: httpx.AsyncClient | None = None
         self.run_mode = self.config.run_mode
 
         # Configure logging
         logger.setLevel(self.config.log_level)
 
+        # Client initialization moved from prepare() to __init__()
+        headers = dict(self.config.default_headers)
+        if self.config.auth_header and self.config.auth_token:
+            headers[self.config.auth_header] = f'Bearer {self.config.auth_token}'
+
+        self._client: httpx.AsyncClient = httpx.AsyncClient( # Initialize directly
+            base_url=self.config.base_url,
+            timeout=httpx.Timeout(
+                timeout=self.config.timeout,
+                connect=self.config.connect_timeout,
+            ),
+            headers=headers,
+            follow_redirects=True,
+        )
+        # No await self._client.prepare() here, as httpx.AsyncClient doesn't have it.
+        # If it did, __init__ would need to be async.
+
     async def __aenter__(self) -> 'Client':
         """Set up the client for use in an async context manager."""
-        await self.prepare()
+        # await self.prepare() # Removed, client is initialized in __init__
+        # If self._client.prepare() was a thing for httpx.AsyncClient, it would be awaited in __init__
+        # or here if __init__ was to remain sync and prepare() was still separate for async parts.
+        # For now, assuming httpx.AsyncClient is ready after sync instantiation.
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Clean up resources when exiting the async context manager."""
         await self.close()
 
-    async def prepare(self) -> None:
-        """Initialize the HTTP client if not already done."""
-        if self._client is None:
-            headers = dict(self.config.default_headers)
-
-            # Add authentication if provided
-            if self.config.auth_header and self.config.auth_token:
-                headers[self.config.auth_header] = f'Bearer {self.config.auth_token}'
-
-            self._client = httpx.AsyncClient(
-                base_url=self.config.base_url,
-                timeout=httpx.Timeout(
-                    timeout=self.config.timeout,
-                    connect=self.config.connect_timeout,
-                ),
-                headers=headers,
-                follow_redirects=True,
-            )
+    # prepare() method is now removed.
 
     async def close(self) -> None:
         """Close the HTTP client and release resources."""
@@ -229,7 +231,10 @@ class Client:
         Raises:
             httpx.RequestError: If the request fails after retries
         """
-        await self.prepare()
+        # await self.prepare() # Removed, client is initialized in __init__
+
+        if self._client is None: # Should ideally not happen if __init__ succeeded
+            raise RuntimeError("HTTP client is not initialized. This should not occur.")
 
         retry_decorator = self._create_retry_decorator()
 

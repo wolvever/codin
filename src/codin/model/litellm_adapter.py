@@ -19,7 +19,8 @@ except ImportError:
     _HAS_LITELLM = False
 
 from .base import BaseLLM
-from .registry import ModelRegistry
+from .config import ModelConfig
+from .registry import register # Changed
 
 __all__ = [
     'LiteLLMAdapter',
@@ -28,7 +29,7 @@ __all__ = [
 logger = logging.getLogger('codin.model.litellm_adapter')
 
 
-@ModelRegistry.register
+@register # Changed
 class LiteLLMAdapter(BaseLLM):
     """Adapter for LiteLLM which supports numerous LLM providers.
 
@@ -39,9 +40,18 @@ class LiteLLMAdapter(BaseLLM):
         LITELLM_CACHE: Whether to enable LiteLLM caching (true/false)
     """
 
-    def __init__(self, model: str):
-        super().__init__(model)
+    def __init__(self, model: str, config: _t.Optional[ModelConfig] = None):
+        """Initialize the LiteLLM Adapter.
 
+        Args:
+            model: The model string that LiteLLM will use (e.g., "gpt-3.5-turbo", "claude-2", "gemini/gemini-pro").
+                   This often includes the provider prefix if not using a globally set model.
+            config: Optional ModelConfig instance. LiteLLM primarily uses environment variables
+                    for provider-specific API keys and base URLs. However, common parameters like
+                    timeout or max_retries from the config might be applicable to litellm.completion calls.
+        """
+        super().__init__(model)
+        self.config = config or ModelConfig()
         self._prepared = False
 
         # Check if litellm is installed
@@ -114,21 +124,53 @@ class LiteLLMAdapter(BaseLLM):
         # Execute in a thread to avoid blocking
         loop = asyncio.get_event_loop()
 
+        # Populate from ModelConfig if available and applicable to litellm.completion
+        client_settings = self.config.get_client_config_kwargs()
+        if client_settings.get('timeout') is not None: # Check if timeout is set in config
+            completion_kwargs['request_timeout'] = client_settings['timeout'] # LiteLLM uses request_timeout
+        if client_settings.get('max_retries') is not None: # Check if max_retries is set
+            completion_kwargs['num_retries'] = client_settings['max_retries'] # LiteLLM uses num_retries
+
+        # Allow overriding api_key and base_url from config if provided
+        # LiteLLM gives precedence to kwargs over environment variables
+        if self.config.api_key:
+            completion_kwargs['api_key'] = self.config.api_key
+        if self.config.base_url:
+            completion_kwargs['base_url'] = self.config.base_url
+        # We don't need to pass 'api_version' as LiteLLM handles this based on model string or other env vars.
+
+        logger.debug(
+            f"Calling litellm.completion for model '{self.model}' (stream={stream}). "
+            f"Options: {{k:v for k,v in completion_kwargs.items() if k not in ['messages', 'model', 'stream']}}"
+        )
+
         if not stream:
             # Non-streaming response
-            completion = await loop.run_in_executor(None, lambda: litellm.completion(**completion_kwargs))
-            return completion.choices[0].message.content or ''
-        # Streaming response - we'll use an async generator
-        async def stream_generator() -> _t.AsyncIterator[str]:
-            # Start the stream in a separate thread
-            stream_response = await loop.run_in_executor(None, lambda: litellm.completion(**completion_kwargs))
+            try:
+                completion = await loop.run_in_executor(None, lambda: litellm.completion(**completion_kwargs))
+                logger.debug(f"LiteLLM non-streaming response received for model '{self.model}'.")
+                # Ensure choice and message exist before accessing content
+                if completion.choices and completion.choices[0].message:
+                    return completion.choices[0].message.content or ''
+                logger.warning(f"LiteLLM response for model '{self.model}' had no choices or message content.")
+                return '' # Return empty string if no valid content
+            except Exception as e:
+                logger.error(f"LiteLLM non-streaming completion for model '{self.model}' failed: {e}")
+                raise # Re-raise the exception to allow higher-level handling
 
-            # Iterate through chunks
-            for chunk in stream_response:
-                if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
-                    content = chunk.choices[0].delta.content
-                    if content:
-                        yield content
+        # Streaming response
+        async def stream_generator() -> _t.AsyncIterator[str]:
+            try:
+                stream_response = await loop.run_in_executor(None, lambda: litellm.completion(**completion_kwargs))
+                logger.debug(f"LiteLLM streaming response initiated for model '{self.model}'.")
+                for chunk in stream_response:
+                    if (hasattr(chunk.choices[0], 'delta') and
+                        hasattr(chunk.choices[0].delta, 'content') and
+                        chunk.choices[0].delta.content is not None): # Ensure content is not None
+                        yield chunk.choices[0].delta.content
+            except Exception as e:
+                logger.error(f"LiteLLM streaming completion for model '{self.model}' failed: {e}")
+                raise # Re-raise the exception
 
         return stream_generator()
 
@@ -161,40 +203,88 @@ class LiteLLMAdapter(BaseLLM):
         # Execute in a thread to avoid blocking
         loop = asyncio.get_event_loop()
 
+        # Populate from ModelConfig if available
+        client_settings = self.config.get_client_config_kwargs()
+        if client_settings.get('timeout') is not None:
+            completion_kwargs['request_timeout'] = client_settings['timeout']
+        if client_settings.get('max_retries') is not None:
+            completion_kwargs['num_retries'] = client_settings['max_retries']
+        if self.config.api_key:
+            completion_kwargs['api_key'] = self.config.api_key
+        if self.config.base_url:
+            completion_kwargs['base_url'] = self.config.base_url
+
+        logger.debug(
+            f"Calling litellm.completion_with_tools for model '{self.model}' (stream={stream}). "
+            f"Options: {{k:v for k,v in completion_kwargs.items() if k not in ['messages', 'tools', 'model', 'stream']}}"
+        )
+
         if not stream:
             # Non-streaming response
-            completion = await loop.run_in_executor(None, lambda: litellm.completion(**completion_kwargs))
+            try:
+                completion = await loop.run_in_executor(None, lambda: litellm.completion(**completion_kwargs))
+                logger.debug(f"LiteLLM non-streaming tool response received for model '{self.model}'.")
 
-            message = completion.choices[0].message
-            result = {}
+                result = {}
+                if completion.choices and completion.choices[0].message:
+                    message = completion.choices[0].message
+                    if message.content:
+                        result['content'] = message.content
 
-            if message.content:
-                result['content'] = message.content
+                    # LiteLLM tool_calls are objects, convert to dict if necessary for consistency
+                    if hasattr(message, 'tool_calls') and message.tool_calls:
+                        raw_tool_calls = message.tool_calls
+                        # Ensure tool_calls are in the expected list-of-dicts format
+                        result['tool_calls'] = [
+                            {'id': tc.id, 'type': tc.type,
+                             'function': {'name': tc.function.name, 'arguments': tc.function.arguments}}
+                            for tc in raw_tool_calls if tc.id and tc.function and tc.function.name and tc.function.arguments is not None
+                        ]
+                else:
+                    logger.warning(f"LiteLLM tool response for model '{self.model}' had no choices or message.")
 
-            if hasattr(message, 'tool_calls') and message.tool_calls:
-                result['tool_calls'] = message.tool_calls
+                return result
+            except Exception as e:
+                logger.error(f"LiteLLM non-streaming tool completion for model '{self.model}' failed: {e}")
+                raise
 
-            return result
         # Streaming response with tools
         async def stream_tool_results() -> _t.AsyncIterator[dict]:
-            # Use litellm's implementation of streaming
-            stream_response = await loop.run_in_executor(None, lambda: litellm.completion(**completion_kwargs))
+            try:
+                stream_response = await loop.run_in_executor(None, lambda: litellm.completion(**completion_kwargs))
+                logger.debug(f"LiteLLM streaming tool response initiated for model '{self.model}'.")
+                for chunk in stream_response:
+                    if not (chunk.choices and chunk.choices[0]):
+                        continue # Skip empty choices
 
-            for chunk in stream_response:
-                # Handle content chunks
-                if (
-                    hasattr(chunk.choices[0], 'delta')
-                    and hasattr(chunk.choices[0].delta, 'content')
-                    and chunk.choices[0].delta.content
-                ):
-                    yield {'content': chunk.choices[0].delta.content}
+                    delta = chunk.choices[0].delta
+                    if not delta:
+                        continue
 
-                # Handle tool call chunks
-                if (
-                    hasattr(chunk.choices[0], 'delta')
-                    and hasattr(chunk.choices[0].delta, 'tool_calls')
-                    and chunk.choices[0].delta.tool_calls
-                ):
-                    yield {'tool_calls': chunk.choices[0].delta.tool_calls}
+                    # Handle content chunks
+                    if hasattr(delta, 'content') and delta.content is not None:
+                        yield {'content': delta.content}
+
+                    # Handle tool call chunks
+                    if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                        # Assuming delta.tool_calls is a list of tool call delta objects.
+                        # Each object might have index, id, type, function (name, arguments).
+                        # Convert to a consistent dict structure.
+                        formatted_tool_calls = []
+                        for tc_delta in delta.tool_calls:
+                            if tc_delta and tc_delta.function: # Ensure function part exists
+                                formatted_tool_calls.append({
+                                    'id': tc_delta.id, # ID might be None in deltas until full
+                                    'type': tc_delta.type or 'function', # type might be None
+                                    'function': {
+                                        'name': tc_delta.function.name,
+                                        'arguments': tc_delta.function.arguments
+                                    }
+                                })
+                        if formatted_tool_calls:
+                             yield {'tool_calls': formatted_tool_calls}
+            except Exception as e:
+                logger.error(f"LiteLLM streaming tool completion for model '{self.model}' failed: {e}")
+                raise
 
         return stream_tool_results()

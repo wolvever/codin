@@ -38,14 +38,8 @@ __all__ = [
     "load_config",
 ]
 
-
-class ModelConfig(BaseModel):
-    """Configuration for a model provider."""
-
-    name: str
-    base_url: str
-    env_key: str
-    models: list[str] = Field(default_factory=list)
+# Import the canonical ModelConfig from src.codin.model.config
+from src.codin.model.config import ModelConfig
 
 
 class HistoryConfig(BaseModel):
@@ -95,7 +89,7 @@ class CodinConfig(BaseModel):
     prevent_duplicate_tools: bool = False  # Prevent duplicate tool calls in same turn
 
     # Model configurations
-    model_configs: dict[str, ModelConfig] = Field(default_factory=dict)
+    model_configs: dict[str, ModelConfig] = Field(default_factory=dict) # Use direct ModelConfig
 
     # Agent configurations
     agent_configs: dict[str, AgentConfig] = Field(default_factory=dict)
@@ -110,76 +104,45 @@ class CodinConfig(BaseModel):
     agents_files: list[str] = Field(default_factory=list)
 
 
-def get_default_model_configs() -> dict[str, ModelConfig]:
-    """Get default model configurations matching codex."""
-    return {
-        "openai": ModelConfig(
-            name="OpenAI",
-            base_url="https://api.openai.com/v1",
-            env_key="OPENAI_API_KEY",
-            models=["gpt-4o", "gpt-4o-mini", "gpt-4", "gpt-3.5-turbo"],
-        ),
-        "azure": ModelConfig(
-            name="Azure OpenAI",
-            base_url="https://YOUR_PROJECT_NAME.openai.azure.com/openai",
-            env_key="AZURE_OPENAI_API_KEY",
-            models=["gpt-4", "gpt-35-turbo"],
-        ),
-        "openrouter": ModelConfig(
-            name="OpenRouter",
-            base_url="https://openrouter.ai/api/v1",
-            env_key="OPENROUTER_API_KEY",
-            models=["anthropic/claude-3.5-sonnet", "openai/gpt-4o"],
-        ),
-        "gemini": ModelConfig(
-            name="Gemini",
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai",
-            env_key="GEMINI_API_KEY",
-            models=["gemini-1.5-pro", "gemini-1.5-flash"],
-        ),
-        "ollama": ModelConfig(
-            name="Ollama",
-            base_url="http://localhost:11434/v1",
-            env_key="OLLAMA_API_KEY",
-            models=["llama2", "codellama", "mistral"],
-        ),
-        "mistral": ModelConfig(
-            name="Mistral",
-            base_url="https://api.mistral.ai/v1",
-            env_key="MISTRAL_API_KEY",
-            models=["mistral-large", "mistral-medium", "mistral-small"],
-        ),
-        "deepseek": ModelConfig(
-            name="DeepSeek",
-            base_url="https://api.deepseek.com",
-            env_key="DEEPSEEK_API_KEY",
-            models=["deepseek-coder", "deepseek-chat"],
-        ),
-        "xai": ModelConfig(
-            name="xAI",
-            base_url="https://api.x.ai/v1",
-            env_key="XAI_API_KEY",
-            models=["grok-1", "grok-beta"],
-        ),
-        "groq": ModelConfig(
-            name="Groq",
-            base_url="https://api.groq.com/openai/v1",
-            env_key="GROQ_API_KEY",
-            models=["llama2-70b-4096", "mixtral-8x7b-32768"],
-        ),
-        "arceeai": ModelConfig(
-            name="ArceeAI",
-            base_url="https://conductor.arcee.ai/v1",
-            env_key="ARCEEAI_API_KEY",
-            models=["arcee-agent", "arcee-nova"],
-        ),
-        "anthropic": ModelConfig(
-            name="Anthropic",
-            base_url="https://api.anthropic.com",
-            env_key="ANTHROPIC_API_KEY",
-            models=["claude-3.5-sonnet", "claude-3-opus", "claude-3-haiku"],
-        ),
+def get_default_model_configs() -> dict[str, ModelConfig]: # Use direct ModelConfig
+    """Get default model configurations using the new ModelConfig."""
+    # Old structure: provider_key: {name, base_url, env_key, models_list}
+    # New structure for ModelConfig: model_name, api_key, base_url, api_version, provider, timeouts, retries
+
+    old_defaults = {
+        "openai": {"name": "OpenAI", "base_url": "https://api.openai.com/v1", "env_key": "OPENAI_API_KEY", "models": ["gpt-4o-mini", "gpt-4o", "gpt-4", "gpt-3.5-turbo"]},
+        "azure": {"name": "Azure OpenAI", "base_url": "https://YOUR_PROJECT_NAME.openai.azure.com/openai", "env_key": "AZURE_OPENAI_API_KEY", "models": ["gpt-4", "gpt-35-turbo"]},
+        "openrouter": {"name": "OpenRouter", "base_url": "https://openrouter.ai/api/v1", "env_key": "OPENROUTER_API_KEY", "models": ["anthropic/claude-3.5-sonnet", "openai/gpt-4o"]},
+        "gemini": {"name": "Gemini", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "env_key": "GEMINI_API_KEY", "models": ["gemini-1.5-pro", "gemini-1.5-flash"]},
+        "ollama": {"name": "Ollama", "base_url": "http://localhost:11434/v1", "env_key": "OLLAMA_API_KEY", "models": ["llama2", "codellama", "mistral"]}, # Ollama API key is optional
+        "mistral": {"name": "Mistral", "base_url": "https://api.mistral.ai/v1", "env_key": "MISTRAL_API_KEY", "models": ["mistral-large", "mistral-medium", "mistral-small"]},
+        "deepseek": {"name": "DeepSeek", "base_url": "https://api.deepseek.com", "env_key": "DEEPSEEK_API_KEY", "models": ["deepseek-coder", "deepseek-chat"]},
+        "xai": {"name": "xAI", "base_url": "https://api.x.ai/v1", "env_key": "XAI_API_KEY", "models": ["grok-1", "grok-beta"]},
+        "groq": {"name": "Groq", "base_url": "https://api.groq.com/openai/v1", "env_key": "GROQ_API_KEY", "models": ["llama2-70b-4096", "mixtral-8x7b-32768"]},
+        "arceeai": {"name": "ArceeAI", "base_url": "https://conductor.arcee.ai/v1", "env_key": "ARCEEAI_API_KEY", "models": ["arcee-agent", "arcee-nova"]},
+        "anthropic": {"name": "Anthropic", "base_url": "https://api.anthropic.com", "env_key": "ANTHROPIC_API_KEY", "models": ["claude-3.5-sonnet", "claude-3-opus", "claude-3-haiku"]},
     }
+
+    new_defaults: dict[str, ModelConfig] = {} # Use direct ModelConfig
+    for provider_key, details in old_defaults.items():
+        api_key_val = os.environ.get(details["env_key"])
+        # For Ollama, API key is often not required or might be a model name itself.
+        # ModelConfig treats api_key as Optional[str].
+        if provider_key == "ollama" and not api_key_val:
+            api_key_val = None # Explicitly set to None if empty for Ollama, or based on specific logic
+
+        new_defaults[provider_key] = ModelConfig( # Use direct ModelConfig
+            provider=provider_key, # Store the provider key
+            model_name=details["models"][0] if details["models"] else None, # Default to first model or None
+            api_key=api_key_val,
+            base_url=details["base_url"],
+            # api_version, timeouts, retries will use defaults from ModelClientConfig definition
+        )
+        # Special case for Anthropic default api_version
+        if provider_key == "anthropic":
+            new_defaults[provider_key].api_version = "2023-06-01" # A common default for Anthropic
+
+    return new_defaults
 
 
 def load_config_file(config_path: Path) -> dict[str, _t.Any]:
@@ -366,14 +329,34 @@ def load_config(config_file: Path | str | None = None) -> CodinConfig:
                 configs = {}
                 for cfg_name, cfg_data in value.items():
                     if isinstance(cfg_data, dict):
-                        configs[cfg_name] = ModelConfig(
-                            name=cfg_data.get("name", cfg_name),
-                            base_url=cfg_data.get("base_url", ""),
-                            env_key=cfg_data.get("env_key", ""),
-                            models=cfg_data.get("models", []),
+                        # Get API key from environment variable specified by env_key
+                        env_key = cfg_data.get("env_key", "")
+                        api_key_from_env = os.environ.get(env_key) if env_key else None
+
+                        # Get the list of models, default to empty list if not present
+                        models_list = cfg_data.get("models", [])
+                        default_model_name = models_list[0] if models_list else None
+
+                        configs[cfg_name] = ModelConfig( # Use direct ModelConfig
+                            provider=cfg_name, # Use the key from the config dict as provider
+                            model_name=cfg_data.get("model_name", default_model_name), # Allow direct model_name in config
+                            api_key=cfg_data.get("api_key", api_key_from_env), # Prioritize direct api_key from config
+                            base_url=cfg_data.get("base_url"),
+                            api_version=cfg_data.get("api_version"),
+                            timeout=cfg_data.get("timeout"),
+                            connect_timeout=cfg_data.get("connect_timeout"),
+                            max_retries=cfg_data.get("max_retries"),
+                            retry_min_wait=cfg_data.get("retry_min_wait"),
+                            retry_max_wait=cfg_data.get("retry_max_wait"),
+                            retry_on_status_codes=cfg_data.get("retry_on_status_codes")
+                            # Note: The old 'name' field (e.g., "OpenAI") from cfg_data is not directly mapped
+                            # as provider key 'cfg_name' now serves this role.
+                            # The 'models' list from old config is used for default_model_name.
                         )
-                    else:
+                    elif isinstance(cfg_data, ModelConfig): # If already a ModelConfig (e.g. from defaults)
                         configs[cfg_name] = cfg_data
+                    # Else, if it's some other type, it might be an error or ignored depending on strictness.
+                    # For now, we only convert dicts or accept existing ModelConfig instances.
                 setattr(config, key, configs)
             elif key == "agent_configs" and isinstance(value, dict):
                 # Convert agent_configs dict to AgentConfig objects
@@ -461,4 +444,5 @@ def get_api_key(provider: str | None = None) -> str | None:
     if not provider_config:
         return None
 
-    return os.environ.get(provider_config.env_key)
+    # ModelClientConfig now directly stores the resolved api_key
+    return provider_config.api_key

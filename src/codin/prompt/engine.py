@@ -140,17 +140,12 @@ class PromptEngine:
             if not self.llm:
                 from ..model.factory import create_llm_from_env
 
-                self.llm = create_llm_from_env()
+                self.llm = await create_llm_from_env() # create_llm_from_env is now async
 
-            # Prepare LLM if needed
-            if hasattr(self.llm, "prepare"):
-                # Check if LLM has _prepared attribute to track preparation state
-                if hasattr(self.llm, "_prepared"):
-                    if not self.llm._prepared:
-                        await self.llm.prepare()
-                else:
-                    # LLM doesn't track preparation state, so always prepare
-                    await self.llm.prepare()
+            # LLM client is prepared in its async __init__. No separate prepare() call needed.
+            # capabilities = self._detect_capabilities(self.llm) # self.llm must be non-None here
+            if not self.llm: # Should be caught by earlier logic or raise specific error
+                 raise RuntimeError("LLM could not be initialized in PromptEngine.")
 
             # Detect capabilities and merge with conditions
             capabilities = self._detect_capabilities(self.llm)

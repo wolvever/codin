@@ -4,72 +4,87 @@ from __future__ import annotations
 
 import asyncio
 import json
-import typing as _t
+from typing import Any
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .base import ReplayService
+from .base import BaseReplay
 
 
 @dataclass
 class _Writer:
-    queue: asyncio.Queue[str]
+    queue: asyncio.Queue[str | None]
     task: asyncio.Task
-    file: _t.TextIO
+    file: Any  # Actually TextIO, but Any for simplicity with open modes
 
 
-class FileReplayService(ReplayService):
-    """Replay service that persists logs to JSONL files on disk."""
+class FileReplay(BaseReplay):
+    """Replay service that persists logs to JSONL files on disk for a single session."""
 
-    def __init__(self, base_dir: Path | None = None) -> None:
-        super().__init__()
+    def __init__(self, session_id: str, base_dir: Path | None = None) -> None:
+        self.session_id = session_id
         self._base_dir = Path(base_dir or Path.home() / ".codin") / "sessions"
         self._base_dir.mkdir(parents=True, exist_ok=True)
-        self._writers: dict[str, _Writer] = {}
+        self._writer: _Writer | None = None
 
-    async def record_step(self, session_id: str, step: _t.Any, result: _t.Any) -> None:
-        await super().record_step(session_id, step, result)
-        entry = self._replay_logs[session_id][-1]
-        writer = await self._ensure_writer(session_id)
+    async def record_message_exchange(
+        self, client_message: Any, agent_message: Any, **kwargs: Any
+    ) -> None:
+        """Records a client message and the corresponding agent message."""
+        writer = await self._ensure_writer()
+        exchange_type = kwargs.pop('exchange_type', 'message_exchange')
+        entry: dict[str, Any] = {
+            "type": exchange_type,
+            "timestamp": datetime.now().isoformat(),
+            "session_id": self.session_id,
+            "client_message": self._serialize_message(client_message),
+            "agent_message": self._serialize_message(agent_message),
+        }
+        if kwargs: # Add any remaining kwargs to the entry
+            entry.update(kwargs)
         await writer.queue.put(json.dumps(entry))
 
     async def cleanup(self) -> None:
-        """Flush and close all session writers."""
-        for writer in self._writers.values():
-            await writer.queue.put(None)  # type: ignore[arg-type]
-            await writer.task
-        self._writers.clear()
+        """Flush and close the session writer."""
+        if self._writer:
+            await self._writer.queue.put(None)
+            await self._writer.task
+            self._writer = None
 
-    async def _ensure_writer(self, session_id: str) -> _Writer:
-        if session_id in self._writers:
-            return self._writers[session_id]
+    async def _ensure_writer(self) -> _Writer:
+        if self._writer is not None:
+            return self._writer
 
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-        filename = f"replay-{timestamp}-{session_id}.jsonl"
+        # Corrected filename to include session_id and current timestamp for uniqueness
+        filename = f"replay-{self.session_id}-{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.jsonl"
         path = self._base_dir / filename
-        file = open(path, "a", encoding="utf-8")
-        queue: asyncio.Queue[str] = asyncio.Queue(maxsize=256)
+
+        # Using Any for file type hint due to open returning _io.TextIOWrapper
+        file_handle: Any = open(path, "a", encoding="utf-8")
+        queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=256)
 
         async def writer_loop() -> None:
             while True:
-                line = await queue.get()
-                if line is None:
+                item = await queue.get()
+                if item is None:
+                    queue.task_done() # Signal that None has been processed
                     break
-                await asyncio.to_thread(file.write, line + "\n")
-                await asyncio.to_thread(file.flush)
-            file.close()
+                await asyncio.to_thread(file_handle.write, item + "\n")
+                await asyncio.to_thread(file_handle.flush)
+                queue.task_done()
+            file_handle.close()
 
         task = asyncio.create_task(writer_loop())
-        writer = _Writer(queue=queue, task=task, file=file)
-        self._writers[session_id] = writer
+        self._writer = _Writer(queue=queue, task=task, file=file_handle)
 
         meta = {
-            "id": session_id,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "type": "session_start",
+            "session_id": self.session_id,
+            "timestamp": datetime.now().isoformat(),
         }
-        await queue.put(json.dumps(meta))
-        return writer
+        await self._writer.queue.put(json.dumps(meta))
+        return self._writer
 
 
-__all__ = ["FileReplayService"]
+__all__ = ["FileReplay"]

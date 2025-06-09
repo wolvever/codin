@@ -19,10 +19,12 @@ from ..agent.types import Message, Role, TextPart
 from .mailbox import Mailbox
 from .supervisor import ActorSupervisor
 from .utils import make_message
+from ..replay import BaseReplay
 
 if _t.TYPE_CHECKING:
     from ..agent.base import Agent
     from ..agent.types import AgentRunInput
+    # _t.Callable and _t.Optional are available
 
 __all__ = [
     'DispatchRequest',
@@ -86,7 +88,19 @@ class LocalDispatcher(Dispatcher):
         )
 
     async def submit(self, a2a_request: dict) -> str:
-        """Submit an A2A request and return runner_id."""
+        """Submit an A2A request and return runner_id.
+
+        Args:
+            a2a_request: The A2A (Agent-to-Agent or Application-to-Agent) request dictionary.
+                         This dictionary can optionally contain a 'replay_factory' key
+                         (e.g., `a2a_request['replay_factory'] = lambda rid: FileReplay(session_id=rid)`).
+                         If provided, its value should be a callable that accepts a `runner_id` (str)
+                         and returns an object conforming to the `BaseReplay` interface.
+                         This factory will be called with the generated `runner_id` for this request,
+                         and the returned replay instance will be used for recording message exchanges.
+                         The `LocalDispatcher` will call `cleanup()` on this instance
+                         upon completion or failure of the request handling within `_handle_request`.
+        """
         request_id = str(uuid.uuid4())
         runner_id = f'run_{request_id[:8]}'
 
@@ -101,8 +115,16 @@ class LocalDispatcher(Dispatcher):
         stream_queue: asyncio.Queue = asyncio.Queue()
         self._run_streams[runner_id] = stream_queue
 
+        # Get replay_factory and create replay_instance if factory is provided
+        replay_factory: _t.Optional[_t.Callable[[str], BaseReplay]] = a2a_request.get('replay_factory')
+        replay_instance: _t.Optional[BaseReplay] = None
+        if replay_factory and callable(replay_factory):
+            replay_instance = replay_factory(runner_id)
+
         # Start async task to handle the request
-        task = asyncio.create_task(self._handle_request(dispatch_request, result, stream_queue))
+        task = asyncio.create_task(
+            self._handle_request(dispatch_request, result, stream_queue, replay_instance)
+        )
         self._run_tasks[runner_id] = task
 
         return runner_id
@@ -141,56 +163,43 @@ class LocalDispatcher(Dispatcher):
         request: DispatchRequest,
         result: DispatchResult,
         stream_queue: asyncio.Queue,
+        replay_instance: _t.Optional[BaseReplay] = None,
     ) -> None:
         """Handle an A2A request by creating and orchestrating agents."""
         created_agents: list[str] = []
         try:
-            # Parse A2A request
             a2a_data = request.a2a_request
-
-            # Extract key information from A2A request
             context_id = a2a_data.get('contextId', str(uuid.uuid4()))
             message_data = a2a_data.get('message', {})
-
-            # Create message from A2A data
             message = make_message(message_data, context_id)
 
-            # Determine which agents to create (allows override via attribute for tests)
-            # In the future, this could parse the request to determine multiple agents
             agents_to_create = getattr(
                 self,
                 'agents_to_create',
-                [
-                    ('main_agent', context_id),
-                    # Could add: ("planner_agent", context_id), ("executor_agent", context_id)
-                ],
+                [('main_agent', context_id)],
             )
 
-            # Create agents through actor manager
             agents: list[Agent] = []
             for agent_type, key in agents_to_create:
-                agent = await self.actor_manager.acquire(agent_type, key)
-                agents.append(agent)
+                agent_obj = await self.actor_manager.acquire(agent_type, key)
+                agents.append(agent_obj)
                 agent_id = (
-                    agent.agent_id if hasattr(agent, 'agent_id') else f'{agent_type}:{key}'
+                    agent_obj.agent_id if hasattr(agent_obj, 'agent_id') else f'{agent_type}:{key}'
                 )
                 created_agents.append(agent_id)
                 result.agents.append(agent_id)
 
-            # Create agent run input
             from ..agent.types import AgentRunInput
-
             run_input = AgentRunInput(
                 id=request.request_id, message=message, session_id=context_id, metadata=request.metadata
             )
 
-            # Start runners for all agents and run them concurrently
             from ..agent.concurrent_runner import ConcurrentRunner
             from ..agent.runner import AgentRunner
 
             runner_group = ConcurrentRunner()
-            for agent in agents:
-                runner_group.add_runner(AgentRunner(agent))
+            for agent_item in agents:
+                runner_group.add_runner(AgentRunner(agent_item, replay_backend=replay_instance))
 
             await runner_group.start_all()
 
@@ -210,20 +219,19 @@ class LocalDispatcher(Dispatcher):
                 result.status = 'completed'
 
         except Exception as e:
-            # Mark as failed
             result.status = 'failed'
             result.metadata['error'] = str(e)
             result.metadata['error_timestamp'] = datetime.now().isoformat()
 
         finally:
-            # Release any acquired agents
             for agent_id in created_agents:
                 await self.actor_manager.release(agent_id)
 
-            # signal end of stream
+            if replay_instance:
+                await replay_instance.cleanup()
+
             await stream_queue.put(None)
 
-            # Clean up task reference
             if result.runner_id in self._run_tasks:
                 del self._run_tasks[result.runner_id]
             if result.runner_id in self._run_streams:
@@ -236,7 +244,6 @@ class LocalDispatcher(Dispatcher):
         stream_queue: asyncio.Queue,
         result: DispatchResult,
     ) -> None:
-        """Iterate over agent.run and enqueue outputs."""
         async for output in agent.run(run_input):
             await stream_queue.put(
                 output.dict() if hasattr(output, 'dict') else str(output)
@@ -267,17 +274,13 @@ class LocalDispatcher(Dispatcher):
 
 
     def get_stream_queue(self, runner_id: str) -> asyncio.Queue | None:
-        """Return the stream queue for a running request."""
         return self._run_streams.get(runner_id)
 
     async def cleanup(self) -> None:
-        """Clean up all active runs and tasks."""
-        # Cancel all running tasks
         for task in self._run_tasks.values():
             if not task.done():
                 task.cancel()
 
-        # Wait for tasks to complete cancellation
         if self._run_tasks:
             await asyncio.gather(*self._run_tasks.values(), return_exceptions=True)
 

@@ -7,13 +7,13 @@ tracked via the `Capability` model, stored within `ActorInfo`.
 
 import asyncio # Added for _DefaultSupervisorActor's pause loop
 import logging
+
 import typing as _t
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import AsyncIterator, Optional
 
 from pydantic import BaseModel, Field
-
 from .types import CallableActor, ActorRunInput, ActorRunOutput
 from .envelope_types import Capability, EnvelopeKind, TaskState # Added TaskState for potential use in _DefaultSupervisorActor
 

@@ -76,7 +76,7 @@ cp .env-example .env
 from codin.agent.base_agent import BaseAgent
 from codin.agent.code_planner import CodePlanner, CodePlannerConfig
 from codin.tool.registry import ToolRegistry
-from codin.tool.sandbox import SandboxToolset
+from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
 from codin.sandbox.local import LocalSandbox
 
 # Initialize components

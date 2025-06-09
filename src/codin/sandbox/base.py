@@ -254,7 +254,10 @@ class Sandbox(LifecycleMixin, ABC):
         """Find snippets of code from the codebase most relevant to the search query.
 
         This is a semantic search tool, so the query should ask for something
-        semantically matching what is needed.
+        semantically matching what is needed. The `explanation` parameter is for
+        the agent to provide a reason for invoking this tool and is primarily
+        used for logging or traceability; it does not affect the tool's execution
+        logic.
         """
         try:
             cmd = ['rg', '-n', '--type', 'py', '--type', 'js', '--type', 'ts', query]
@@ -299,7 +302,9 @@ class Sandbox(LifecycleMixin, ABC):
         The output will be the 1-indexed file contents from start_line_one_indexed
         to end_line_one_indexed_inclusive, together with a summary of the lines
         outside that range. Note that this call can view at most 250 lines at a
-        time and 200 lines minimum.
+        time and 200 lines minimum. The `explanation` parameter is for the agent
+        to provide a reason for invoking this tool and is primarily used for
+        logging or traceability; it does not affect the tool's execution logic.
         """
         try:
             content = await self.read_file(target_file)
@@ -360,6 +365,9 @@ class Sandbox(LifecycleMixin, ABC):
 
         PROPOSE a command to run on behalf of the user. If you have this tool,
         note that you DO have the ability to run commands directly on the USER's system.
+        The `explanation` parameter is for the agent to provide a reason for
+        invoking this tool and is primarily used for logging or traceability; it
+        does not affect the tool's execution logic.
         """
         try:
             if is_background:
@@ -396,7 +404,10 @@ class Sandbox(LifecycleMixin, ABC):
 
         The quick tool to use for discovery, before using more targeted tools
         like semantic search or file reading. Useful to try to understand the
-        file structure before diving deeper into specific files.
+        file structure before diving deeper into specific files. The `explanation`
+        parameter is for the agent to provide a reason for invoking this tool and
+        is primarily used for logging or traceability; it does not affect the
+        tool's execution logic.
         """
         try:
             files = await self.list_files(relative_workspace_path)
@@ -416,7 +427,10 @@ class Sandbox(LifecycleMixin, ABC):
         """Run fast, exact regex searches over text files using the ripgrep engine.
 
         This is preferred over semantic search when we know the exact symbol/function
-        name/etc. to search in some set of directories/file types.
+        name/etc. to search in some set of directories/file types. The
+        `explanation` parameter is for the agent to provide a reason for invoking
+        this tool and is primarily used for logging or traceability; it does not
+        affect the tool's execution logic.
         """
         try:
             cmd = ['rg', query]
@@ -523,7 +537,10 @@ class Sandbox(LifecycleMixin, ABC):
         """Fast file search based on fuzzy matching against file path.
 
         Use if you know part of the file path but don't know where it's located
-        exactly. Response will be capped to 10 results.
+        exactly. Response will be capped to 10 results. The `explanation`
+        parameter is for the agent to provide a reason for invoking this tool and
+        is primarily used for logging or traceability; it does not affect the
+        tool's execution logic.
         """
         try:
             # Use find command for basic file search
@@ -551,7 +568,10 @@ class Sandbox(LifecycleMixin, ABC):
         """Delete a file at the specified path.
 
         The operation will fail gracefully if the file doesn't exist, the operation
-        is rejected for security reasons, or the file cannot be deleted.
+        is rejected for security reasons, or the file cannot be deleted. The
+        `explanation` parameter is for the agent to provide a reason for invoking
+        this tool and is primarily used for logging or traceability; it does not
+        affect the tool's execution logic.
         """
         try:
             # Use rm command to delete the file
@@ -608,6 +628,9 @@ class Sandbox(LifecycleMixin, ABC):
 
         Use this tool when you need up-to-date information that might not be
         available in your training data, or when you need to verify current facts.
+        The `explanation` parameter is for the agent to provide a reason for
+        invoking this tool and is primarily used for logging or traceability; it
+        does not affect the tool's execution logic.
         """
         return {
             'search_term': search_term,

@@ -17,10 +17,12 @@ from codin.agent.types import Message, Role, TextPart
 from .base import PromptResponse, ToolDefinition
 from .engine import PromptEngine
 from .registry import set_endpoint
+from typing import Any # Added for type hinting
 
-__all__ = ["prompt_run", "render_only", "set_endpoint"]
+__all__ = ["prompt_run", "set_endpoint", "prompt_render"]
 
 # Global engine instance for convenience
+# _engine is used by _get_engine(), which is used by prompt_run.
 _engine: PromptEngine | None = None
 
 
@@ -117,42 +119,83 @@ async def prompt_run(
     """
     engine = _get_engine()
 
-    # Extract history from kwargs if provided
-    history = kwargs.pop("history", None)
+    # Prepare variables for engine.run, which expects tools and history within its 'variables' dict
+    engine_run_vars = (variables or {}).copy()
+
+    processed_tools = _convert_tools(tools)
+    if processed_tools is not None: # _convert_tools returns None if tools is None
+        engine_run_vars["tools"] = processed_tools
+
+    # Extract history from kwargs if provided, then add to engine_run_vars
+    history_data = kwargs.pop("history", None)
+    if history_data is not None:
+        processed_history = _convert_history(history_data)
+        if processed_history is not None: # _convert_history returns None if history_data is None
+             engine_run_vars["history"] = processed_history
+
+    # Note: context_id and task_id are not explicitly handled here in prompt_run wrapper.
+    # If they need to be passed to engine.run, they should be part of the 'variables'
+    # dict passed to prompt_run, or part of **kwargs. engine.run will then extract them
+    # from its 'variables' parameter (which is 'engine_run_vars' here).
 
     return await engine.run(
         name,
         version=version,
-        variables=variables,
-        tools=_convert_tools(tools),
-        history=_convert_history(history),
+        variables=engine_run_vars, # Pass the combined variables
         conditions=conditions,
         stream=stream,
-        **kwargs,
+        **kwargs, # Pass remaining kwargs
     )
 
+# The render_only function has been deleted.
 
-async def render_only(
+async def prompt_render(
     name: str,
     /,
     version: str | None = None,
-    variables: dict[str, _t.Any] | None = None,
-    conditions: dict[str, _t.Any] | None = None,
+    variables: dict[str, Any] | None = None,
+    conditions: dict[str, Any] | None = None,
     **kwargs,
 ) -> str:
-    """Render a template without executing LLM.
+    """Render a template text without executing LLM, using a fresh engine.
+
+    This function is specifically for rendering the text of a prompt
+    and guarantees that no LLM is initialized or used in the process.
+    It instantiates a fresh PromptEngine for rendering.
 
     Args:
-        name: Template name
-        version: Template version (optional)
-        variables: Template variables
-        conditions: Template selection conditions
-        **kwargs: Additional variables
+        name: The name of the prompt template to render.
+        version: Optional. The specific version of the template to use.
+            If None, the latest version is typically used.
+        variables: Optional. A dictionary of variables to be interpolated
+            into the prompt template.
+        conditions: Optional. A dictionary of conditions used to select
+            the appropriate variant of the prompt template.
+        **kwargs: Additional keyword arguments passed to the underlying
+            `engine.render` call.
 
     Returns:
-        Rendered prompt text
-    """
-    engine = _get_engine()
+        str: The rendered text content of the prompt template.
 
-    rendered = await engine.render_only(name, version=version, variables=variables, conditions=conditions, **kwargs)
-    return rendered.text
+    Example:
+        >>> variables = {"user_input": "Can you explain prompt engineering?"}
+        >>> conditions = {"model_family": "claude"}
+        >>> prompt_text = await prompt_render(
+        ...     "explain_concept",
+        ...     variables=variables,
+        ...     conditions=conditions
+        ... )
+        >>> print(prompt_text)
+    """
+    # Instantiate a new PromptEngine without any LLM
+    engine = PromptEngine()
+
+    # PromptEngine.render_only was renamed to render and now returns str
+    rendered_text = await engine.render(
+        name,
+        version=version,
+        variables=variables,
+        conditions=conditions,
+        **kwargs,
+    )
+    return rendered_text

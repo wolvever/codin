@@ -7,6 +7,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..id import new_id
+from .types import Artifact
 
 __all__ = [
     'Plan',
@@ -58,7 +59,7 @@ class Task(BaseModel):
     completed_at: datetime | None = None
     input_data: dict[str, _t.Any] = Field(default_factory=dict)
     output_data: dict[str, _t.Any] = Field(default_factory=dict)
-    artifacts: list[dict] = Field(default_factory=list)  # TODO: Use Artifact type
+    artifacts: list[Artifact] = Field(default_factory=list)
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
 
     def __init__(self, **data):
@@ -175,6 +176,7 @@ class Task(BaseModel):
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'input_data': self.input_data,
             'output_data': self.output_data,
+            'artifacts': [art.model_dump() for art in self.artifacts if isinstance(art, Artifact)] if self.artifacts else [],
             'metadata': self.metadata,
         }
 
@@ -203,9 +205,13 @@ class Task(BaseModel):
                     task_data['requires'].append(dep)
 
         # Convert artifacts if they exist
-        if 'artifacts' in task_data and isinstance(task_data['artifacts'], list):
-            # This would need artifact conversion logic if needed
-            pass
+        raw_artifacts = task_data.pop('artifacts', [])
+        if isinstance(raw_artifacts, list):
+            task_data['artifacts'] = [
+                Artifact(**art_data) for art_data in raw_artifacts if isinstance(art_data, dict)
+            ]
+        else:
+            task_data['artifacts'] = []
 
         return cls(**task_data)
 
@@ -226,7 +232,7 @@ class Plan(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     started_at: datetime | None = None
     completed_at: datetime | None = None
-    artifacts: list[dict] = Field(default_factory=list)
+    artifacts: list[dict] = Field(default_factory=list) # TODO: This might also need Artifact type
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
 
     def __init__(self, **data):
@@ -386,6 +392,8 @@ class Plan(BaseModel):
             'started_at': self.started_at.isoformat() if self.started_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'metadata': self.metadata,
+            # Plan.artifacts is not modified in this subtask, but noted for future.
+            'artifacts': self.artifacts,
         }
 
     @classmethod
@@ -409,6 +417,7 @@ class Plan(BaseModel):
             tasks_dict[task_id] = Task.from_dict(task_data)
 
         plan_data['tasks'] = tasks_dict
+        # Plan.artifacts is not modified in this subtask
         return cls(**plan_data)
 
 

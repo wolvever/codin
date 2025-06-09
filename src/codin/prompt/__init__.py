@@ -50,12 +50,12 @@ from .engine import PromptEngine
 from .registry import PromptRegistry, get_registry
 
 # Core API - Simple and elegant
-from .run import prompt_run, render_only, set_endpoint
+from .run import prompt_run, prompt_render, set_endpoint
 
 __all__ = [
     # Primary API - Use these for most cases
     'prompt_run',
-    'render_only',
+    'prompt_render',
     'set_endpoint',
     # A2A Protocol Types
     'A2ARole',

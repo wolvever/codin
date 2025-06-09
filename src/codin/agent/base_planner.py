@@ -11,8 +11,7 @@ from ..id import new_id
 from ..prompt.run import prompt_run
 from ..tool.base import to_tool_definitions
 from ..utils.message import (
-    extract_text_from_message,
-    format_history_for_prompt,
+    format_history_for_prompt, # extract_text_from_message removed
     format_tool_results_for_conversation,
 )
 from .base import Planner
@@ -24,7 +23,7 @@ from .types import (
     Role,
     State,
     Step,
-    TextPart,
+    TextPart, # TextPart is used by Message.from_text, but not directly here anymore
     ThinkStep,
     ToolCall,
     ToolCallStep,
@@ -96,12 +95,11 @@ class BasePlanner(Planner):
                     async for chunk in response.content:  # type: ignore[arg-type]
                         stream_chunks.append(str(chunk))
                         yield str(chunk)
-                    step.message = Message(
-                        messageId=str(uuid.uuid4()),
+                    step.message = Message.from_text( # Updated
+                        text="".join(stream_chunks),
                         role=Role.agent,
-                        parts=[TextPart(text="".join(stream_chunks))],
                         contextId=state.session_id,
-                        kind="message",
+                        messageId=str(uuid.uuid4())
                     )
 
                 step.message_stream = _iter()
@@ -110,13 +108,12 @@ class BasePlanner(Planner):
             else:
                 message_content = ""
                 if hasattr(response, "message") and response.message:
-                    for part in response.message.parts:
-                        if hasattr(part, "text"):
-                            message_content += part.text
+                    # If Message.parts is now list[Part], we can use get_text_content
+                    message_content = response.message.get_text_content()
                 elif hasattr(response, "content") and response.content:
                     message_content = str(response.content)
 
-            parsed_response = self._parse_structured_response(message_content)
+            parsed_response = self._parse_structured_response(message_content) # Pass message_content
 
             # Emit thinking step if enabled and thinking is present
             if self.thinking_enabled and parsed_response.get("thinking"):
@@ -143,14 +140,13 @@ class BasePlanner(Planner):
                         break
 
             # Emit message step if there's a message
-            message_content = parsed_response.get("message", "")
-            if message_content and not (response.streaming and self.streaming_enabled):
-                message = Message(
-                    messageId=str(uuid.uuid4()),
+            llm_message_text = parsed_response.get("message", "") # Use 'message' from parsed_response
+            if llm_message_text and not (response.streaming and self.streaming_enabled):
+                message = Message.from_text( # Updated
+                    text=llm_message_text,
                     role=Role.agent,
-                    parts=[TextPart(text=message_content)],
                     contextId=state.session_id,
-                    kind="message",
+                    messageId=str(uuid.uuid4())
                 )
 
                 yield MessageStep(
@@ -167,14 +163,23 @@ class BasePlanner(Planner):
             if not should_continue or not tool_calls:
                 # Task is complete
                 final_message = None
-                if message_content and not (response.streaming and self.streaming_enabled):
-                    final_message = Message(
-                        messageId=str(uuid.uuid4()),
+                # Use llm_message_text which is parsed_response.get("message", "")
+                if llm_message_text and not (response.streaming and self.streaming_enabled):
+                    final_message = Message.from_text( # Updated
+                        text=llm_message_text, # Use the already extracted message
                         role=Role.agent,
-                        parts=[TextPart(text=message_content)],
                         contextId=state.session_id,
-                        kind="message",
+                        messageId=str(uuid.uuid4())
                     )
+                elif not llm_message_text and (response.streaming and self.streaming_enabled and message_content):
+                    # If it was a streaming response and no specific message in parsed_response, use full stream content
+                    final_message = Message.from_text(
+                        text=message_content,
+                        role=Role.agent,
+                        contextId=state.session_id,
+                        messageId=str(uuid.uuid4())
+                    )
+
 
                 yield FinishStep(
                     step_id=str(uuid.uuid4()),
@@ -191,12 +196,11 @@ class BasePlanner(Planner):
         except Exception as e:
             logger.error(f"Error in planner execution: {e}", exc_info=True)
 
-            error_message = Message(
-                messageId=str(uuid.uuid4()),
+            error_message = Message.from_text( # Updated
+                text=f"I encountered an error while planning: {e!s}",
                 role=Role.agent,
-                parts=[TextPart(text=f"I encountered an error while planning: {e!s}")],
                 contextId=state.session_id,
-                kind="message",
+                messageId=str(uuid.uuid4())
             )
 
             yield ErrorStep(
@@ -230,18 +234,23 @@ class BasePlanner(Planner):
 
         # Format conversation history
         history_messages = []
-        for msg in state.history[:-1]:  # All but the last message (if it's the current input)
+        # Iterate up to the potential last user message
+        history_to_format = state.history
+        if state.history and state.history[-1].role == Role.user:
+            history_to_format = state.history[:-1]
+
+        for msg in history_to_format:
             history_messages.append(
                 {
                     "role": "user" if msg.role == Role.user else "assistant",
-                    "content": extract_text_from_message(msg),
+                    "content": msg.get_text_content(), # Updated
                 }
             )
 
         # Get current user input (last message if it's from user)
         current_input = ""
         if state.history and state.history[-1].role == Role.user:
-            current_input = extract_text_from_message(state.history[-1])
+            current_input = state.history[-1].get_text_content() # Updated
 
         # Format tool results from previous turn if any
         tool_results_text = ""
@@ -250,7 +259,7 @@ class BasePlanner(Planner):
 
         return {
             "agent_name": "BasePlanner",
-            "task_id": state.session_id,
+            "task_id": state.session_id, # Using session_id as task_id for planner context
             "turn_count": state.turn_count,
             "has_tools": len(tool_definitions) > 0,
             "tools": tool_definitions,
@@ -263,22 +272,8 @@ class BasePlanner(Planner):
             "rules": self.rules,
         }
 
-    def _parse_structured_response(self, response) -> dict[str, _t.Any]:
+    def _parse_structured_response(self, content: str) -> dict[str, _t.Any]: # Added content type
         """Parse the structured response from prompt_run, adapted from CodeAgent."""
-        # Extract content from response
-        content = ""
-        if hasattr(response, "message") and response.message:
-            # Extract text from A2A message parts
-            for part in response.message.parts:
-                if hasattr(part, "root") and hasattr(part.root, "text"):
-                    content += part.root.text
-                elif hasattr(part, "text"):
-                    content += part.text
-        elif hasattr(response, "content"):
-            content = str(response.content)
-        else:
-            content = str(response)
-
         # Initialize default response structure
         parsed_response = {
             "thinking": "",
@@ -308,8 +303,10 @@ class BasePlanner(Planner):
             except json.JSONDecodeError:
                 # If JSON parsing fails, try to extract information from text
                 logger.debug("No valid JSON found, extracting from text content")
-                parsed_response["message"] = content
+                parsed_response["message"] = content # Assign full content as message
                 parsed_response["tool_calls"] = self._parse_tool_calls_from_text(content)
+                # If there are tool calls, we assume it should continue unless message implies otherwise
+                parsed_response["should_continue"] = not bool(parsed_response["tool_calls"])
                 return parsed_response
 
         # Extract fields from parsed JSON
@@ -335,6 +332,10 @@ class BasePlanner(Planner):
                             arguments=call_data.get("arguments", {}),
                         )
                         parsed_response["tool_calls"].append(tool_call)
+            # If tool_calls are present, default should_continue to True unless explicitly set false
+            if parsed_response["tool_calls"] and "should_continue" not in response_data:
+                parsed_response["should_continue"] = True
+
 
         return parsed_response
 

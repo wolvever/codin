@@ -7,7 +7,7 @@ import os
 from unittest.mock import AsyncMock, MagicMock
 
 from codin.tool.core_tools import FetchTool
-from codin.tool.sandbox import SandboxToolset
+from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
 from codin.tool.base import ToolContext
 from codin.sandbox.local import LocalSandbox
 

@@ -1,63 +1,32 @@
-"""Session service implementations for codin agents.
+"""Session management components for codin agents.
 
-This module provides session management services including session state tracking,
-conversation recording, metrics collection, and session lifecycle management.
+This module provides session management components including session state tracking
+(ID, context, basic metrics), and session lifecycle management.
 """
 
 import asyncio
 import typing as _t
 from contextlib import asynccontextmanager
 from datetime import datetime
+import os # Added
+from urllib.parse import urlparse # Added
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from codin.replay.base import ReplayService
+# Removed ReplayService and other unused imports from here, will be handled by __init__.py if needed
+# from codin.replay.base import ReplayService
+# from ..agent.types import State # Not directly used in this file after refactor
+# from ..memory.base import MemMemoryService, MemoryService # Not directly used in this file after refactor
 
-from ..agent.types import State
-from ..memory.base import MemMemoryService, MemoryService
+# Added for persistence
+from .persistence import SessionPersistor, LocalFilePersistor, HttpPersistor
+
 
 __all__ = [
-    'ReplayService',
+    # ReplayService might be re-exported from __init__ if still needed there
     'Session',
     'SessionManager',
-    'SessionService',
 ]
-
-
-class SessionService:
-    """Service for managing agent sessions."""
-
-    def __init__(self):
-        self._sessions: dict[str, dict] = {}
-        self._counter = 0
-
-    async def get_or_create_session(self, session_id: str | None) -> dict:
-        """Get existing or create new session."""
-        if session_id is None:
-            self._counter += 1
-            session_id = f'session_{self._counter}'
-
-        if session_id not in self._sessions:
-            self._sessions[session_id] = {
-                'session_id': session_id,
-                'created_at': datetime.now(),
-                'iteration_count': 0,
-                'total_tokens': 0,
-                'total_cost': 0.0,
-                'elapsed_time': 0.0,
-                'metadata': {},
-            }
-
-        return self._sessions[session_id]
-
-    async def update_session(self, session_id: str, updates: dict) -> None:
-        """Update session data."""
-        if session_id in self._sessions:
-            self._sessions[session_id].update(updates)
-
-    async def get_session(self, session_id: str) -> dict | None:
-        """Get session by ID."""
-        return self._sessions.get(session_id)
 
 
 # =============================================================================
@@ -65,28 +34,19 @@ class SessionService:
 # =============================================================================
 
 
-
-
 class Session(BaseModel):
-    """Data-oriented session that holds conversation state and manages recording."""
+    """Data-oriented session that holds session identifiers, creation timestamp,
+    a generic context dictionary, and high-level metrics.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     session_id: str
     created_at: datetime = Field(default_factory=datetime.now)
 
-    # Core conversation data
-    messages: list[dict] = Field(default_factory=list)  # Changed from Message to dict for now
-    turn_count: int = 0
-    task_list: dict[str, list[str]] = Field(default_factory=lambda: {'completed': [], 'pending': []})
-
     # Execution metrics
     metrics: dict[str, _t.Any] = Field(default_factory=dict)
     context: dict[str, _t.Any] = Field(default_factory=dict)
-
-    # Optional external systems
-    memory_system: _t.Any | None = None  # Changed to Any to avoid import issues
-    rollout_recorder: _t.Any | None = None  # For audit trail - type depends on implementation
 
     def __post_init__(self):
         """Initialize default metrics."""
@@ -99,65 +59,19 @@ class Session(BaseModel):
                 'cost': 0.0,
                 'last_activity': self.created_at.timestamp(),
             }
+        else:
+            self.metrics.setdefault('start_time', self.created_at.timestamp())
+            self.metrics['last_activity'] = datetime.now().timestamp()
 
-    async def record(self, message: dict) -> None:  # Changed from Message to dict
-        """Record a message to both internal state and external systems (Codex-inspired)."""
-        # Update internal state
-        self.messages.append(message)
-        self.metrics['last_activity'] = datetime.now().timestamp()
-
-        # Record to memory system if available
-        if self.memory_system:
-            try:
-                await self.memory_system.add_message(message)
-            except Exception as e:
-                # Log but don't fail - memory is optional
-                import logging
-
-                logging.warning(f'Failed to record to memory system: {e}')
-
-        # Record to rollout recorder if available (for complete audit trail)
-        if self.rollout_recorder and hasattr(self.rollout_recorder, 'record'):
-            try:
-                await self.rollout_recorder.record(message)
-            except Exception as e:
-                import logging
-
-                logging.warning(f'Failed to record to rollout recorder: {e}')
-
-    def build_state(self) -> 'State':
-        """Build a State object for the planner from current session data."""
-        # Import here at runtime to avoid circular imports
-        from ..agent.types import State
-
-        return State(
-            session_id=self.session_id,
-            task_id=None,  # This needs to be set properly based on context
-            agent_id='',
-            created_at=self.created_at,
-            iteration=self.turn_count,
-            tools=[],  # These will be set by the agent
-            tool_call_results=[],
-            context=self.context.copy(),
-            metadata={'task_list': self.task_list.copy(), **self.context},
-        )
-
-    def update_from_state(self, state: 'State') -> None:
-        """Update session data from a State object after planner execution."""
-        self.turn_count = state.iteration
-        if 'task_list' in state.metadata:
-            self.task_list = state.metadata['task_list']
-        self.context.update(state.context)
 
     def get_metrics_summary(self) -> dict[str, _t.Any]:
         """Get a summary of session metrics."""
         current_time = datetime.now().timestamp()
-        elapsed = current_time - self.metrics['start_time']
+        start_time = self.metrics.get('start_time', self.created_at.timestamp())
+        elapsed = current_time - start_time
 
         return {
             'session_id': self.session_id,
-            'turn_count': self.turn_count,
-            'message_count': len(self.messages),
             'elapsed_seconds': elapsed,
             'total_tool_calls': self.metrics.get('total_tool_calls', 0),
             'input_tokens': self.metrics.get('input_tokens', 0),
@@ -168,92 +82,170 @@ class Session(BaseModel):
 
 
 class SessionManager:
-    """Manages active sessions with optional cleanup and persistence."""
+    """Manages active sessions with optional persistence and cleanup."""
 
-    def __init__(self, memory_system_factory: _t.Callable[[], MemoryService] | None = None):
+    def __init__(self, endpoint: _t.Optional[str] = None):
+        """Initialize the SessionManager.
+
+        Args:
+            endpoint: An optional URI or local path for session persistence.
+                If None, sessions are in-memory only.
+                Supported schemes:
+                - Local file system:
+                    - URI: `file:///path/to/sessions_directory`
+                    - Absolute path: `/abs/path/to/sessions_directory`
+                    - Relative path: `rel/path/to/sessions_directory`
+                - HTTP service:
+                    - URI: `http://host/api/sessions`
+                    - URI: `https://host/api/sessions`
+                Sessions are stored as JSON files in the specified directory for
+                file persistence, or sent to the HTTP endpoint.
+        """
         self._sessions: dict[str, Session] = {}
-        self._memory_system_factory = memory_system_factory or (lambda: MemMemoryService())
+        self._persistor: _t.Optional[SessionPersistor] = None
         self._cleanup_lock = asyncio.Lock()
 
-    async def get_or_create_session(self, session_id: str, memory_system: MemoryService | None = None) -> Session:
-        """Get existing session or create a new one."""
-        if session_id not in self._sessions:
-            # Create new session
-            if memory_system is None:
-                memory_system = self._memory_system_factory()
+        if endpoint:
+            parsed_url = urlparse(endpoint)
+            if parsed_url.scheme in ('http', 'https'):
+                self._persistor = HttpPersistor(endpoint)
+            elif parsed_url.scheme == 'file':
+                # Adjust for file URI format (e.g., file:///path or file:C:/path on Windows)
+                path = os.path.abspath(os.path.join(parsed_url.netloc, parsed_url.path))
+                if os.name == 'nt': # Windows path adjustments
+                    # Remove leading '/' if path starts like /C:/
+                    if path.startswith('/') and len(path) > 2 and path[2] == ':':
+                        path = path[1:]
+                    # Handle drive letter if already correct from urlparse.netloc
+                    elif len(parsed_url.netloc) > 1 and parsed_url.netloc[1] == ':':
+                         path = parsed_url.netloc + parsed_url.path
+                self._persistor = LocalFilePersistor(path)
+            elif not parsed_url.scheme and endpoint: # No scheme, assume local path
+                self._persistor = LocalFilePersistor(endpoint)
+            # else: self._persistor remains None for unrecognized schemes or if endpoint is just a name
 
-            session = Session(session_id=session_id, memory_system=memory_system)
-            self._sessions[session_id] = session
+    async def get_or_create_session(self, session_id: str) -> Session:
+        """Get existing session from memory, load from persistor, or create a new one."""
+        if session_id in self._sessions:
+            return self._sessions[session_id]
 
-        return self._sessions[session_id]
+        if self._persistor:
+            try:
+                # print(f"Attempting to load session {session_id} from persistor.") # Debug
+                loaded_session = await self._persistor.load_session(session_id)
+                if loaded_session:
+                    # print(f"Loaded session {session_id} successfully.") # Debug
+                    self._sessions[session_id] = loaded_session
+                    return loaded_session
+            except Exception as e:
+                # Consider using a proper logger in a real application
+                print(f"Error loading session {session_id} from persistence: {e}") # Placeholder for logging
+
+        # print(f"Creating new session {session_id}.") # Debug
+        new_session = Session(session_id=session_id)
+        self._sessions[session_id] = new_session
+        # If persistor exists, save the newly created session immediately
+        # This behavior might be desirable to ensure the session exists in persistent store
+        # as soon as it's created, even if the context manager exits prematurely.
+        # However, the original spec saves only on successful context exit.
+        # For now, adhering to saving only on successful context exit or full cleanup.
+        return new_session
 
     def get_session(self, session_id: str) -> Session | None:
-        """Get existing session by ID."""
+        """Get existing session by ID from memory cache."""
         return self._sessions.get(session_id)
 
     @asynccontextmanager
     async def session(
-        self, session_id: str, memory_system: MemoryService | None = None
-    ) -> _t.AsyncGenerator[Session]:
+        self, session_id: str
+    ) -> _t.AsyncGenerator[Session, None]:
         """Context manager to manage a session's lifecycle.
-
-        Creates or retrieves the session and ensures it is closed when the
-        context exits.
+        Retrieves from memory/persistor or creates a session.
+        Saves on successful context exit if a persistor is configured.
+        Always removes from in-memory cache on exit.
         """
-        session = await self.get_or_create_session(session_id, memory_system)
+        session_obj = await self.get_or_create_session(session_id)
+        succeeded = False
         try:
-            yield session
+            yield session_obj
+            succeeded = True # Mark as succeeded if yield completes without error
         finally:
-            await self.close_session(session_id)
+            if session_id in self._sessions: # Check if session still in memory (it should be)
+                if self._persistor and succeeded: # Only save if context block was successful
+                    try:
+                        # print(f"Saving session {session_obj.session_id} on context exit.") # Debug
+                        await self._persistor.save_session(session_obj)
+                    except Exception as e:
+                        print(f"Error saving session {session_obj.session_id} on context exit: {e}")
+            # Always remove from in-memory cache after context manager usage.
+            # If not persisted, it's lost. If persisted, it's loaded next time.
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+
 
     async def close_session(self, session_id: str) -> None:
-        """Close and cleanup a session."""
+        """Removes a session from the in-memory cache.
+        Note: Persistence (saving or deleting from store) is handled by
+        the session context manager or the main cleanup method.
+        This method primarily ensures the session is no longer active in memory.
+        """
         if session_id in self._sessions:
-            session = self._sessions[session_id]
-
-            # Cleanup memory system if it has cleanup method
-            if session.memory_system and hasattr(session.memory_system, 'cleanup'):
-                try:
-                    await session.memory_system.cleanup()
-                except Exception as e:
-                    import logging
-
-                    logging.warning(f'Error cleaning up memory system for session {session_id}: {e}')
-
-            # Cleanup rollout recorder if it has cleanup method
-            if session.rollout_recorder and hasattr(session.rollout_recorder, 'cleanup'):
-                try:
-                    await session.rollout_recorder.cleanup()
-                except Exception as e:
-                    import logging
-
-                    logging.warning(f'Error cleaning up rollout recorder for session {session_id}: {e}')
-
+            # print(f"Closing session {session_id} from memory (explicit call).") # Debug
             del self._sessions[session_id]
+        # Optionally, one might want to also delete from persistor here,
+        # but current design has explicit delete on persistor or cleanup saving.
+        # For now, this just removes from memory.
 
     async def cleanup_inactive_sessions(self, max_age_seconds: float = 3600) -> int:
-        """Cleanup sessions that haven't been active for specified time."""
+        """Cleanup sessions that haven't been active for specified time.
+        This involves saving them to persistence (if configured) and removing from memory.
+        """
         async with self._cleanup_lock:
             current_time = datetime.now().timestamp()
-            inactive_sessions = []
+            inactive_session_ids = []
 
-            for session_id, session in self._sessions.items():
-                last_activity = session.metrics.get('last_activity', session.created_at.timestamp())
+            # Iterate over a copy of items for safe removal if needed during iteration elsewhere
+            for session_id, session_obj in list(self._sessions.items()):
+                last_activity = session_obj.metrics.get('last_activity', session_obj.created_at.timestamp())
                 if current_time - last_activity > max_age_seconds:
-                    inactive_sessions.append(session_id)
+                    inactive_session_ids.append(session_id)
 
-            # Close inactive sessions
-            for session_id in inactive_sessions:
-                await self.close_session(session_id)
-
-            return len(inactive_sessions)
+            for session_id in inactive_session_ids:
+                if session_id in self._sessions: # Check if still present
+                    session_to_cleanup = self._sessions[session_id]
+                    if self._persistor:
+                        try:
+                            # print(f"Saving inactive session {session_id} due to inactivity.") # Debug
+                            await self._persistor.save_session(session_to_cleanup)
+                        except Exception as e:
+                            print(f"Error saving inactive session {session_id}: {e}")
+                    # Remove from memory after attempting to save
+                    del self._sessions[session_id]
+            return len(inactive_session_ids)
 
     def get_active_sessions(self) -> dict[str, dict[str, _t.Any]]:
-        """Get summary of all active sessions."""
+        """Get summary of all active sessions currently in memory."""
         return {session_id: session.get_metrics_summary() for session_id, session in self._sessions.items()}
 
     async def cleanup(self) -> None:
-        """Cleanup all sessions."""
-        session_ids = list(self._sessions.keys())
-        for session_id in session_ids:
-            await self.close_session(session_id)
+        """Saves all currently active in-memory sessions to the persistor (if configured),
+        closes the persistor if it owns its client, and clears the in-memory session cache.
+        """
+        if self._persistor:
+            # print("SessionManager cleanup: saving all active in-memory sessions.") # Debug
+            for session_id, session_obj in list(self._sessions.items()): # Iterate over a copy
+                try:
+                    # print(f"Saving session {session_id} during main cleanup.") # Debug
+                    await self._persistor.save_session(session_obj)
+                except Exception as e:
+                    print(f"Error saving session {session_id} during main cleanup: {e}")
+
+            if hasattr(self._persistor, 'close') and callable(getattr(self._persistor, 'close')):
+                try:
+                    # print("Closing persistor during main cleanup.") # Debug
+                    await self._persistor.close() # type: ignore
+                except Exception as e:
+                    print(f"Error closing persistor during main cleanup: {e}")
+
+        # print("Clearing all in-memory sessions during main cleanup.") # Debug
+        self._sessions.clear()

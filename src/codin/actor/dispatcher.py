@@ -27,12 +27,12 @@ from .task_manager import TaskRegistry, TaskInfo
 
 logger = logging.getLogger(__name__)
 
+
 __all__ = [
     'DispatchResult',
     'Dispatcher',
     'LocalDispatcher',
 ]
-
 
 class DispatchResult(BaseModel):
     """Represents the outcome of a dispatched work request."""
@@ -63,7 +63,6 @@ class Dispatcher(ABC):
     async def list_active_runs(self) -> list[DispatchResult]:
         """Lists all currently active runs."""
         ...
-
 
 class LocalDispatcher(Dispatcher):
     """Local, in-process Dispatcher that integrates with a TaskRegistry."""
@@ -107,7 +106,6 @@ class LocalDispatcher(Dispatcher):
         self._active_runs[runner_id] = result
         stream_queue: asyncio.Queue[ActorRunOutput | None] = asyncio.Queue()
         self._run_streams[runner_id] = stream_queue
-
         async_task = asyncio.create_task(self._handle_request(envelope, result, stream_queue))
         self._run_tasks[runner_id] = async_task
         return runner_id
@@ -254,6 +252,7 @@ class LocalDispatcher(Dispatcher):
                     await stream_queue.put({"error": "Invalid ControlPayload", "details": ve.errors()})
                 return
 
+
             actors_to_create_spec = [(actor_type_hint, actor_key)]
             actors, created_actor_ids = await self._create_actors(actors_to_create_spec, result)
 
@@ -352,7 +351,6 @@ class LocalDispatcher(Dispatcher):
             if result.status not in [TaskState.FAILED.value] and not result.status.startswith("CONTROL_"):
                  result.status = TaskState.COMPLETED.value
 
-
     async def _run_actor(self, actor: CallableActor, run_input: ActorRunInput, stream_queue: asyncio.Queue[ActorRunOutput | None], result: DispatchResult,) -> None:
         async for output_item in actor.run(run_input):
             processed_output = output_item.model_dump() if hasattr(output_item, 'model_dump') else \
@@ -377,6 +375,7 @@ class LocalDispatcher(Dispatcher):
         active_run_keys = list(self._active_runs.keys())
         for task_obj in self._run_tasks.values():
             if not task_obj.done(): task_obj.cancel()
+
         if self._run_tasks:
             await asyncio.gather(*self._run_tasks.values(), return_exceptions=True)
         for runner_id in active_run_keys:
@@ -388,5 +387,3 @@ class LocalDispatcher(Dispatcher):
                     await self._task_registry.update_task_state(dispatch_result.task_id, TaskState.FAILED, error_info="Dispatcher cleanup initiated while task was active.")
         self._run_tasks.clear(); self._active_runs.clear(); self._run_streams.clear()
         logger.info("LocalDispatcher cleanup complete.")
-
-[end of src/codin/actor/dispatcher.py]

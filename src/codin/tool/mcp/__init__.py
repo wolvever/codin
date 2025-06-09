@@ -20,8 +20,14 @@ from .session_manager import (
 )
 from .toolset import MCPToolset
 from .utils import retry_on_closed_resource
+from . import mcp_types
+from . import exceptions
 
 __all__ = [
+    # MCP Types
+    'mcp_types',
+    # Exceptions
+    'exceptions',
     # Session management
     'MCPSessionManager',
     'HttpSessionManager',

@@ -56,7 +56,8 @@ tool_execution_errors = meter.create_counter(
     unit="1",
 )
 
-# Define Prometheus metrics - use try/except to avoid duplicate registration
+# Define Prometheus metrics.
+# The try-except blocks are used to prevent errors if metrics are already registered (e.g., in a test environment or due to re-imports).
 try:
     prom_tool_executions = prom.Counter(
         "codin_tool_executions_total",
@@ -266,6 +267,9 @@ class ToolExecutor:
         try:
             async with self._concurrency_limit():
                 # Get the result from tool.run - can be a coroutine or async generator
+            # A tool's run() method can be an async generator directly (async def ...(): yield ...)
+            # or an async method that returns an async generator (async def ...(): return my_async_gen()).
+            # This section handles both cases.
                 run_call = tool.run(validated_args, context)
 
                 # Check if the result is directly an async generator

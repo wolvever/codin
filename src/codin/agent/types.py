@@ -85,6 +85,32 @@ class FilePart(BaseModel):
     kind: str = "file"
     metadata: dict[str, _t.Any] | None = None
 
+
+class ToolUsePart(_pyd.BaseModel):
+    """Represents a tool use (call and/or result) segment within message parts."""
+
+    kind: _t.Literal["tool-use"] = "tool-use"
+    """Part type - tool-use for ToolUseParts"""
+
+    type: _t.Literal["call", "result"] = "call"
+    """Whether this is a tool call or tool result"""
+
+    id: str
+    """Unique identifier for the tool use"""
+
+    name: str
+    """Name of the tool being called"""
+
+    input: dict[str, _t.Any] | None = None
+    """Tool input/arguments (for calls)"""
+
+    output: _t.Any | None = None
+    """Tool output/result (for results)"""
+
+    metadata: dict[str, _t.Any] | None = None
+    """Additional metadata about the tool call or result"""
+
+
 # Union type for message parts - defined early so Message can use it.
 Part = TextPart | DataPart | FilePart | ToolUsePart
 
@@ -222,31 +248,6 @@ class ToolCallResult(_pyd.BaseModel):
     success: bool
     output: _t.Any = None
     error: str | None = None
-
-
-class ToolUsePart(_pyd.BaseModel):
-    """Represents a tool use (call and/or result) segment within message parts."""
-
-    kind: _t.Literal["tool-use"] = "tool-use"
-    """Part type - tool-use for ToolUseParts"""
-
-    type: _t.Literal["call", "result"] = "call"
-    """Whether this is a tool call or tool result"""
-
-    id: str
-    """Unique identifier for the tool use"""
-
-    name: str
-    """Name of the tool being called"""
-
-    input: dict[str, _t.Any] | None = None
-    """Tool input/arguments (for calls)"""
-
-    output: _t.Any | None = None
-    """Tool output/result (for results)"""
-
-    metadata: dict[str, _t.Any] | None = None
-    """Additional metadata about the tool call or result"""
 
 
 # =============================================================================
@@ -691,3 +692,19 @@ class ErrorStep(Step):
 
     step_type: StepType = StepType.ERROR
     error: str | None = None
+
+# After all model definitions, explicitly update forward references
+# This helps Pydantic resolve types that were defined using string literals (forward references)
+# especially for types imported under TYPE_CHECKING.
+
+# Import the specific types needed for model_rebuild's namespace if they are not already available
+# at runtime at this point in the module execution.
+# For 'Tool' and 'ArtifactService' in 'State' and 'Artifact':
+from ..tool.base import Tool
+from ..artifact.base import ArtifactService
+
+State.model_rebuild(_types_namespace=dict(Tool=Tool, ArtifactService=ArtifactService))
+Artifact.model_rebuild(_types_namespace=dict(Part=Part)) # Part is defined in this file
+TaskArtifactUpdateEvent.model_rebuild(_types_namespace=dict(Artifact=Artifact)) # Artifact is defined in this file
+Message.model_rebuild(_types_namespace=dict(Part=Part, ToolCall=ToolCall, ToolUsePart=ToolUsePart, ToolCallResult=ToolCallResult)) # All defined in file or imported
+Step.model_rebuild(_types_namespace=dict(Message=Message, Event=Event, ToolUsePart=ToolUsePart, ToolCall=ToolCall, ToolCallResult=ToolCallResult)) # All defined in file or imported

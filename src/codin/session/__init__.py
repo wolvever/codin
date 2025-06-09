@@ -4,10 +4,13 @@ This module provides session services for managing agent execution sessions,
 tracking state, and coordinating multi-agent conversations.
 """
 
-from .base import Session, SessionManager, SessionService
+from .base import Session, SessionManager
+from .persistence import SessionPersistor, LocalFilePersistor, HttpPersistor
 
 __all__ = [
     'Session',
     'SessionManager',
-    'SessionService',
+    'SessionPersistor',
+    'LocalFilePersistor',
+    'HttpPersistor',
 ]

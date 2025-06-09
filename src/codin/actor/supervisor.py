@@ -11,18 +11,19 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-# Provide a runtime definition for ``Agent`` so Pydantic can resolve the
-# forward reference on import. This avoids the need for tests to patch in the
-# ``Agent`` type before calling ``ActorInfo.model_rebuild``.
-from ..agent.base_agent import BaseAgent as Agent
-
+# TYPE_CHECKING block to handle forward references and avoid circular imports
 if _t.TYPE_CHECKING:
-    from ..agent.base import Agent
+    from ..agent.base_agent import BaseAgent as ConcreteAgentForTypeHinting
+    from ..agent.base import Agent as AbstractAgent # For general interface type hints
 else:  # pragma: no cover - runtime fallback for forward refs
-    try:  # avoid import cycle during runtime import
-        from ..agent.base import Agent
-    except Exception:  # noqa: BLE001 - best effort fallback
-        Agent = _t.Any
+    # Attempt to import BaseAgent for Pydantic's model_rebuild at runtime if possible,
+    # but fall back to Any if it causes an import cycle during initial loading.
+    try:
+        from ..agent.base_agent import BaseAgent as ConcreteAgentForTypeHinting
+    except ImportError: # Catch import error specifically
+        ConcreteAgentForTypeHinting = _t.Any  # Fallback for Pydantic
+    AbstractAgent = _t.Any # Fallback for general Agent type hints
+
 
 __all__ = [
     'ActorInfo',
@@ -36,7 +37,7 @@ class ActorInfo(BaseModel):
 
     actor_id: str
     actor_type: str
-    agent: 'Agent'
+    agent: 'ConcreteAgentForTypeHinting' # Use the alias for the concrete BaseAgent type
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.now)
     last_accessed: datetime = Field(default_factory=datetime.now)
@@ -46,14 +47,15 @@ class ActorInfo(BaseModel):
         arbitrary_types_allowed = True
 
 
-# Ensure pydantic schema resolves forward references at import time
-ActorInfo.model_rebuild(_types_namespace={'Agent': Agent})
+# Ensure pydantic schema resolves forward references using the correct type.
+ActorInfo.model_rebuild(_types_namespace={'ConcreteAgentForTypeHinting': ConcreteAgentForTypeHinting})
+
 
 class ActorSupervisor(ABC):
     """Abstract actor manager protocol from design document."""
 
     @abstractmethod
-    async def acquire(self, actor_type: str, key: str, *args: _t.Any, **kwargs: _t.Any) -> 'Agent':
+    async def acquire(self, actor_type: str, key: str, *args: _t.Any, **kwargs: _t.Any) -> 'AbstractAgent': # Use AbstractAgent for interface
         """Get or create an actor/agent instance."""
 
     @abstractmethod
@@ -72,7 +74,7 @@ class ActorSupervisor(ABC):
 class LocalActorManager(ActorSupervisor):
     """Local implementation of actor manager using in-memory storage."""
 
-    def __init__(self, agent_factory: _t.Callable[..., _t.Awaitable['Agent']] | None = None):
+    def __init__(self, agent_factory: _t.Callable[..., _t.Awaitable['AbstractAgent']] | None = None): # Use AbstractAgent
         """Initialize with optional agent factory function.
 
         Args:
@@ -81,7 +83,7 @@ class LocalActorManager(ActorSupervisor):
         self._actors: dict[str, ActorInfo] = {}
         self._agent_factory = agent_factory
 
-    async def acquire(self, actor_type: str, key: str, *args: _t.Any, **kwargs: _t.Any) -> 'Agent':
+    async def acquire(self, actor_type: str, key: str, *args: _t.Any, **kwargs: _t.Any) -> 'AbstractAgent': # Use AbstractAgent
         """Get or create an actor/agent instance."""
         actor_id = f'{actor_type}:{key}'
 
@@ -94,14 +96,16 @@ class LocalActorManager(ActorSupervisor):
         if self._agent_factory:
             agent = await self._agent_factory(actor_type, key, *args, **kwargs)
         else:
-            # Default agent creation - import here to avoid circular import
+            # Default agent creation - import BaseAgent locally to avoid circular import at module level
             from ..agent.base_agent import BaseAgent
-            from ..agent.base_planner import BasePlanner
+            from ..agent.base_planner import BasePlanner # Assuming BasePlanner is a concrete planner
 
-            planner = BasePlanner()
+            planner = BasePlanner() # You might need to configure this planner
             agent = BaseAgent(name=f'{actor_type}-{key}', agent_id=actor_id, planner=planner)
 
         # Store actor info
+        # The 'agent' field of ActorInfo expects ConcreteAgentForTypeHinting.
+        # Ensure the 'agent' created here is compatible. BaseAgent is compatible.
         actor_info = ActorInfo(actor_id=actor_id, actor_type=actor_type, agent=agent)
         self._actors[actor_id] = actor_info
 
@@ -111,9 +115,11 @@ class LocalActorManager(ActorSupervisor):
         """Deactivate an actor/agent instance."""
         if agent_id in self._actors:
             # Perform cleanup if agent has cleanup method
-            agent = self._actors[agent_id].agent
-            if hasattr(agent, 'cleanup'):
-                await agent.cleanup()
+            agent_instance = self._actors[agent_id].agent
+            if hasattr(agent_instance, 'cleanup'):
+                # Ensure agent_instance is treated as the concrete type for attribute access if necessary,
+                # though 'cleanup' should be part of a common interface or checked with hasattr.
+                await agent_instance.cleanup()
 
             # Remove from active actors
             del self._actors[agent_id]

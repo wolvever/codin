@@ -197,7 +197,7 @@ class BaseAgent(Agent):
             await asyncio.sleep(0.1)
             await self.check_inbox_for_control()
 
-    async def run(self, input_data: AgentRunInput) -> _t.AsyncGenerator[AgentRunOutput]:
+    async def run(self, input_data: AgentRunInput) -> _t.AsyncGenerator[AgentRunOutput, None]:
         """Execute agent logic using simplified architecture."""
         start_time = time.time()
         session_id = input_data.session_id or f"session_{uuid.uuid4().hex[:8]}"
@@ -285,6 +285,10 @@ class BaseAgent(Agent):
         elif isinstance(config_data, dict):
             current_config = RunConfig(**config_data)
 
+        # Ensure current_config is always a RunConfig instance
+        if current_config is None:
+            current_config = RunConfig()
+
         # Create task from input message
         task = None
         if input_data.message:
@@ -309,7 +313,7 @@ class BaseAgent(Agent):
                     id=input_data.message.messageId or str(uuid.uuid4()), # Task ID can be same as original message ID
                     message=task_message, # Assign the created message here
                     contextId=session_id,
-                    status=TaskStatus(state=TaskState.submitted),
+                    status=TaskStatus(state=TaskState.SUBMITTED),
                     metadata={"session_id": session_id, "agent_id": self.id, "original_message_id": input_data.message.messageId}
                 )
             else: # If no query text could be formed, maybe create a task without a message or with a generic one
@@ -317,7 +321,7 @@ class BaseAgent(Agent):
                     id=input_data.message.messageId or str(uuid.uuid4()),
                     message=None,
                     contextId=session_id,
-                    status=TaskStatus(state=TaskState.submitted),
+                    status=TaskStatus(state=TaskState.SUBMITTED),
                     metadata={"session_id": session_id, "agent_id": self.id, "original_message_id": input_data.message.messageId}
                 )
 
@@ -343,7 +347,7 @@ class BaseAgent(Agent):
 
     async def _execute_planning_loop(
         self, state: State, session_id: str, start_time: float
-    ) -> _t.AsyncGenerator[AgentRunOutput]:
+    ) -> _t.AsyncGenerator[AgentRunOutput, None]:
         """Execute planning loop with budget constraints and control handling."""
 
         await self._emit_event(
@@ -490,7 +494,7 @@ class BaseAgent(Agent):
             },
         )
 
-    async def _execute_step(self, step: Step, state: State, session_id: str) -> _t.AsyncGenerator[AgentRunOutput]:
+    async def _execute_step(self, step: Step, state: State, session_id: str) -> _t.AsyncGenerator[AgentRunOutput, None]:
         """Execute step using codin components and send outputs to mailbox."""
         step_output_metadata_base = {"agent_id": self.id, "step_id": step.step_id}
 

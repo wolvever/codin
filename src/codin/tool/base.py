@@ -119,7 +119,7 @@ class Tool(LifecycleMixin):
     @abc.abstractmethod
     async def run(
         self, args: dict[str, _t.Any], tool_context: ToolContext
-    ) -> _t.Any | _t.AsyncGenerator[_t.Any]:
+    ) -> _t.Any | _t.AsyncGenerator[_t.Any, None]:
         """Execute the tool with the given arguments."""
         raise NotImplementedError('Tool subclasses must implement run')
 

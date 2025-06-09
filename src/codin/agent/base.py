@@ -92,7 +92,7 @@ class Planner(abc.ABC):
     """
 
     @abc.abstractmethod
-    async def next(self, state: State) -> _t.AsyncGenerator[Step]:
+    async def next(self, state: State) -> _t.AsyncGenerator[Step, None]:
         """Generate the next execution steps based on current state.
 
         The planner should use:

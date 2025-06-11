@@ -11,22 +11,28 @@ import logging
 import os
 import typing as _t
 
-from ..client import Client, ClientConfig
-from .base import BaseLLM
-from .registry import ModelRegistry
+# Removed direct Client, ClientConfig imports if not used directly by OpenAILLM itself
+# from ..client import Client, ClientConfig
+from .openai_compatible_llm import OpenAICompatibleBaseLLM # Import new base class
+from .config import ModelConfig # Already here
+from .registry import register # Changed from ModelRegistry to module-level register
+# HTTP utils are used by the new base class, so direct imports might not be needed here
+# from .http_utils import (...)
 
 __all__ = [
     'OpenAILLM',
 ]
 
-logger = logging.getLogger('codin.model.openai_llm')
+logger = logging.getLogger('codin.model.openai_llm') # Logger can remain
 
 
-@ModelRegistry.register
-class OpenAILLM(BaseLLM):
-    """Implementation of BaseLLM for OpenAI API and compatible services (e.g., Azure OpenAI).
-
-    Supports both streaming and non-streaming generation, and function/tool calling.
+@register # Changed from @ModelRegistry.register
+class OpenAILLM(OpenAICompatibleBaseLLM): # Inherit from new base
+    """
+    Specific OpenAI LLM implementation.
+    This class leverages OpenAICompatibleBaseLLM and specializes it for OpenAI models,
+    primarily by defining specific supported model patterns and potentially any OpenAI-specific
+    default configurations or minor behavior overrides if needed in the future.
 
     Environment variables:
         LLM_PROVIDER: The LLM provider (should be 'openai' for this class)
@@ -39,54 +45,49 @@ class OpenAILLM(BaseLLM):
         OPENAI_API_BASE: Base URL for the API
     """
 
-    def __init__(self, model: str | None = None):
-        # Get model from environment or use provided model or default
-        # Support both LLM_MODEL and OPENAI_MODEL for backward compatibility
-        env_model = os.getenv('LLM_MODEL') or os.getenv('OPENAI_MODEL')
-        self.model = model or env_model or 'gpt-4o-mini'
+    DEFAULT_MODEL = 'gpt-4o-mini'
+    DEFAULT_BASE_URL = 'https://api.openai.com/v1'
+    DEFAULT_TIMEOUT = 120.0
+    DEFAULT_CONNECT_TIMEOUT = 30.0
+    DEFAULT_MAX_RETRIES = 3
+    DEFAULT_RETRY_MIN_WAIT = 1.0
+    DEFAULT_RETRY_MAX_WAIT = 10.0
+    DEFAULT_RETRY_STATUS_CODES = [429, 500, 502, 503, 504] # Kept for reference, base might use them
 
-        # Initialize client as None - will be set up in prepare()
-        self._client: Client | None = None
-        self._prepared: bool = False  # Track preparation state
+    # Override ENV VAR names if OpenAI uses specific ones not covered by the generic LLM_ ones
+    # For OpenAI, the generic ones in OpenAICompatibleBaseLLM are often sufficient.
+    # API_KEY_ENV_VAR = 'OPENAI_API_KEY' # Already a default in the new base
+    # BASE_URL_ENV_VAR = 'OPENAI_API_BASE' # Already a default
+    # MODEL_ENV_VAR = 'OPENAI_MODEL' # Already a default
 
-        logger.info(f'Initialized OpenAI LLM with model {self.model}')
+    async def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None):
+        """
+        Initialize the OpenAI LLM.
+        Relies on OpenAICompatibleBaseLLM for client setup and core logic.
+        """
+        # Determine model name with OpenAILLM defaults before calling super().__init__
+        # This ensures that if 'model' is None and config.model_name is None,
+        # OpenAILLM's specific defaults (OPENAI_MODEL, self.DEFAULT_MODEL) are used.
 
-    async def prepare(self) -> None:
-        """Prepare the LLM by setting up the HTTP client with proper configuration."""
-        if self._prepared:
-            return  # Already prepared, skip
+        final_config = config or ModelConfig()
 
-        # Get API key from environment - support both LLM_API_KEY and OPENAI_API_KEY
-        api_key = os.getenv('LLM_API_KEY') or os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            raise ValueError('LLM_API_KEY or OPENAI_API_KEY environment variable is required')
+        chosen_model = model
+        if chosen_model is None and final_config.model_name:
+            chosen_model = final_config.model_name
+        if chosen_model is None: # Fallback to env vars specific to OpenAILLM or general LLM
+            chosen_model = os.getenv(self.MODEL_ENV_VAR) or \
+                           os.getenv(self.LLM_MODEL_ENV_VAR) or \
+                           os.getenv('OPENAI_MODEL') # Explicitly check old one too for this class
 
-        # Get base URL from environment - support both LLM_BASE_URL and OPENAI_BASE_URL
-        base_url = os.getenv('LLM_BASE_URL') or os.getenv('OPENAI_BASE_URL') or 'https://api.openai.com/v1'
+        final_model = chosen_model or self.DEFAULT_MODEL
 
-        # Create client configuration
-        config = ClientConfig(
-            base_url=base_url,
-            timeout=120.0,  # 2 minutes timeout for completion
-            connect_timeout=30.0,  # 30 seconds to connect
-            default_headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-            max_retries=3,
-            retry_min_wait=1.0,
-            retry_max_wait=10.0,
-            retry_on_status_codes=[429, 500, 502, 503, 504],
-        )
-
-        # Initialize and prepare the client
-        self._client = Client(config)
-        await self._client.prepare()
-
-        # Mark as prepared
-        self._prepared = True
-
-        logger.info(f'Using OpenAI-compatible API at {base_url} with model {self.model}')
+        # Call the async __init__ of the new base class
+        await super().__init__(config=final_config, model=final_model)
+        # Logger message from base class __init__ will cover initialization.
+        # logger.info(f'OpenAILLM specific initialization complete for model {self.model}') # Optional
 
     @classmethod
-    def supported_models(cls) -> list[str]:
+    def supported_models(cls) -> list[str]: # Reinstated
         """Supported models for OpenAI LLM."""
         return [
             # GPT models
@@ -109,8 +110,8 @@ class OpenAILLM(BaseLLM):
         max_tokens: int | None = None,
         stop_sequences: list[str] | None = None,
     ) -> _t.AsyncIterator[str] | str:
-        if not self._client:
-            raise RuntimeError('OpenAI client not initialized. Call prepare() first.')
+        if not self._client: # Should not happen if __init__ completes successfully
+            raise RuntimeError('OpenAI client not initialized. This should not happen after async __init__.')
 
         # Convert string prompt to messages format if needed
         messages = self._prepare_messages(prompt)
@@ -130,53 +131,69 @@ class OpenAILLM(BaseLLM):
             return await self._stream_response(payload)
         return await self._complete_response(payload)
 
+    def _extract_content_from_response(self, response_data: dict) -> _t.Optional[str]:
+        """Helper to extract content from OpenAI's non-streaming response JSON."""
+        choices = response_data.get('choices')
+        if choices and isinstance(choices, list) and len(choices) > 0:
+            message = choices[0].get('message')
+            if message and isinstance(message, dict):
+                return message.get('content')
+        return None
+
+    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> _t.Optional[str]:
+        """Helper to extract content delta from OpenAI's streaming response chunk."""
+        choices = data_chunk.get('choices')
+        if choices and isinstance(choices, list) and len(choices) > 0:
+            delta = choices[0].get('delta')
+            if delta and isinstance(delta, dict):
+                return delta.get('content')
+        return None
+
     async def _complete_response(self, payload: dict) -> str:
         """Handle a complete (non-streaming) response."""
+        response = await make_post_request(
+            self._client,
+            '/chat/completions',
+            payload,
+            error_message_prefix=f"OpenAI API request for model {self.model} failed"
+        )
         try:
-            # Make API request
-            response = await self._client.post('/chat/completions', json=payload)
-            response.raise_for_status()
+            response_data = response.json()
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON response from OpenAI for model {self.model}: {e}. Response text: {response.text}")
+            raise StreamProcessingError(f"Failed to decode JSON response: {e}") from e # Or ModelResponseParsingError
 
-            # Parse response
-            data = response.json()
-            return data['choices'][0]['message']['content'] or ''
-
-        except Exception as e:
-            logger.error(f'OpenAI API request failed: {e}')
+        try:
+            return extract_content_from_json(
+                response_data,
+                self._extract_content_from_response, # Use helper method
+                error_message_prefix=f"OpenAI content extraction for model {self.model} failed"
+            )
+        except ContentExtractionError as e: # ContentExtractionError or ModelResponseParsingError
+            logger.error(f"OpenAI content extraction error for model {self.model}: {e}")
             raise
 
     async def _stream_response(self, payload: dict) -> _t.AsyncIterator[str]:
         """Handle a streaming response."""
+        response = await make_post_request(
+            self._client,
+            '/chat/completions',
+            payload,
+            error_message_prefix=f"OpenAI streaming API request for model {self.model} failed"
+        )
 
-        async def stream_generator():
-            try:
-                # Make streaming API request
-                response = await self._client.post('/chat/completions', json=payload)
-                response.raise_for_status()
+        try:
+            return process_sse_stream(
+                response,
+                delta_extractor=self._extract_delta_from_stream_chunk, # Use helper method
+                stop_marker="[DONE]",
+                error_message_prefix="OpenAI streaming processing failed"
+            )
+        except StreamProcessingError as e:
+            # Log and re-raise to match previous behavior
+            logger.error(f"OpenAI stream processing error: {e}")
+            raise
 
-                # Process SSE stream
-                async for line in response.aiter_lines():
-                    if line.startswith('data: '):
-                        data_str = line[6:]  # Remove "data: " prefix
-                        if data_str.strip() == '[DONE]':
-                            break
-
-                        try:
-                            data = json.loads(data_str)
-                            if 'choices' in data and len(data['choices']) > 0:
-                                delta = data['choices'][0].get('delta', {})
-                                content = delta.get('content')
-                                if content:
-                                    yield content
-                        except json.JSONDecodeError:
-                            # Skip malformed JSON
-                            continue
-
-            except Exception as e:
-                logger.error(f'OpenAI streaming API request failed: {e}')
-                raise
-
-        return stream_generator()
 
     def _prepare_messages(self, prompt: str | list[dict[str, str]]) -> list[dict[str, str]]:
         """Convert prompt to OpenAI message format."""
@@ -193,8 +210,8 @@ class OpenAILLM(BaseLLM):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> dict | _t.AsyncIterator[dict]:
-        if not self._client:
-            raise RuntimeError('OpenAI client not initialized. Call prepare() first.')
+        if not self._client: # Should not happen if __init__ completes successfully
+            raise RuntimeError('OpenAI client not initialized. This should not happen after async __init__.')
 
         # Convert string prompt to messages format if needed
         messages = self._prepare_messages(prompt)
@@ -214,82 +231,109 @@ class OpenAILLM(BaseLLM):
 
     async def _complete_tool_response(self, payload: dict) -> dict:
         """Handle a complete (non-streaming) response with tool calls."""
+        response = await make_post_request(
+            self._client,
+            '/chat/completions',
+            payload,
+            error_message_prefix=f"OpenAI tool API request for model {self.model} failed"
+        )
         try:
-            # Make API request
-            response = await self._client.post('/chat/completions', json=payload)
-            response.raise_for_status()
+            response_data = response.json()
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON tool response from OpenAI for model {self.model}: {e}. Response text: {response.text}")
+            raise StreamProcessingError(f"Failed to decode JSON tool response: {e}") from e # Or ModelResponseParsingError
 
-            # Parse response
-            data = response.json()
-            message = data['choices'][0]['message']
+        # Custom extraction logic for tool responses
+        try:
+            choices = response_data.get('choices')
+            if not choices or not isinstance(choices, list) or len(choices) == 0:
+                # Using ModelResponseParsingError as structure is unexpected
+                raise ModelResponseParsingError(f"Missing 'choices' in OpenAI tool response for model {self.model}.")
+
+            message = choices[0].get('message')
+            if not message or not isinstance(message, dict):
+                raise ModelResponseParsingError(f"Missing 'message' in OpenAI tool response choice for model {self.model}.")
 
             result = {}
-            if message.get('content'):
+            if message.get('content'): # Content can be None
                 result['content'] = message['content']
             if message.get('tool_calls'):
                 result['tool_calls'] = message['tool_calls']
 
-            return result
+            if not result.get('content') and not result.get('tool_calls'):
+                logger.warning(f"OpenAI tool response for model {self.model} had no content or tool_calls.")
+                # This might be a valid empty response, or an issue.
+                # Depending on strictness, one might raise ContentExtractionError if content/tool_calls are expected.
+                # For now, allow empty result dict.
 
-        except Exception as e:
-            logger.error(f'OpenAI tool API request failed: {e}')
+            return result
+        except ModelResponseParsingError: # Re-raise specific parsing errors
             raise
+        except Exception as e: # Catch broader errors during extraction
+            logger.error(f'OpenAI tool response processing for model {self.model} failed: {e}.', exc_info=True)
+            logger.debug(f"Problematic data for tool response processing: {response_data}") # Log full data at DEBUG
+            raise ContentExtractionError(f'Failed to process tool response for model {self.model}: {e}') from e
+
 
     async def _stream_tool_response(self, payload: dict) -> _t.AsyncIterator[dict]:
         """Handle a streaming response with tool calls."""
+        response = await make_post_request(
+            self._client,
+            '/chat/completions',
+            payload,
+            error_message_prefix="OpenAI streaming tool API request failed"
+        )
 
+        # SSE processing for tool calls is complex and stateful.
+        # The generic process_sse_stream is designed for simpler string content streams.
         async def stream_generator():
-            try:
-                # Make streaming API request
-                response = await self._client.post('/chat/completions', json=payload)
-                response.raise_for_status()
+            # accumulated_content and accumulated_tool_calls can be useful if a full final
+            # object needs to be constructed or for debugging, but primary yield is per delta.
+            # For this refactoring, we focus on yielding deltas as they come.
+            # accumulated_content = ''
+            # accumulated_tool_calls = []
 
-                # For tool calls with streaming, we need to accumulate the response
-                accumulated_content = ''
-                accumulated_tool_calls = []
+            async for line in response.aiter_lines():
+                line = line.strip()
+                if not line:
+                    continue
 
-                # Process SSE stream
-                async for line in response.aiter_lines():
-                    if line.startswith('data: '):
-                        data_str = line[6:]  # Remove "data: " prefix
-                        if data_str.strip() == '[DONE]':
-                            # Yield final accumulated result
-                            result = {}
-                            if accumulated_content:
-                                result['content'] = accumulated_content
-                            if accumulated_tool_calls:
-                                result['tool_calls'] = accumulated_tool_calls
-                            if result:
-                                yield result
-                            break
+                if line.startswith("data: "):
+                    data_str = line[len("data: "):].strip()
+                    if data_str == "[DONE]":
+                        break # Signal end of stream.
 
-                        try:
-                            data = json.loads(data_str)
-                            if 'choices' in data and len(data['choices']) > 0:
-                                delta = data['choices'][0].get('delta', {})
+                    try:
+                        data_chunk = json.loads(data_str)
+                        choices = data_chunk.get('choices')
+                        if choices and isinstance(choices, list) and len(choices) > 0:
+                            delta = choices[0].get('delta', {})
 
-                                # Handle content
-                                content = delta.get('content')
-                                if content:
-                                    accumulated_content += content
-                                    yield {'content': content}
+                            content_delta = delta.get('content')
+                            if content_delta:
+                                # accumulated_content += content_delta # Accumulate if needed for other logic
+                                yield {'content': content_delta}
 
-                                # Handle tool calls
-                                tool_calls = delta.get('tool_calls')
-                                if tool_calls:
-                                    # This is a simplified handling - in practice, tool calls
-                                    # in streaming are more complex with partial updates
-                                    accumulated_tool_calls.extend(tool_calls)
+                            tool_calls_delta = delta.get('tool_calls')
+                            if tool_calls_delta:
+                                # OpenAI streams tool calls, potentially in parts.
+                                # Yielding them directly as they arrive. Robust consumer should handle aggregation if needed.
+                                yield {'tool_calls': tool_calls_delta}
+                                # accumulated_tool_calls.extend(tool_calls_delta) # Accumulate if needed
 
-                        except json.JSONDecodeError:
-                            # Skip malformed JSON
-                            continue
+                    except json.JSONDecodeError:
+                        logger.warning(f"OpenAI streaming tool: Failed to parse SSE JSON: {data_str}")
+                        continue
 
-            except Exception as e:
-                logger.error(f'OpenAI streaming tool API request failed: {e}')
-                raise
-
-        return stream_generator()
+        # Ensure the response is closed after the generator is exhausted.
+        try:
+            async for item in stream_generator():
+                yield item
+        except Exception as e:
+            logger.error(f'OpenAI streaming tool API processing failed: {e}')
+            raise StreamProcessingError(f"OpenAI streaming tool processing failed: {e}") from e
+        finally:
+            await response.aclose()
 
     async def close(self) -> None:
         """Close the HTTP client and release resources."""

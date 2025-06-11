@@ -13,7 +13,15 @@ import typing as _t
 
 from ..client import Client, ClientConfig, LoggingTracer
 from .base import BaseLLM
-from .registry import ModelRegistry
+from .config import ModelConfig
+from .registry import register # Changed
+from .http_utils import (
+    make_post_request,
+    extract_content_from_json,
+    process_sse_stream,
+    ContentExtractionError,
+    StreamProcessingError
+)
 
 __all__ = [
     'AnthropicLLM',
@@ -22,7 +30,7 @@ __all__ = [
 logger = logging.getLogger('codin.model.anthropic_llm')
 
 
-@ModelRegistry.register
+@register # Changed
 class AnthropicLLM(BaseLLM):
     """Implementation of BaseLLM for Anthropic API.
 
@@ -39,46 +47,77 @@ class AnthropicLLM(BaseLLM):
         ANTHROPIC_API_BASE: Base URL for the API
         ANTHROPIC_API_VERSION: API version
     """
+    DEFAULT_MODEL = 'claude-3-sonnet-20240229'
+    DEFAULT_BASE_URL = 'https://api.anthropic.com'
+    DEFAULT_API_VERSION = '2023-06-01'
+    DEFAULT_TIMEOUT = 60.0
+    # Anthropic doesn't have explicit connect_timeout in ClientConfig, but we can use ModelConfig's
+    # Default retry policies are often handled by the underlying HTTP client library if not specified.
 
-    def __init__(self, model: str | None = None):
-        # Get model from environment or use provided model or default
-        env_model = os.environ.get('LLM_MODEL')
-        model_name = model or env_model or 'claude-3-sonnet-20240229'
+    async def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None): # Changed to async
+        """Initialize and prepare the Anthropic LLM.
 
-        super().__init__(model_name)
+        Args:
+            config: Optional ModelConfig instance. If None, a default config is used,
+                    and settings are primarily sourced from environment variables.
+            model: Optional model name to override config or environment settings.
+        """
+        self.config = config or ModelConfig()
 
-        # Try new environment variables first, fall back to legacy ones
-        self.api_key = os.environ.get('LLM_API_KEY') or os.environ.get('ANTHROPIC_API_KEY')
-        self.api_base = os.environ.get('LLM_BASE_URL') or os.environ.get(
-            'ANTHROPIC_API_BASE', 'https://api.anthropic.com'
-        )
-        self.api_version = os.environ.get('ANTHROPIC_API_VERSION', '2023-06-01')
+        # Determine model name: constructor arg > config > env > default
+        chosen_model = model
+        if chosen_model is None and self.config.model_name:
+            chosen_model = self.config.model_name
+        if chosen_model is None:
+            chosen_model = os.getenv('LLM_MODEL') # LLM_MODEL is generic
 
-        # Remove trailing slash if present
-        if self.api_base.endswith('/'):
-            self.api_base = self.api_base[:-1]
+        self.model = chosen_model or self.DEFAULT_MODEL
+        super().__init__(self.model) # Call super class __init__
 
-        self._client: Client | None = None
+        # Client initialization logic moved from prepare()
+        # API Key: config > env (generic) > env (specific)
+        api_key = self.config.api_key or \
+                  os.getenv('LLM_API_KEY') or \
+                  os.getenv('ANTHROPIC_API_KEY')
+        if not api_key:
+            raise ValueError(
+                'API key not found. Set in ModelConfig, LLM_API_KEY, or ANTHROPIC_API_KEY environment variable.'
+            )
 
-        # Initialize the client
-        if not self.api_key:
-            raise ValueError('LLM_API_KEY or ANTHROPIC_API_KEY environment variable not set')
+        # Base URL: config > env (generic) > env (specific) > default
+        base_url = self.config.base_url or \
+                   os.getenv('LLM_BASE_URL') or \
+                   os.getenv('ANTHROPIC_API_BASE') or \
+                   self.DEFAULT_BASE_URL
+        if base_url.endswith('/'): # Ensure no trailing slash
+            base_url = base_url[:-1]
 
-        # Configure the HTTP client
-        config = ClientConfig(
-            base_url=self.api_base,
-            default_headers={
-                'x-api-key': self.api_key,
-                'anthropic-version': self.api_version,
-                'Content-Type': 'application/json',
-            },
-            timeout=60.0,
-            # Add tracing in debug mode
-            tracers=[LoggingTracer()] if logger.isEnabledFor(logging.DEBUG) else [],
-        )
-        self._client = Client(config)
+        # API Version: config > env (specific) > default
+        api_version = self.config.api_version or \
+                      os.getenv('ANTHROPIC_API_VERSION') or \
+                      self.DEFAULT_API_VERSION
 
-        logger.info(f'Using Anthropic API at {self.api_base} with model {self.model}')
+        client_kwargs = self.config.get_client_config_kwargs()
+        client_kwargs.setdefault('timeout', self.DEFAULT_TIMEOUT)
+        client_kwargs['default_headers'] = {
+            'x-api-key': api_key,
+            'anthropic-version': api_version,
+            'Content-Type': 'application/json',
+        }
+        client_kwargs['base_url'] = base_url
+
+        if logger.isEnabledFor(logging.DEBUG) and 'tracers' not in client_kwargs:
+            client_kwargs['tracers'] = [LoggingTracer()]
+        elif 'tracers' not in client_kwargs:
+             client_kwargs['tracers'] = []
+
+        client_config = ClientConfig(**client_kwargs)
+        self._client = Client(client_config)
+        # await self._client.prepare() # Removed, Client.__init__ now handles full setup
+
+        logger.info(f'Anthropic LLM initialized and client prepared for model {self.model} at {base_url}')
+
+    # prepare() method is now removed.
 
     @classmethod
     def supported_models(cls) -> list[str]:
@@ -86,15 +125,6 @@ class AnthropicLLM(BaseLLM):
         return [
             r'claude-.*',
         ]
-
-    async def _ensure_client(self) -> Client:
-        """Ensure the HTTP client is prepared and return it."""
-        if not self._client:
-            raise RuntimeError('Failed to initialize Anthropic client')
-
-        # Make sure the client is prepared
-        await self._client.prepare()
-        return self._client
 
     def _prepare_messages(self, prompt: str | list[dict[str, str]]) -> tuple[list[dict], str | None]:
         """Convert prompt to Anthropic message format.
@@ -138,7 +168,10 @@ class AnthropicLLM(BaseLLM):
         stop_sequences: list[str] | None = None,
     ) -> _t.AsyncIterator[str] | str:
         """Generate text using Anthropic API."""
-        client = await self._ensure_client()
+        if not self._client: # Should not happen if __init__ completes successfully
+            raise RuntimeError('Anthropic client not initialized. This should not happen after async __init__.')
+        # client variable is no longer needed as methods will use self._client
+        # client = self._client
 
         # Extract the system prompt if any
         messages, system_prompt = self._prepare_messages(prompt)
@@ -166,71 +199,80 @@ class AnthropicLLM(BaseLLM):
 
         # Send request
         if stream:
-            return self._stream_response(client, payload)
-        return await self._complete_response(client, payload)
+            return self._stream_response(payload) # Use self._client internally
+        return await self._complete_response(payload) # Use self._client internally
 
-    async def _complete_response(self, client: Client, payload: dict) -> str:
+    def _extract_content_from_response(self, response_data: dict) -> _t.Optional[str]:
+        """Helper to extract content from Anthropic's non-streaming response JSON."""
+        content_blocks = response_data.get('content')
+        if not content_blocks or not isinstance(content_blocks, list):
+            # Return None if no content blocks, let extract_content_from_json handle raising error if content is expected.
+            # Or, if "" is acceptable for "no content", return that. Given current behavior, None is better.
+            return None
+
+        text_parts = []
+        for block in content_blocks:
+            if isinstance(block, dict) and block.get('type') == 'text':
+                text_parts.append(block.get('text', ''))
+        return "".join(text_parts)
+
+    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> _t.Optional[str]:
+        """Helper to extract content delta from Anthropic's streaming response chunk."""
+        if data_chunk.get('type') == 'content_block_delta':
+            delta = data_chunk.get('delta')
+            if isinstance(delta, dict) and delta.get('type') == 'text_delta':
+                return delta.get('text')
+        return None
+
+    async def _complete_response(self, payload: dict) -> str:
         """Handle a complete (non-streaming) response."""
-        response = await client.post('/v1/messages', json=payload)
-        response.raise_for_status()
+        if not self._client:
+            raise RuntimeError(f"Anthropic client for model {self.model} not initialized in _complete_response.")
 
-        data = response.json()
-
-        # Extract content from response
+        response = await make_post_request(
+            self._client,
+            '/v1/messages',
+            payload,
+            error_message_prefix=f"Anthropic API request for model {self.model} failed"
+        )
         try:
-            content = data.get('content', [])
-            if not content:
-                return ''
+            response_data = response.json()
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON response from Anthropic for model {self.model}: {e}. Response text: {response.text}")
+            raise StreamProcessingError(f"Failed to decode JSON response: {e}") from e # Or ModelResponseParsingError
 
-            # Join all text blocks
-            text = ''
-            for block in content:
-                if block.get('type') == 'text':
-                    text += block.get('text', '')
+        try:
+            return extract_content_from_json(
+                response_data,
+                self._extract_content_from_response, # Use helper
+                error_message_prefix=f"Anthropic content extraction for model {self.model} failed"
+            )
+        except ContentExtractionError as e: # Catches ModelResponseParsingError too if it's a base
+            logger.error(f"Anthropic content extraction error for model {self.model}: {e}")
+            raise
 
-            return text
-        except (KeyError, IndexError) as e:
-            logger.error(f'Error parsing Anthropic response: {e}')
-            logger.debug(f'Response data: {data}')
-            raise ValueError(
-                f'Failed to parse Anthropic response: {e}'
-            ) from e
-
-    async def _stream_response(self, client: Client, payload: dict) -> _t.AsyncIterator[str]:
+    async def _stream_response(self, payload: dict) -> _t.AsyncIterator[str]:
         """Handle a streaming response."""
+        if not self._client:
+            raise RuntimeError(f"Anthropic client for model {self.model} not initialized in _stream_response.")
 
-        async def stream_generator():
-            response = await client.post('/v1/messages', json=payload)
-            response.raise_for_status()
+        response = await make_post_request(
+            self._client,
+            '/v1/messages',
+            payload,
+            error_message_prefix=f"Anthropic streaming API request for model {self.model} failed"
+        )
 
-            text_buffer = ''
-
-            async for line in response.aiter_lines():
-                line = line.strip()
-                if not line or line == 'data: [DONE]':
-                    continue
-
-                if line.startswith('data: '):
-                    try:
-                        data = json.loads(line[6:])
-
-                        # Check if this is a content block
-                        if data.get('type') == 'content_block_delta':
-                            delta = data.get('delta', {})
-                            if delta.get('type') == 'text_delta':
-                                text = delta.get('text', '')
-                                if text:
-                                    text_buffer += text
-                                    yield text
-
-                        # Check if this is a message stop
-                        elif data.get('type') == 'message_stop':
-                            break
-
-                    except json.JSONDecodeError:
-                        logger.warning(f'Failed to parse SSE line: {line}')
-
-        return stream_generator()
+        try:
+            return process_sse_stream(
+                response,
+                delta_extractor=self._extract_delta_from_stream_chunk, # Use helper
+                stop_marker=None, # Anthropic doesn't use a data line like "[DONE]"
+                error_message_prefix="Anthropic streaming processing failed"
+            )
+        except StreamProcessingError as e:
+            logger.error(f"Anthropic stream processing error: {e}")
+            raise
 
     async def generate_with_tools(
         self,
@@ -256,13 +298,9 @@ class AnthropicLLM(BaseLLM):
             self._client = None
 
     def __del__(self):
-        """Clean up resources when the object is garbage collected."""
+        """Cleanup on deletion."""
         if self._client:
-            import asyncio
-
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    loop.create_task(self._client.close())
-            except Exception:
-                pass
+            # Can't await in __del__, so just log a warning if not closed properly
+            # This matches the pattern in OpenAILLM for consistency
+            # The original asyncio.create_task can lead to issues if the loop is closed
+            logger.warning('AnthropicLLM was deleted without calling close(). This may leak resources.')

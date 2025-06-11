@@ -6,12 +6,15 @@ based on provider names and configuration settings.
 
 import logging
 import os
+import typing as _t
 
 from .anthropic_llm import AnthropicLLM
 from .base import BaseLLM
+from .config import ModelConfig  # Import ModelConfig
 from .gemini_llm import GeminiLLM
 from .litellm_adapter import LiteLLMAdapter
 from .openai_llm import OpenAILLM
+
 
 __all__ = [
     'LLMFactory',
@@ -42,20 +45,25 @@ class LLMFactory:
     }
 
     @classmethod
-    def create_llm(
+    async def create_llm( # Changed to async
         cls,
         model: str | None = None,
         provider: str | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
+        config: _t.Optional[ModelConfig] = None,
     ) -> BaseLLM:
         """Create an LLM instance based on configuration.
 
+        The method prioritizes provided arguments, then values from the `config` object,
+        and finally falls back to environment variables.
+
         Args:
-            model: Model name (overrides LLM_MODEL env var)
-            provider: Provider name (overrides LLM_PROVIDER env var)
-            api_key: API key (overrides LLM_API_KEY env var)
-            base_url: Base URL (overrides LLM_BASE_URL env var)
+            model: Model name (overrides LLM_MODEL env var and config.model_name)
+            provider: Provider name (overrides LLM_PROVIDER env var and config.provider)
+            api_key: API key (overrides LLM_API_KEY env var and config.api_key)
+            base_url: Base URL (overrides LLM_BASE_URL env var and config.base_url)
+            config: A ModelConfig object to source configuration from.
 
         Returns:
             A BaseLLM instance
@@ -63,20 +71,31 @@ class LLMFactory:
         Raises:
             ValueError: If provider is not supported or auto-detection fails
         """
-        # Get configuration from environment variables or parameters
-        env_provider = os.environ.get('LLM_PROVIDER', 'auto').lower()
-        env_model = os.environ.get('LLM_MODEL')
-        env_api_key = os.environ.get('LLM_API_KEY')
-        env_base_url = os.environ.get('LLM_BASE_URL')
+        # Create a base ModelConfig if none is provided
+        effective_config = config or ModelConfig()
 
-        # Use parameters or fall back to environment variables
-        final_provider = provider or env_provider
-        final_model = model or env_model
-        final_api_key = api_key or env_api_key
-        final_base_url = base_url or env_base_url
+        # Determine final configuration values: direct args > config object > env vars
+        final_provider = provider or \
+                         effective_config.provider or \
+                         os.environ.get('LLM_PROVIDER', 'auto').lower()
+
+        final_model = model or \
+                      effective_config.model_name or \
+                      os.environ.get('LLM_MODEL')
+
+        final_api_key = api_key or \
+                        effective_config.api_key or \
+                        os.environ.get('LLM_API_KEY')
+
+        final_base_url = base_url or \
+                         effective_config.base_url or \
+                         os.environ.get('LLM_BASE_URL')
+
+        # Other ModelConfig fields can be populated similarly if the factory needs to override them
+        # For now, we assume other fields in `effective_config` are used as is.
 
         if not final_model:
-            raise ValueError('Model name must be provided via parameter or LLM_MODEL environment variable')
+            raise ValueError('Model name must be provided via parameter, ModelConfig, or LLM_MODEL env var')
 
         # Auto-detect provider if needed
         if final_provider == 'auto':
@@ -85,44 +104,40 @@ class LLMFactory:
 
         # Validate provider
         if final_provider not in cls.PROVIDER_CLASSES:
-            supported = ', '.join(cls.PROVIDER_CLASSES.keys())
-            raise ValueError(f"Unsupported provider '{final_provider}'. Supported: {supported}")
+            supported_providers = ', '.join(cls.PROVIDER_CLASSES.keys())
+            raise ValueError(f"Unsupported provider '{final_provider}'. Supported: {supported_providers}")
 
-        # Set environment variables for the LLM class to use
-        original_env = {}
-        try:
-            # Backup original environment
-            env_vars_to_set = {
-                'LLM_MODEL': final_model,
-                'LLM_PROVIDER': final_provider,
-            }
-            if final_api_key:
-                env_vars_to_set['LLM_API_KEY'] = final_api_key
-            if final_base_url:
-                env_vars_to_set['LLM_BASE_URL'] = final_base_url
+        # Prepare the ModelConfig to be passed to the LLM constructor
+        # Prioritize specific settings passed to the factory, then existing config, then env.
+        instance_config = ModelConfig(
+            model_name=final_model, # Model name in config is for reference/consistency
+            api_key=final_api_key,
+            base_url=final_base_url,
+            provider=final_provider,
+            # Carry over other settings from the input config if they weren't overridden by direct args
+            timeout=effective_config.timeout,
+            connect_timeout=effective_config.connect_timeout,
+            max_retries=effective_config.max_retries,
+            retry_min_wait=effective_config.retry_min_wait,
+            retry_max_wait=effective_config.retry_max_wait,
+            retry_on_status_codes=effective_config.retry_on_status_codes,
+            api_version=effective_config.api_version # Important for Anthropic
+        )
 
-            for key, _value in env_vars_to_set.items():
-                if key in os.environ:
-                    original_env[key] = os.environ[key]
-                os.environ[key] = _value
+        # Create the LLM instance
+        llm_class = cls.PROVIDER_CLASSES[final_provider]
+        # Pass the constructed config and the final_model directly.
+        # The model classes' __init__ are designed to use the direct model first.
+        # Model __init__ is now async
+        instance = await llm_class(config=instance_config, model=final_model)
 
-            # Create the LLM instance
-            llm_class = cls.PROVIDER_CLASSES[final_provider]
-            instance = llm_class(model=final_model)
+        logger.info(f"Created {final_provider} LLM instance for model '{final_model}'")
+        if final_base_url: # Log if a non-default base_url was used
+            logger.info(f'Using base URL: {final_base_url}')
+        if final_api_key: # Log if an API key was explicitly sourced by the factory
+             logger.debug(f'Using API key ending with: ...{final_api_key[-4:] if final_api_key else "None"}')
 
-            logger.info(f"Created {final_provider} LLM instance for model '{final_model}'")
-            if final_base_url:
-                logger.info(f'Using custom base URL: {final_base_url}')
-
-            return instance
-
-        finally:
-            # Restore original environment
-            for key, _value in env_vars_to_set.items():
-                if key in original_env:
-                    os.environ[key] = original_env[key]
-                elif key in os.environ:
-                    del os.environ[key]
+        return instance
 
     @classmethod
     def _detect_provider(cls, model: str, base_url: str | None = None) -> str:
@@ -160,10 +175,22 @@ class LLMFactory:
         return 'openai'
 
 
-def create_llm_from_env() -> BaseLLM:
-    """Convenience function to create an LLM from environment variables only.
+async def create_llm_from_env(config: _t.Optional[ModelConfig] = None) -> BaseLLM: # Changed to async
+    """Convenience function to create an LLM.
+
+    If a config object is provided, it's used as a base.
+    Environment variables can override settings in the config unless specific parameters
+    (model, api_key, base_url) are set directly in the config object, which then take precedence
+    over environment variables.
+
+    Args:
+        config: Optional ModelConfig object.
 
     Returns:
-        A BaseLLM instance configured from environment variables
+        A BaseLLM instance.
     """
-    return LLMFactory.create_llm()
+    # If config is None, LLMFactory.create_llm will create a new ModelConfig()
+    # and rely on environment variables for api_key, base_url, model, provider.
+    # If config is provided, those values are used as defaults, potentially overridden by env vars
+    # if the corresponding fields in the config object are None.
+    return await LLMFactory.create_llm(config=config) # Added await

@@ -69,20 +69,20 @@ __all__: list[str] = [
 # For backward compatibility or specific testing setups, these sys.modules manipulations exist.
 # They might need review in a broader context but are kept for now.
 # It's generally better if modules are directly importable via PYTHONPATH.
-if 'src.codin.agent.types' not in _sys.modules: # Check before setting default
-    import codin.agent.types as _agent_types_module
-    _sys.modules.setdefault('src.codin.agent.types', _agent_types_module)
-
-if 'src.codin' not in _sys.modules:
-     _sys.modules.setdefault('src.codin', _sys.modules[__name__])
-
-if 'src' not in _sys.modules: # This makes `import src.codin` work if only `codin` is in PYTHONPATH
-    # This can be tricky. If 'codin' is a top-level package in PYTHONPATH,
-    # then `import codin` works. `import src.codin` implies 'src' is also in PYTHONPATH.
-    # This line seems to try to make `src.codin` an alias for `codin` if `codin` is imported.
-    # It might be better to ensure consistent PYTHONPATH setup.
-    # For now, preserving the logic but with a note.
-    _sys.modules.setdefault('src', _sys.modules[__name__].__path__) # type: ignore
+# if 'src.codin.agent.types' not in _sys.modules: # Check before setting default
+#     import codin.agent.types as _agent_types_module
+#     _sys.modules.setdefault('src.codin.agent.types', _agent_types_module)
+#
+# if 'src.codin' not in _sys.modules:
+#      _sys.modules.setdefault('src.codin', _sys.modules[__name__])
+#
+# if 'src' not in _sys.modules: # This makes `import src.codin` work if only `codin` is in PYTHONPATH
+#     # This can be tricky. If 'codin' is a top-level package in PYTHONPATH,
+#     # then `import codin` works. `import src.codin` implies 'src' is also in PYTHONPATH.
+#     # This line seems to try to make `src.codin` an alias for `codin` if `codin` is imported.
+#     # It might be better to ensure consistent PYTHONPATH setup.
+#     # For now, preserving the logic but with a note.
+#     _sys.modules.setdefault('src', _sys.modules[__name__].__path__) # type: ignore
 
 
 # To make get_api_key etc. work if they are in config.py

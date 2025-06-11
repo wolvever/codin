@@ -267,7 +267,9 @@ class BaseAgent(AgentActor):
                 logger.warning(f"Agent {self.id} ({self.name}): Budget constraint exceeded for session {session_id}: {reason}")
                 finish_msg = A2AMessage(messageId=str(uuid.uuid4()),role=Role.agent,parts=[TextPart(text=f"Budget exceeded: {reason}")],contextId=session_id,kind="message")
                 finish_step = FinishStep(step_id=str(uuid.uuid4()), reason=f"Budget exceeded: {reason}", final_message=finish_msg)
-                await self.mailbox.put_outbox(finish_msg); async for output in self._execute_step(finish_step, state, session_id): yield output
+                await self.mailbox.put_outbox(finish_msg)
+                async for output in self._execute_step(finish_step, state, session_id): # MODIFIED
+                    yield output
                 break
             await self._emit_event("turn_start", {"session_id": session_id, "iteration": state.iteration, "metrics": state.metrics.model_dump(), "request_id": state.metadata.get("request_id")})
             steps_executed = 0; task_finished_by_step = False

@@ -134,6 +134,11 @@ class TaskState(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+class TaskStatus(BaseModel):
+    state: TaskState
+    message: str | None = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+
 class TaskStatusUpdateEvent(BaseModel):
     contextId: str
     taskId: str

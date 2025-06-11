@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .base import ModelOptions, PromptTemplate, PromptVariant
 # Import Client and ClientConfig from the correct location
-from ...client import Client, ClientConfig # Assuming relative path from src/codin/prompt to src/codin/client
+from ..client import Client, ClientConfig # MODIFIED: Assuming client is a submodule of codin
 
 logger = logging.getLogger(__name__) # Added
 

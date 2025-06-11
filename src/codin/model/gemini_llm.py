@@ -285,14 +285,6 @@ class GeminiLLM(BaseLLM):
             raise
 
     async def generate_with_tools(
-                stop_marker=None, # Gemini doesn't use a specific data line like "[DONE]"
-                error_message_prefix="Gemini streaming processing failed"
-            )
-        except StreamProcessingError as e:
-            logger.error(f"Gemini stream processing error: {e}")
-            raise
-
-    async def generate_with_tools(
         self,
         prompt: str | list[dict[str, str]],
         tools: list[dict],

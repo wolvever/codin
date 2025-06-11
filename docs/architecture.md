@@ -74,15 +74,15 @@ class Runtime(ABC):
 
 ## 10. Sub-System Boundaries
 
-Below are the five top-level sub-systems and their primary responsibilities.  Each maps directly to a Python package in the codebase (e.g. `omni_agent/agent`, `omni_agent/tool`, …).
+Below are the five top-level sub-systems and their primary responsibilities.  Each maps directly to a Python package in the codebase (e.g. `codin/agent`, `codin/tool`, …).
 
 | Sub-System | Package | Responsibility |
 |------------|---------|----------------|
-| **AgentSystem** | `omni_agent.agent` | Framework-agnostic `Agent` interface, wrappers for ADK/LangGraph/CrewAI, multi-agent coordination (Planner, Router, etc.). |
-| **ToolSystem** | `omni_agent.tool` | `Tool` abstraction, `ToolRegistry`, `ToolExecutor`, adapters for OpenAPI and Python functions. |
-| **Sandbox** | `omni_agent.sandbox` | Secure, isolated execution layer for code & shell (local, Docker, Daytona, E2B). Provides FS access abstraction. |
-| **MemorySystem** | `omni_agent.memory` | Persistent conversation history, short-term "note" store, vector search over memory chunks (pluggable backends: in-mem, Redis, pgvector). |
-| **OmniRuntime** | `omni_agent.runtime` | Execution orchestration of functions, CLI, containers, endpoints, and distributed jobs across local, Docker/K8s, Ray, etc. |
+| **AgentSystem** | `codin.agent` | Framework-agnostic `Agent` interface, wrappers for ADK/LangGraph/CrewAI, multi-agent coordination (Planner, Router, etc.). |
+| **ToolSystem** | `codin.tool` | `Tool` abstraction, `ToolRegistry`, `ToolExecutor`, adapters for OpenAPI and Python functions. |
+| **Sandbox** | `codin.sandbox` | Secure, isolated execution layer for code & shell (local, Docker, Daytona, E2B). Provides FS access abstraction. |
+| **MemorySystem** | `codin.memory` | Persistent conversation history, short-term "note" store, vector search over memory chunks (pluggable backends: in-mem, Redis, pgvector). |
+| **OmniRuntime** | `codin.runtime` | Execution orchestration of functions, CLI, containers, endpoints, and distributed jobs across local, Docker/K8s, Ray, etc. |
 
 Each sub-system is internally cohesive and externally communicates through well-defined interfaces (Python protocols / ABCs) and—when crossing service boundaries—via the A2A protocol.
 

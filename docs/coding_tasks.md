@@ -1,6 +1,6 @@
 # Sample Coding Tasks for codin CLI
 
-This document lists a few example tasks you can run with the `codin` CLI to evaluate the `BaseAgent` and `BasePlanner` using your environment configuration.
+This document lists a few example tasks you can run with the `codin` CLI using the `CodeAgent` and its default `CodePlanner`.
 
 ```bash
 export LLM_PROVIDER=openai
@@ -17,6 +17,6 @@ codin --debug --approval-mode never -q "Create a function that sums a list"
 codin --debug --approval-mode never -q "Add a README section describing the project"
 ```
 
-Each command runs the default BaseAgent + BasePlanner loop and prints the result. These small tasks are good sanity checks for prompt formatting and tool calls.
+Each command runs the CodeAgent loop and prints the result. These small tasks are good sanity checks for prompt formatting and tool calls.
 
 > **Note** Ensure network access to the configured base URL. If the MCP toolset fails to initialize or the API key is missing, CLI runs may fail.

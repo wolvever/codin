@@ -25,8 +25,11 @@ class E2BSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
         super().__init__(env_policy=env_policy)
         try:
             from e2b import Sandbox as _E2B_SDK
+            from e2b.sandbox.main import ProcessMessage # For type hint
         except ImportError as e:  # pragma: no cover
             raise RuntimeError('e2b package not available – install with `pip install e2b`.') from e
+
+        self._E2BProcessMessage: _t.Type[ProcessMessage] = ProcessMessage # Store for type hinting
 
         self._sandbox = _E2B_SDK(**kwargs) # e2b.Sandbox instance
 
@@ -76,8 +79,9 @@ class E2BSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
             )
             proc.wait() # Wait for the process to complete
 
-            stdout = "".join(proc.output.stdout_messages)
-            stderr = "".join(proc.output.stderr_messages)
+            stdout = "".join(msg.line for msg in proc.output.stdout_messages)
+            stderr = "".join(msg.line for msg in proc.output.stderr_messages)
+
 
             return ExecResult(stdout, stderr, proc.exit_code if proc.exit_code is not None else -1)
 
@@ -251,8 +255,6 @@ class E2BSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
         # E2B SDK's write takes an absolute path.
         # If path for `_common_run_code_logic` (e.g. /tmp/code_...) is absolute, it's used as is.
         # If it's relative, it needs to be based on a known E2B root.
-        # The mixin uses simple names like "temp_code_HASH.ext" which would be relative.
-        # We must ensure they are written to a sensible place, e.g. /tmp or /home/user.
         # The mixin's _common_run_code_logic uses `temp_file_name = f"temp_code_{hash(code) % 10000}{ext}"`
         # for temp scripts. This needs to be an absolute path for E2B.
 
@@ -277,3 +279,21 @@ class E2BSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
             await loop.run_in_executor(None, _write_file_async_wrapper)
         except IOError: # Re-raise
             raise
+
+    async def list_available_binaries(self) -> list[str]:
+        # Similar approach to CodexSandbox, adjust as needed for E2B's environment
+        commands_to_try = [
+            "bash -c 'compgen -c'",
+            "sh -c 'ls /bin /usr/bin /usr/local/bin /sbin /usr/sbin 2>/dev/null | sort -u'",
+        ]
+        for cmd_str in commands_to_try:
+            try:
+                # Using self.run_cmd which is already implemented for E2B
+                result = await self.run_cmd(cmd_str)
+
+                if result.exit_code == 0 and result.stdout:
+                    return sorted(list(set(result.stdout.strip().split('\n'))))
+            except Exception:
+                # Try the next command if one fails
+                pass
+        return []

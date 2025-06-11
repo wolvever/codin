@@ -220,6 +220,11 @@ class Sandbox(LifecycleMixin, ABC):
     async def write_file(self, path: str, content: str) -> None:
         """Write *content* (UTF-8) to *path*, creating parent directories if needed."""
 
+    @abc.abstractmethod
+    async def list_available_binaries(self) -> list[str]:
+        """Lists available binaries in the sandbox environment."""
+        raise NotImplementedError
+
     # -----------------------------------------------------------------------
     # Convenience helpers common to most back-ends – these might be overriden
     # for more efficient implementations.

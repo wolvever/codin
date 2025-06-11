@@ -412,3 +412,17 @@ class LocalSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
                 f.write(content)
 
         await loop.run_in_executor(None, _write_file_sync)
+
+    async def list_available_binaries(self) -> list[str]:
+        binaries = set()
+        paths = os.environ.get('PATH', '').split(os.pathsep)
+        for path_dir in paths:
+            try:
+                for item in os.listdir(path_dir):
+                    item_path = os.path.join(path_dir, item)
+                    if os.path.isfile(item_path) and os.access(item_path, os.X_OK):
+                        binaries.add(item)
+            except OSError:
+                # Ignore errors like permission denied or non-existent directories
+                pass
+        return sorted(list(binaries))

@@ -10,7 +10,7 @@ import shutil
 import typing as _t
 from pathlib import Path
 
-from .base import ExecResult, ShellEnvironmentPolicy
+from .base import ExecResult, ShellEnvironmentPolicy # Added ExecResult
 from .local import LocalSandbox
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,11 @@ class CodexSandbox(LocalSandbox):
             return await super().run_cmd(cmd, cwd=cwd, timeout=timeout, env=env)
 
         cmd_list = cmd if isinstance(cmd, list) or isinstance(cmd, tuple) else [cmd]
-        full_cmd = [self._codex_cmd, *self._cmd_prefix, '--', *cmd_list]
+        # If the command is already a codex command, don't prefix it again.
+        if cmd_list and cmd_list[0] == self._codex_cmd:
+            full_cmd = cmd_list
+        else:
+            full_cmd = [self._codex_cmd, *self._cmd_prefix, '--', *cmd_list]
         return await super().run_cmd(full_cmd, cwd=cwd, timeout=timeout, env=env)
 
     async def run_code(
@@ -76,6 +80,9 @@ class CodexSandbox(LocalSandbox):
         env: dict[str, str] | None = None,
     ) -> ExecResult:
         """Execute code in the Codex sandbox."""
+        # This method from LocalSandbox already handles code execution appropriately.
+        # If codex_available, its run_cmd will be used by underlying helpers,
+        # effectively sandboxing the execution of interpreters (python, node, etc.).
         return await super().run_code(
             code,
             file_path=file_path,
@@ -87,12 +94,39 @@ class CodexSandbox(LocalSandbox):
 
     async def list_files(self, path: str = '.') -> list[str]:
         """List files in the Codex sandbox."""
+        # LocalSandbox.list_files uses Python's os module, which is fine
+        # as it operates on the mapped working directory.
         return await super().list_files(path)
 
     async def read_file(self, path: str) -> str:
         """Read a file from the Codex sandbox."""
+        # LocalSandbox.read_file uses Python's open(), operating on mapped workdir.
         return await super().read_file(path)
 
     async def write_file(self, path: str, content: str) -> None:
         """Write content to a file in the Codex sandbox."""
+        # LocalSandbox.write_file uses Python's open(), operating on mapped workdir.
         await super().write_file(path, content)
+
+    async def list_available_binaries(self) -> list[str]:
+        # This is a common way to list commands, but might need adjustment
+        # based on the specific shell and available tools in the Codex environment.
+        # It tries 'compgen -c' (bash), then 'ls' on common bin dirs.
+        commands_to_try = [
+            "bash -c 'compgen -c'", # Bash specific, lists all commands
+            "sh -c 'ls /bin /usr/bin /usr/local/bin 2>/dev/null | sort -u'", # More generic
+        ]
+        for cmd_str in commands_to_try:
+            try:
+                # Use self.run_cmd to ensure commands are run within the codex sandbox if available
+                # self.run_cmd itself prepends the codex command and prefix.
+                # We pass the command string directly to run_cmd, which expects str | Iterable[str].
+                # LocalSandbox's _prepare_command will handle shell execution.
+                result = await self.run_cmd(cmd_str)
+
+                if result.exit_code == 0 and result.stdout:
+                    return sorted(list(set(result.stdout.strip().split('\n'))))
+            except Exception:
+                # Try the next command if one fails
+                pass
+        return [] # Return empty if no command succeeded

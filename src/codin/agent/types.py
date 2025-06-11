@@ -85,6 +85,31 @@ class FilePart(BaseModel):
     kind: str = "file"
     metadata: dict[str, _t.Any] | None = None
 
+
+class ToolUsePart(_pyd.BaseModel):
+    """Represents a tool use (call and/or result) segment within message parts."""
+
+    kind: _t.Literal["tool-use"] = "tool-use"
+    """Part type - tool-use for ToolUseParts"""
+
+    type: _t.Literal["call", "result"] = "call"
+    """Whether this is a tool call or tool result"""
+
+    id: str
+    """Unique identifier for the tool use"""
+
+    name: str
+    """Name of the tool being called"""
+
+    input: dict[str, _t.Any] | None = None
+    """Tool input/arguments (for calls)"""
+
+    output: _t.Any | None = None
+    """Tool output/result (for results)"""
+
+    metadata: dict[str, _t.Any] | None = None
+    """Additional metadata about the tool call or result"""
+
 # Union type for message parts - defined early so Message can use it.
 Part = TextPart | DataPart | FilePart | ToolUsePart
 
@@ -222,31 +247,6 @@ class ToolCallResult(_pyd.BaseModel):
     success: bool
     output: _t.Any = None
     error: str | None = None
-
-
-class ToolUsePart(_pyd.BaseModel):
-    """Represents a tool use (call and/or result) segment within message parts."""
-
-    kind: _t.Literal["tool-use"] = "tool-use"
-    """Part type - tool-use for ToolUseParts"""
-
-    type: _t.Literal["call", "result"] = "call"
-    """Whether this is a tool call or tool result"""
-
-    id: str
-    """Unique identifier for the tool use"""
-
-    name: str
-    """Name of the tool being called"""
-
-    input: dict[str, _t.Any] | None = None
-    """Tool input/arguments (for calls)"""
-
-    output: _t.Any | None = None
-    """Tool output/result (for results)"""
-
-    metadata: dict[str, _t.Any] | None = None
-    """Additional metadata about the tool call or result"""
 
 
 # =============================================================================

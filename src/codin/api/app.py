@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ..actor import Dispatcher, LocalActorManager, LocalDispatcher
+from ..replay import FileReplay # Added import for FileReplay
 
 
 class SubmitRequest(BaseModel):
@@ -38,6 +39,10 @@ def create_app(dispatcher: Dispatcher | None = None) -> FastAPI:
 
     @app.post("/v1/submit", response_model=SubmitResponse)
     async def submit(req: SubmitRequest) -> SubmitResponse:
+        # Add the replay_factory to the a2a_request
+        # This lambda creates a FileReplay instance when called by the dispatcher
+        req.a2a_request['replay_factory'] = lambda runner_id_str: FileReplay(session_id=runner_id_str)
+
         runner_id = await dispatcher.submit(req.a2a_request)
         return SubmitResponse(runner_id=runner_id)
 

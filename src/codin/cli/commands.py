@@ -80,7 +80,7 @@ async def run_quiet_mode(
 
         toolsets = []
         # Create sandbox toolset (auto-generates tools from sandbox methods)
-        from codin.tool.sandbox import SandboxToolset
+        from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
 
         sandbox_toolset = SandboxToolset(sandbox)
         toolsets.append(sandbox_toolset)
@@ -558,7 +558,7 @@ async def show_tools_info(verbose: bool = False, config_file: Path | None = None
             click.echo(f"[OK] Initialized sandbox: {type(sandbox).__name__}")
 
         # Create sandbox toolset (auto-generates tools from sandbox methods)
-        from codin.tool.sandbox import SandboxToolset
+        from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
 
         sandbox_toolset = SandboxToolset(sandbox)
         await sandbox_toolset.up()

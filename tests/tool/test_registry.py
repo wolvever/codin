@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from codin.tool.registry import ToolRegistry, ToolRegistryConfig, ToolEndpoint
 from codin.tool.base import Tool, Toolset, ToolContext
-from codin.tool.sandbox import SandboxToolset
+from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
 from codin.sandbox.local import LocalSandbox
 
 

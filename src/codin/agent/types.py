@@ -40,8 +40,6 @@ __all__ = [
     "RunnerControl",
     "RunnerInput",
     # Agent types
-    "AgentRunInput",
-    "AgentRunOutput",
     "RunConfig",
     "Metrics",
     "State",
@@ -89,7 +87,7 @@ class FilePart(BaseModel):
 class Message(BaseModel):
     messageId: str = Field(default_factory=lambda: str(uuid4()))
     role: Role
-    parts: list[_t.Any]
+    parts: list[Part]  # Updated type hint
     contextId: str | None = None
     kind: str = "message"
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
@@ -129,7 +127,6 @@ class Message(BaseModel):
             )
         )
 
-
 class TaskState(str, Enum):
     QUEUED = "queued"
     SUBMITTED = "submitted"
@@ -137,29 +134,17 @@ class TaskState(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
-    queued = QUEUED
-    submitted = SUBMITTED
-    working = WORKING
-    completed = COMPLETED
-    failed = FAILED
-
-
-
-class TaskStatus(BaseModel):
-    state: TaskState
-
-
 class TaskStatusUpdateEvent(BaseModel):
     contextId: str
     taskId: str
-    status: TaskStatus
+    state: TaskState
     final: bool = False
 
 
 class TaskArtifactUpdateEvent(BaseModel):
     contextId: str
     taskId: str
-    artifact: dict[str, _t.Any] | None = None
+    artifact: Artifact | None = None # Updated type hint
     final: bool = False
 
 
@@ -209,14 +194,108 @@ class ToolUsePart(_pyd.BaseModel):
     """Unique identifier for the tool use"""
 
     name: str
-    """Name of the tool being called"""
+    arguments: dict[str, _t.Any]
 
-    input: dict[str, _t.Any] | None = None
-    """Tool input/arguments (for calls)"""
 
-    output: _t.Any | None = None
-    """Tool output/result (for results)"""
+class ToolCallResult(_pyd.BaseModel):
+    """Represents the result of a tool call."""
 
+    call_id: str
+    success: bool
+    output: _t.Any = None
+    error: str | None = None
+
+
+# =============================================================================
+# Internal events and control types
+# =============================================================================
+
+
+class EventType(str, Enum):
+    """Types of events for EventStep."""
+
+    # Standard event types
+    TASK_STATUS_UPDATE = "task_status_update"
+    TASK_ARTIFACT_UPDATE = "task_artifact_update"
+
+    TASK_START = "task_start"
+    TASK_END = "task_end"
+    THINK = "think"
+    TOOL_CALL_START = "tool_call_start"
+    TOOL_CALL_END = "tool_call_end"
+    TURN_START = "turn_start"
+    TURN_END = "turn_end"
+    ERROR = "error"
+
+
+class RunEvent(BaseModel):
+    """Internal event type for non-A2A events."""
+
+    event_type: str
+    data: dict[str, _t.Any]
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+# Union type for all events
+Event = TaskStatusUpdateEvent | TaskArtifactUpdateEvent | RunEvent
+
+
+# =============================================================================
+# Control and Runner Types for Bidirectional Mailbox
+# =============================================================================
+
+
+class ControlSignal(str, Enum):
+    """Control signals that can be sent through mailbox."""
+
+    PAUSE = "pause"
+    RESUME = "resume"
+    CANCEL = "cancel"
+    RESET = "reset"
+    STOP = "stop"
+
+
+class RunnerControl(BaseModel):
+    """Control message for runner/agent management."""
+
+    signal: ControlSignal
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class RunnerInput(BaseModel):
+    """Enhanced input for agents through bidirectional mailbox."""
+
+    message: Message | None = None
+    control: RunnerControl | None = None
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+    @classmethod
+    def from_message(cls, message: Message) -> RunnerInput:
+        """Create RunnerInput from a message."""
+        return cls(message=message)
+
+    @classmethod
+    def from_control(cls, signal: ControlSignal, metadata: dict[str, _t.Any] | None = None) -> RunnerInput:
+        """Create RunnerInput from a control signal."""
+        control = RunnerControl(signal=signal, metadata=metadata or {})
+        return cls(control=control)
+
+
+# =============================================================================
+# Agent Types (from base.py)
+# =============================================================================
+
+
+class AgentRunInput(_pyd.BaseModel):
+    """Input for agent execution."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    id: str | int | None = None
+    message: Message
     metadata: dict[str, _t.Any] | None = None
     """Additional metadata about the tool call or result"""
 
@@ -307,29 +386,44 @@ class RunnerInput(BaseModel):
 # Agent Types (from base.py) - Updated for A2A compatibility
 # =============================================================================
 
-
+# DEPRECATED: Use codin.actor.types.ActorRunInput instead.
+# This definition is kept for backward compatibility during transition
+# for any modules that might still directly import it.
 class AgentRunInput(_pyd.BaseModel):
-    """Input for agent execution."""
+    """Input for agent execution.
+
+    DEPRECATED: New agent implementations should use `ActorRunInput`
+    from `codin.actor.types` for compatibility with the actor system.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: str | int | None = None
-    message: Message
-    metadata: dict[str, _t.Any] | None = None
-    options: dict[str, _t.Any] | None = None
-    session_id: str | None = None
+    message: Message # Main message payload for the agent
+    metadata: dict[str, _t.Any] | None = None # Additional metadata
+    options: dict[str, _t.Any] | None = None # Configuration options for the run
+    session_id: str | None = None # Session identifier
     task_id: str | None = None  # Optional task ID for continuing existing task
 
 
+# DEPRECATED: Use codin.actor.types.ActorRunOutput instead.
+# This definition is kept for backward compatibility during transition.
+# ActorRunOutput is 'Any', so results from BaseAgent (e.g. Message objects)
+# are compatible.
 class AgentRunOutput(_pyd.BaseModel):
-    """Output from agent execution."""
+    """Output from agent execution.
+
+    DEPRECATED: New agent implementations should yield outputs compatible with
+    `ActorRunOutput` from `codin.actor.types` (which is currently `Any`).
+    The `BaseAgent` now yields `Message` objects or dictionaries directly,
+    which are compatible with `ActorRunOutput = Any`.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: str | int | None = None
-    result: Task | Message | Event
-    metadata: dict[str, _t.Any] | None = None
-
+    id: str | int | None = None # ID of the step or output item
+    result: Task | Message | Event # The actual result data
+    metadata: dict[str, _t.Any] | None = None # Additional metadata about the output
 
 class RunConfig(BaseModel):
     """Budget constraints and agent configuration."""
@@ -529,7 +623,7 @@ class Step(BaseModel):
 
 class MessageStep(Step):
     """A2A compatible message step with enhanced support for mixed content."""
-
+    
     is_streaming: bool = False
     message_stream: _t.AsyncIterator[str] | None = None
     step_type: StepType = StepType.MESSAGE
@@ -538,7 +632,7 @@ class MessageStep(Step):
         if self.message is None and self.message_stream is None:
             raise ValueError("message or message_stream is required for MessageStep")
 
-    async def stream_content(self) -> _t.AsyncGenerator[str]:
+    async def stream_content(self) -> _t.AsyncGenerator[str, None]: # Added None for send type
         """Stream message content if ``is_streaming`` is True."""
         if self.message_stream is not None:
             async for chunk in self.message_stream:
@@ -560,15 +654,15 @@ class ToolCallStep(Step):
     """Step for executing a tool call with enhanced result handling."""
 
     step_type: StepType = StepType.TOOL_CALL
-    tool_call: ToolUsePart | None = None
-    tool_call_result: ToolUsePart | None = None
+    tool_call: ToolUsePart | None = None # Must be ToolUsePart type='call'
+    tool_call_result: ToolUsePart | None = None # Must be ToolUsePart type='result'
     success: bool = True
 
     @model_validator(mode="before")
     @classmethod
     def _convert_calls(cls, data: dict[str, _t.Any]) -> dict[str, _t.Any]:
         call = data.get("tool_call")
-        if isinstance(call, ToolCall):
+        if isinstance(call, ToolCall): # If old ToolCall type is passed
             data["tool_call"] = ToolUsePart(
                 type="call",
                 id=call.call_id,
@@ -576,11 +670,11 @@ class ToolCallStep(Step):
                 input=call.arguments,
             )
         result = data.get("tool_call_result")
-        if isinstance(result, ToolCallResult):
+        if isinstance(result, ToolCallResult): # If old ToolCallResult type is passed
             data["tool_call_result"] = ToolUsePart(
                 type="result",
                 id=result.call_id,
-                name=call.name if call else "",
+                name=call.name if isinstance(call, ToolCall) else (data.get("tool_call").name if data.get("tool_call") else ""), # type: ignore
                 output=result.output,
                 metadata={"error": result.error} if result.error else None,
             )
@@ -589,15 +683,17 @@ class ToolCallStep(Step):
     def model_post_init(self, __context: _t.Any) -> None:
         if self.tool_call is None:
             raise ValueError("tool_call (ToolUsePart type='call') is required for ToolCallStep")
-        if self.tool_call.type != "call":
+        if not isinstance(self.tool_call, ToolUsePart) or self.tool_call.type != "call": # type: ignore
             raise ValueError("ToolCallStep.tool_call must be a ToolUsePart with type='call'")
 
     def add_result(self, result: ToolCallResult) -> None:
         """Attach a ToolCallResult to this step and update success."""
+        # Ensure tool_call is not None and has a name before accessing it.
+        tool_name = self.tool_call.name if self.tool_call and isinstance(self.tool_call, ToolUsePart) else ""
         self.tool_call_result = ToolUsePart(
             type="result",
             id=result.call_id,
-            name=self.tool_call.name if self.tool_call else "",
+            name=tool_name,
             output=result.output,
             metadata={"error": result.error} if result.error else None,
         )
@@ -605,6 +701,8 @@ class ToolCallStep(Step):
 
     def to_message_parts(self) -> tuple[ToolUsePart, ToolUsePart | None]:
         """Return tool call and result parts for message conversion."""
+        if not self.tool_call: # Should not happen due to model_post_init
+             raise ValueError("ToolCallStep.tool_call cannot be None when calling to_message_parts")
         return self.tool_call, self.tool_call_result
 
 
@@ -625,8 +723,7 @@ class ThinkStep(Step):
 
     def model_post_init(self, __context: _t.Any) -> None:
         if self.thinking is None:
-            self.thinking = ""
-
+            self.thinking = "" # Default to empty string if not provided
 
 class FinishStep(Step):
     """Step indicating task completion with enhanced content support."""
@@ -635,7 +732,7 @@ class FinishStep(Step):
     final_message: Message | None = None
     reason: str | None = None
     success: bool = True
-    task: Task | None = None
+    task: Task | None = None # Optional task snapshot at finish
 
     def model_post_init(self, __context: _t.Any) -> None:
         if self.reason is None:
@@ -647,25 +744,17 @@ class FinishStep(Step):
                 messageId=f"finish-{self.step_id}",
                 role=Role.agent,
                 parts=[TextPart(text=self.reason)],
-                contextId=None,
+                contextId=None, # Context ID might be set by the agent later
                 kind="message",
             )
-            self.message = msg
+            # self.message = msg # Step.message is already available.
             self.final_message = msg
 
-    def create_completion_event(self, task_id: str, context_id: str) -> TaskStatusUpdateEvent:
-        """Create a task completion event."""
-        completion_status = TaskStatus(
-            state=TaskState.completed, message=self.message, timestamp=datetime.now().isoformat()
-        )
-        return TaskStatusUpdateEvent(
-            contextId=context_id, taskId=task_id, status=completion_status, final=True, metadata=self.metadata
-        )
 
 class ErrorStep(Step):
-    """Step emitted when planning fails."""
+    """Step emitted when planning fails or an unrecoverable error occurs."""
 
     step_type: StepType = StepType.ERROR
-    error: str | None = None
-
+    error: str | None = None # Description of the error
+    original_step_id: str | None = None # If error occurred processing a specific step
 

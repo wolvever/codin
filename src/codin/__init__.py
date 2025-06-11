@@ -9,9 +9,18 @@ import sys as _sys
 
 # Import submodules or specific types to make them available at the 'codin' level
 from . import config
-from . import agent
-from . import actor
-from . import a2a # Added new a2a submodule
+try:  # Import may fail in minimal environments or due to circular deps
+    from . import agent
+except Exception:  # pragma: no cover - best effort fallback
+    agent = None
+try:
+    from . import actor
+except Exception:  # pragma: no cover - best effort fallback
+    actor = None
+try:  # This optional import may fail if deps are missing
+    from . import a2a  # Added new a2a submodule
+except Exception:  # pragma: no cover - optional module
+    a2a = None
 # from . import tool # Example if tool was a submodule
 # from . import memory # Example if memory was a submodule
 

@@ -196,4 +196,3 @@ class MCPTool(Tool):
             _logger.exception(f"MCPTool {self.name}: Unexpected error during _reinitialize_session.")
             self._state = LifecycleState.ERROR
 
-```

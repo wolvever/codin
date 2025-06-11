@@ -738,4 +738,3 @@ class SseSessionManager(StdioSessionManagerBase):
         except Exception as e:
             _logger.debug(f'SseSessionManager: Error closing exit stack: {e}', exc_info=True)
 
-```

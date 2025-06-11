@@ -519,7 +519,7 @@ class CodeAgent(Agent):
                 for tool_call in tool_calls: # Tool call execution loop (omitted for brevity, assumed correct)
                     result = await asyncio.wait_for(self._execute_tool_call(tool_call, task_id), timeout=60.0)
                     tool_results.append(result)
-                await self._emit_event("tool_results", { "num_tools_executed": len(tool_results), ... })
+                await self._emit_event("tool_results", { "num_tools_executed": len(tool_results) })
             self._last_tool_results = tool_results
             response_message_content = parsed_response["message"] or content
             response_message = self._create_agent_message(response_message_content, task_id)
@@ -564,13 +564,13 @@ class CodeAgent(Agent):
             if self.memory_system:
                 for msg in conversation_history: await self.memory_system.add_message(msg)
             await self._emit_event("task_end", { "task_id": task_id, "session_id": self._context_id, "iteration": iteration, "elapsed_time": time.time() - self._start_time, })
-            return AgentRunOutput(result=final_response, metadata={ "task_id": task_id, "iterations": iteration, ...})
+            return AgentRunOutput(result=final_response, metadata={ "task_id": task_id, "iterations": iteration })
         except Exception as e:
             logger.error(f"Error in agent execution: {e}", exc_info=True)
             await self._emit_event("task_error", {"task_id": task_id, "error": str(e), "iteration": iteration})
             error_response = self._create_agent_message(f"I encountered an error: {e!s}", task_id)
-            await self._emit_event("task_end", {"task_id": task_id, ...})
-            return AgentRunOutput(result=error_response, metadata={"task_id": task_id, "error": str(e), ...})
+            await self._emit_event("task_end", {"task_id": task_id })
+            return AgentRunOutput(result=error_response, metadata={"task_id": task_id, "error": str(e) })
 
     def _is_task_complete(
         self, response_messages: list[Message], tool_results: list[ToolCallResult], run_context: dict[str, _t.Any]

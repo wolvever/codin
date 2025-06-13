@@ -16,6 +16,7 @@ from ..actor.types import ActorRunInput, ActorRunOutput
 from .types import (
     State,
     Step,
+    Plan,
 )
 from ..tool.base import Tool # Tools are generic
 from ..id import new_id # For generating default IDs
@@ -24,6 +25,8 @@ from ..id import new_id # For generating default IDs
 __all__ = [
     'Agent',
     'Planner',
+    'TaskExecutor',
+    'StepExecutor',
 ]
 
 
@@ -137,3 +140,15 @@ class Planner(abc.ABC):
                    the planner.
         """
         ... # Ellipsis for abstract method
+
+
+class TaskExecutor(_t.Protocol):
+    """Protocol for executing high-level plans."""
+
+    async def execute_dag_plan(self, plan: "Plan") -> _t.Any: ...
+
+
+class StepExecutor(_t.Protocol):
+    """Protocol for executing individual steps."""
+
+    async def execute_step(self, step: Step, state: State) -> _t.Any: ...

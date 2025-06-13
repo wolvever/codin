@@ -6,6 +6,7 @@ import typing as _t
 from uuid import uuid4
 from datetime import datetime
 from enum import Enum
+import abc
 
 import pydantic as _pyd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -50,8 +51,10 @@ __all__ = [
     "ToolCallStep",
     "EventStep",
     "ThinkStep",
+    "PlanStep",
     "FinishStep",
     "ErrorStep",
+    "Plan",
     # Base interfaces
     "EventType",
 ]
@@ -556,12 +559,22 @@ class State(BaseModel):
 class StepType(Enum):
     """Types of steps a planner can emit."""
 
+    PLAN = "plan"  # Structured plan that must be executed
     MESSAGE = "message"  # A2A Message (streaming or non-streaming)
     EVENT = "event"  # A2A Event + internal events
     TOOL_CALL = "tool_call"  # Tool execution
     THINK = "think"  # Internal reasoning
     FINISH = "finish"  # Task completion
     ERROR = "error"  # Error step
+
+
+class Plan(abc.ABC):
+    """Abstract plan that can be executed by a TaskExecutor."""
+
+    @abc.abstractmethod
+    async def execute(self, executor: "TaskExecutor") -> _t.Any:
+        """Execute the plan using the provided executor."""
+        raise NotImplementedError
 
 
 class Step(BaseModel):
@@ -709,6 +722,13 @@ class ToolCallStep(Step):
         if not self.tool_call: # Should not happen due to model_post_init
              raise ValueError("ToolCallStep.tool_call cannot be None when calling to_message_parts")
         return self.tool_call, self.tool_call_result
+
+
+class PlanStep(Step):
+    """Step containing a structured plan to be executed."""
+
+    step_type: StepType = StepType.PLAN
+    plan: Plan
 
 
 class EventStep(Step):

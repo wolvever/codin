@@ -1,0 +1,240 @@
+[2025-06-15T02:38:20.499Z] Claude Bridge Logger Started
+[2025-06-15T02:38:20.501Z] Requests logged to .claude-bridge/requests-2025-06-15-02-38-20.jsonl
+[2025-06-15T02:38:20.501Z] Transformed requests logged to .claude-bridge/transformed-2025-06-15-02-38-20.jsonl
+[2025-06-15T02:38:20.501Z] Initialized anthropic client for model: claude-sonnet-4-20250514
+[2025-06-15T02:38:20.501Z] Claude Bridge interceptor initialized
+[2025-06-15T02:38:21.615Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:21.615Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:21.851Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:21.851Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:21.874Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:21.874Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:32.400Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:32.400Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:32.556Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:32.557Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:32.573Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:32.573Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:43.414Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:43.415Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:44.006Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:44.006Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:44.033Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:44.034Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:51.263Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:51.269Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:38:53.265Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:53.265Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:54.075Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:54.075Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:38:54.143Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:38:54.143Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:04.018Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:04.019Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:09.074Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:09.075Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:09.181Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:09.181Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:14.866Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:14.866Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:23.210Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:23.210Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:25.779Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:25.779Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:26.378Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:26.378Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:32.386Z] ERROR: anthropic error response: {"type":"api_error","message":"Request timed out.","retryable":false}
+[2025-06-15T02:39:32.386Z] ERROR: CRITICAL: anthropic request failed with detailed error information:
+[2025-06-15T02:39:32.386Z] ERROR: Error type: object
+[2025-06-15T02:39:32.386Z] ERROR: Error constructor: Error
+[2025-06-15T02:39:32.386Z] ERROR: Error message: Request timed out.
+[2025-06-15T02:39:32.387Z] ERROR: Error stack: Error: Request timed out.
+    at _ClaudeBridgeInterceptor.callProvider (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:916:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async _ClaudeBridgeInterceptor.handleAnthropicRequest (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:851:99)
+    at async qw.fetchWithTimeout (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:6087)
+    at async qw.makeRequest (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:3632)
+[2025-06-15T02:39:32.387Z] ERROR: Config: {"provider":"openai","model":"claude-sonnet-4-20250514","apiKey":"sk-aaoM7y5..."}
+[2025-06-15T02:39:32.389Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:32.392Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:39:35.064Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:35.064Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:46.480Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:46.480Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:49.565Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:49.565Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:49.980Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:49.981Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:39:54.837Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:39:54.837Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:40:05.849Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:40:05.850Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:40:13.880Z] ERROR: anthropic error response: {"type":"api_error","message":"Request timed out.","retryable":false}
+[2025-06-15T02:40:13.880Z] ERROR: CRITICAL: anthropic request failed with detailed error information:
+[2025-06-15T02:40:13.880Z] ERROR: Error type: object
+[2025-06-15T02:40:13.880Z] ERROR: Error constructor: Error
+[2025-06-15T02:40:13.880Z] ERROR: Error message: Request timed out.
+[2025-06-15T02:40:13.880Z] ERROR: Error stack: Error: Request timed out.
+    at _ClaudeBridgeInterceptor.callProvider (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:916:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async _ClaudeBridgeInterceptor.handleAnthropicRequest (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:851:99)
+    at async qw.fetchWithTimeout (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:6087)
+    at async qw.makeRequest (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:3632)
+    at async D11.showErrors (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:22007)
+    at async D11 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:12203)
+    at async cw2 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:21853)
+    at async file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:17103
+    at async Jt1 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:5151)
+[2025-06-15T02:40:13.880Z] ERROR: Config: {"provider":"openai","model":"claude-sonnet-4-20250514","apiKey":"sk-aaoM7y5..."}
+[2025-06-15T02:40:14.414Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:40:14.418Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:40:17.680Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:40:17.681Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:40:31.943Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:40:31.944Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:40:34.637Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:40:34.637Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:40:53.356Z] ERROR: anthropic error response: {"type":"api_error","message":"Request timed out.","retryable":false}
+[2025-06-15T02:40:53.357Z] ERROR: CRITICAL: anthropic request failed with detailed error information:
+[2025-06-15T02:40:53.357Z] ERROR: Error type: object
+[2025-06-15T02:40:53.357Z] ERROR: Error constructor: Error
+[2025-06-15T02:40:53.357Z] ERROR: Error message: Request timed out.
+[2025-06-15T02:40:53.357Z] ERROR: Error stack: Error: Request timed out.
+    at _ClaudeBridgeInterceptor.callProvider (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:916:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async _ClaudeBridgeInterceptor.handleAnthropicRequest (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:851:99)
+    at async qw.fetchWithTimeout (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:6087)
+    at async qw.makeRequest (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:3632)
+    at async D11.showErrors (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:22007)
+    at async D11 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:12203)
+    at async cw2 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:21853)
+    at async file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:17103
+    at async Jt1 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:5151)
+[2025-06-15T02:40:53.357Z] ERROR: Config: {"provider":"openai","model":"claude-sonnet-4-20250514","apiKey":"sk-aaoM7y5..."}
+[2025-06-15T02:40:54.568Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:40:54.572Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:41:18.727Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:41:18.727Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:41:21.133Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:41:21.133Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:41:35.877Z] ERROR: anthropic error response: {"type":"api_error","message":"Request timed out.","retryable":false}
+[2025-06-15T02:41:35.877Z] ERROR: CRITICAL: anthropic request failed with detailed error information:
+[2025-06-15T02:41:35.877Z] ERROR: Error type: object
+[2025-06-15T02:41:35.877Z] ERROR: Error constructor: Error
+[2025-06-15T02:41:35.877Z] ERROR: Error message: Request timed out.
+[2025-06-15T02:41:35.877Z] ERROR: Error stack: Error: Request timed out.
+    at _ClaudeBridgeInterceptor.callProvider (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:916:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async _ClaudeBridgeInterceptor.handleAnthropicRequest (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:851:99)
+    at async qw.fetchWithTimeout (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:6087)
+    at async qw.makeRequest (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:3632)
+    at async D11.showErrors (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:22007)
+    at async D11 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:12203)
+    at async cw2 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:21853)
+    at async file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:17103
+    at async Jt1 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:5151)
+[2025-06-15T02:41:35.877Z] ERROR: Config: {"provider":"openai","model":"claude-sonnet-4-20250514","apiKey":"sk-aaoM7y5..."}
+[2025-06-15T02:41:38.324Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:41:38.327Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:42:00.710Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:42:00.710Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:42:03.539Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:42:03.540Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:42:19.337Z] ERROR: anthropic error response: {"type":"api_error","message":"Request timed out.","retryable":false}
+[2025-06-15T02:42:19.337Z] ERROR: CRITICAL: anthropic request failed with detailed error information:
+[2025-06-15T02:42:19.337Z] ERROR: Error type: object
+[2025-06-15T02:42:19.337Z] ERROR: Error constructor: Error
+[2025-06-15T02:42:19.337Z] ERROR: Error message: Request timed out.
+[2025-06-15T02:42:19.337Z] ERROR: Error stack: Error: Request timed out.
+    at _ClaudeBridgeInterceptor.callProvider (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:916:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async _ClaudeBridgeInterceptor.handleAnthropicRequest (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:851:99)
+    at async qw.fetchWithTimeout (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:6087)
+    at async qw.makeRequest (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:3632)
+    at async D11.showErrors (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:22007)
+    at async D11 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:12203)
+    at async cw2 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:21853)
+    at async file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:17103
+    at async Jt1 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:5151)
+[2025-06-15T02:42:19.337Z] ERROR: Config: {"provider":"openai","model":"claude-sonnet-4-20250514","apiKey":"sk-aaoM7y5..."}
+[2025-06-15T02:42:21.304Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:42:21.309Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:42:47.752Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:42:47.752Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:42:48.157Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:42:48.158Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:42:55.347Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:42:55.349Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:43:02.336Z] ERROR: anthropic error response: {"type":"api_error","message":"Request timed out.","retryable":false}
+[2025-06-15T02:43:02.336Z] ERROR: CRITICAL: anthropic request failed with detailed error information:
+[2025-06-15T02:43:02.336Z] ERROR: Error type: object
+[2025-06-15T02:43:02.336Z] ERROR: Error constructor: Error
+[2025-06-15T02:43:02.336Z] ERROR: Error message: Request timed out.
+[2025-06-15T02:43:02.336Z] ERROR: Error stack: Error: Request timed out.
+    at _ClaudeBridgeInterceptor.callProvider (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:916:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async _ClaudeBridgeInterceptor.handleAnthropicRequest (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:851:99)
+    at async qw.fetchWithTimeout (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:6087)
+    at async qw.makeRequest (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:3632)
+    at async D11.showErrors (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:22007)
+    at async D11 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:12203)
+    at async cw2 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:21853)
+    at async file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:17103
+    at async Jt1 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:5151)
+[2025-06-15T02:43:02.336Z] ERROR: Config: {"provider":"openai","model":"claude-sonnet-4-20250514","apiKey":"sk-aaoM7y5..."}
+[2025-06-15T02:43:06.439Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:43:06.440Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:43:11.182Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:43:11.184Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:43:17.923Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:43:17.924Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:43:27.936Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:43:27.937Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:43:42.679Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:43:42.680Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:43:49.799Z] ERROR: anthropic error response: {"type":"api_error","message":"Request timed out.","retryable":false}
+[2025-06-15T02:43:49.799Z] ERROR: CRITICAL: anthropic request failed with detailed error information:
+[2025-06-15T02:43:49.799Z] ERROR: Error type: object
+[2025-06-15T02:43:49.799Z] ERROR: Error constructor: Error
+[2025-06-15T02:43:49.799Z] ERROR: Error message: Request timed out.
+[2025-06-15T02:43:49.799Z] ERROR: Error stack: Error: Request timed out.
+    at _ClaudeBridgeInterceptor.callProvider (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:916:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async _ClaudeBridgeInterceptor.handleAnthropicRequest (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:851:99)
+    at async qw.fetchWithTimeout (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:6087)
+    at async qw.makeRequest (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:3632)
+    at async D11.showErrors (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:22007)
+    at async D11 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:12203)
+    at async cw2 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:21853)
+    at async file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:17103
+    at async Jt1 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:5151)
+[2025-06-15T02:43:49.799Z] ERROR: Config: {"provider":"openai","model":"claude-sonnet-4-20250514","apiKey":"sk-aaoM7y5..."}
+[2025-06-15T02:43:59.088Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:43:59.089Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:44:08.543Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:44:08.545Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:44:24.160Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:44:24.161Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:44:49.794Z] ERROR: anthropic error response: {"type":"api_error","message":"Request timed out.","retryable":false}
+[2025-06-15T02:44:49.794Z] ERROR: CRITICAL: anthropic request failed with detailed error information:
+[2025-06-15T02:44:49.794Z] ERROR: Error type: object
+[2025-06-15T02:44:49.794Z] ERROR: Error constructor: Error
+[2025-06-15T02:44:49.794Z] ERROR: Error message: Request timed out.
+[2025-06-15T02:44:49.794Z] ERROR: Error stack: Error: Request timed out.
+    at _ClaudeBridgeInterceptor.callProvider (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:916:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async _ClaudeBridgeInterceptor.handleAnthropicRequest (file:///home/jucheng/work/claude_code/lemmy/apps/claude-bridge/dist/index.js:851:99)
+    at async qw.fetchWithTimeout (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:6087)
+    at async qw.makeRequest (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1342:3632)
+    at async D11.showErrors (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:22007)
+    at async D11 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:12203)
+    at async cw2 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:21853)
+    at async file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:17103
+    at async Jt1 (file:///usr/lib/node_modules/@anthropic-ai/claude-code/cli.js:1670:5151)
+[2025-06-15T02:44:49.794Z] ERROR: Config: {"provider":"openai","model":"claude-sonnet-4-20250514","apiKey":"sk-aaoM7y5..."}
+[2025-06-15T02:45:09.902Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:45:09.903Z] Skipping transformation for haiku model: claude-3-5-haiku-20241022
+[2025-06-15T02:45:23.233Z] Intercepted Claude request: https://api.anthropic.com/v1/messages?beta=true
+[2025-06-15T02:45:23.235Z] Calling anthropic with model: claude-sonnet-4-20250514
+[2025-06-15T02:45:35.880Z] Cleaning up interceptor...
+[2025-06-15T02:45:35.881Z] Cleanup complete.

@@ -6,6 +6,7 @@ tool definitions, toolsets, and execution contexts for agent capabilities.
 
 import abc
 import typing as _t
+from enum import Enum
 
 import pydantic as _pyd
 from pydantic import BaseModel, ConfigDict
@@ -18,8 +19,114 @@ __all__ = [
     'ToolContext',
     'ToolDefinition',
     'ToolSpec',
+    'ToolType',
+    'ExecutionMode',
+    'ToolMetadata',
     'Toolset',
 ]
+
+
+class ToolType(str, Enum):
+    """Types of tool implementations."""
+    PYTHON = "python"
+    MCP = "mcp"
+    SANDBOX = "sandbox"
+    HTTP = "http"
+    SHELL = "shell"
+
+
+class ExecutionMode(str, Enum):
+    """Execution modes for tools."""
+    SYNC = "sync"
+    ASYNC = "async"
+    STREAMING = "streaming"
+
+
+class ToolMetadata(BaseModel):
+    """Metadata for tool specifications."""
+    model_config = ConfigDict(extra='allow')
+    
+    version: str = "1.0.0"
+    author: str | None = None
+    category: str | None = None
+    tags: list[str] = []
+    documentation_url: str | None = None
+    source_url: str | None = None
+    
+    # Execution hints
+    estimated_duration: float | None = None  # seconds
+    requires_approval: bool = False
+    is_dangerous: bool = False
+    
+    # Dependencies
+    requires_tools: list[str] = []
+    conflicts_with: list[str] = []
+
+
+class ToolSpec(BaseModel):
+    """Tool specification that defines what a tool does."""
+    model_config = ConfigDict(frozen=True)
+    
+    # Core identification
+    name: str
+    description: str
+    tool_type: ToolType
+    
+    # Schema definition
+    input_schema: dict[str, _t.Any]
+    output_schema: dict[str, _t.Any] | None = None
+    
+    # Execution properties
+    execution_mode: ExecutionMode = ExecutionMode.ASYNC
+    timeout: float | None = None
+    retries: int = 0
+    
+    # Metadata
+    metadata: ToolMetadata = ToolMetadata()
+    
+    def to_openai_schema(self) -> dict[str, _t.Any]:
+        """Convert to OpenAI function calling format."""
+        return {
+            'type': 'function',
+            'function': {
+                'name': self.name,
+                'description': self.description,
+                'parameters': self.input_schema,
+            },
+        }
+    
+    def to_mcp_schema(self) -> dict[str, _t.Any]:
+        """Convert to MCP tool format."""
+        return {
+            'name': self.name,
+            'description': self.description,
+            'inputSchema': self.input_schema,
+        }
+    
+    def validate_args(self, args: dict[str, _t.Any]) -> dict[str, _t.Any]:
+        """Validate arguments against input schema."""
+        # Create temporary pydantic model for validation
+        model_name = f"{self.name.title()}Args"
+        temp_model = _pyd.create_model(
+            model_name,
+            **{
+                prop: (self._get_python_type(prop_def), ...)
+                for prop, prop_def in self.input_schema.get('properties', {}).items()
+            }
+        )
+        return temp_model(**args).model_dump()
+    
+    def _get_python_type(self, prop_def: dict) -> type:
+        """Convert JSON schema type to Python type."""
+        type_map = {
+            'string': str,
+            'integer': int,
+            'number': float,
+            'boolean': bool,
+            'array': list,
+            'object': dict,
+        }
+        return type_map.get(prop_def.get('type', 'string'), str)
 
 
 class ToolDefinition(BaseModel):
@@ -91,30 +198,75 @@ class Tool(LifecycleMixin):
         self,
         name: str,
         description: str,
+        tool_type: ToolType = ToolType.PYTHON,
         version: str = '1.0.0',
         input_schema: type[_pyd.BaseModel] | None = None,
         is_generative: bool = False,
+        execution_mode: ExecutionMode = ExecutionMode.ASYNC,
+        timeout: float | None = None,
+        retries: int = 0,
+        metadata: dict[str, _t.Any] | None = None,
     ):
         """Initialize a tool.
 
         Args:
             name: Name of the tool
             description: Description of what the tool does
+            tool_type: Type of tool implementation
             version: Version of the tool
             input_schema: Pydantic model for input validation
             is_generative: Whether the tool generates streaming output
+            execution_mode: How the tool should be executed
+            timeout: Maximum execution time in seconds
+            retries: Number of retry attempts on failure
+            metadata: Additional metadata for the tool
         """
         super().__init__()
         self.name = name
         self.description = description
+        self.tool_type = tool_type
         self.version = version
         self.input_schema = input_schema or _pyd.create_model(f'{name}Schema', __base__=_pyd.BaseModel)
         self.is_generative = is_generative
-        self.metadata = {}
+        self.execution_mode = execution_mode
+        self.timeout = timeout
+        self.retries = retries
+        self.metadata = metadata or {}
 
     def validate_input(self, args: dict[str, _t.Any]) -> dict[str, _t.Any]:
         """Validate input against schema and return validated data."""
         return self.input_schema(**args).dict()
+    
+    def get_spec(self) -> ToolSpec:
+        """Get the tool specification."""
+        # Convert Pydantic model schema to JSON schema
+        schema = self.input_schema.schema()
+        input_schema = {
+            'type': 'object',
+            'properties': schema.get('properties', {}),
+        }
+        if schema.get('required'):
+            input_schema['required'] = schema['required']
+        
+        return ToolSpec(
+            name=self.name,
+            description=self.description,
+            tool_type=self.tool_type,
+            input_schema=input_schema,
+            execution_mode=self.execution_mode,
+            timeout=self.timeout,
+            retries=self.retries,
+            metadata=ToolMetadata(
+                version=self.version,
+                category=self.metadata.get('category'),
+                tags=self.metadata.get('tags', []),
+                estimated_duration=self.metadata.get('estimated_duration'),
+                requires_approval=self.metadata.get('requires_approval', False),
+                is_dangerous=self.metadata.get('is_dangerous', False),
+                **{k: v for k, v in self.metadata.items() 
+                   if k not in ['category', 'tags', 'estimated_duration', 'requires_approval', 'is_dangerous']}
+            )
+        )
 
     @abc.abstractmethod
     async def run(
@@ -249,11 +401,6 @@ class Toolset(LifecycleMixin):
                 pass  # Continue cleanup even if individual tools fail
 
 
-class ToolSpec(_t.Protocol):
-    """Protocol defining what a Tool specification should support."""
-
-    def to_mcp_schema(self) -> dict[str, _t.Any]: ...
-    def to_openai_schema(self) -> dict[str, _t.Any]: ...
 
 
 def to_tool_definition(tool: Tool | ToolDefinition) -> ToolDefinition:

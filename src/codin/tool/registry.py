@@ -16,7 +16,7 @@ import httpx
 import pydantic as _pyd
 import yaml
 
-from .base import Tool, Toolset
+from .base import Tool, Toolset, ToolSpec
 
 __all__ = [
     'ToolEndpoint',
@@ -251,6 +251,28 @@ class ToolRegistry:
     def get_toolsets(self) -> list[Toolset]:
         """Get all registered toolsets."""
         return list(self._toolsets.values())
+    
+    def get_spec(self, name: str) -> ToolSpec | None:
+        """Get tool specification by name."""
+        tool = self.get_tool(name)
+        return tool.get_spec() if tool else None
+    
+    def list_specs(self, tool_type: str | None = None) -> list[ToolSpec]:
+        """List all tool specifications, optionally filtered by type."""
+        specs = [tool.get_spec() for tool in self._tools.values()]
+        if tool_type:
+            from .base import ToolType
+            filter_type = ToolType(tool_type)
+            specs = [spec for spec in specs if spec.tool_type == filter_type]
+        return specs
+    
+    def to_openai_tools(self) -> list[dict[str, _t.Any]]:
+        """Convert all tools to OpenAI function format."""
+        return [tool.to_openai_schema() for tool in self._tools.values()]
+    
+    def to_mcp_tools(self) -> list[dict[str, _t.Any]]:
+        """Convert all tools to MCP format.""" 
+        return [tool.to_mcp_schema() for tool in self._tools.values()]
 
     def get_tools_with_executor(self) -> list[Tool]:
         """Get all tools wrapped with the executor if available."""

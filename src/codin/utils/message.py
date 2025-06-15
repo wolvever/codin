@@ -5,23 +5,9 @@ from __future__ import annotations
 from codin.agent.types import Message
 
 __all__ = [
-    "extract_text_from_message",
     "format_history_for_prompt",
     "format_tool_results_for_conversation",
 ]
-
-
-# DEPRECATED: This function is deprecated. Use Message.get_text_content() instead.
-# TODO: Refactor usages outside of src/codin/agent/ (e.g. in src/codin/__init__.py) and then remove this function.
-def extract_text_from_message(message: Message) -> str:
-    """Extract concatenated text from all parts of a message."""
-    text_parts: list[str] = []
-    for part in message.parts:
-        if hasattr(part, "root") and hasattr(part.root, "text"):
-            text_parts.append(part.root.text)
-        elif hasattr(part, "text"):
-            text_parts.append(part.text)
-    return "\n".join(text_parts)
 
 
 def format_history_for_prompt(history_messages: list[dict]) -> str:

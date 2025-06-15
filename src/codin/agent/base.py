@@ -8,35 +8,26 @@ managed by the actor system.
 
 import abc
 import typing as _t # For _t.AsyncIterator, _t.AsyncGenerator
-
-# Import new actor types used in Agent method signatures
 from ..actor.types import ActorRunInput, ActorRunOutput
-
-# Types potentially still used by Planner or concrete Agent implementations
 from .types import (
     State,
     Step,
     Plan,
 )
-from ..tool.base import Tool # Tools are generic
-from ..id import new_id # For generating default IDs
+from ..tool.base import Tool
+from ..id import new_id
 
 
 __all__ = [
     'Agent',
     'Planner',
-    'TaskExecutor',
-    'StepExecutor',
 ]
 
 
 class Agent(abc.ABC):
-    """Abstract Base Class for a CoDIN Agent.
+    """Abstract Base Class for Agent.
 
     This class defines the essential methods and properties for an agent.
-    It is designed to be compatible with the `CallableActor` protocol,
-    featuring an asynchronous `run` method that yields outputs and a
-    `cleanup` method.
 
     Attributes:
         id: Unique identifier for the agent.
@@ -139,16 +130,4 @@ class Planner(abc.ABC):
             state: The current agent state, which might be used to re-initialize
                    the planner.
         """
-        ... # Ellipsis for abstract method
-
-
-class TaskExecutor(_t.Protocol):
-    """Protocol for executing high-level plans."""
-
-    async def execute_dag_plan(self, plan: "Plan") -> _t.Any: ...
-
-
-class StepExecutor(_t.Protocol):
-    """Protocol for executing individual steps."""
-
-    async def execute_step(self, step: Step, state: State) -> _t.Any: ...
+        ...

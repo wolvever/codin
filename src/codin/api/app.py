@@ -20,9 +20,6 @@ class SubmitResponse(BaseModel):
     runner_id: str
 
 
-class SignalRequest(BaseModel):
-    ctrl: str
-
 
 async def _sse_stream(queue: asyncio.Queue) -> _t.AsyncIterator[str]:
     while True:
@@ -45,11 +42,6 @@ def create_app(dispatcher: Dispatcher | None = None) -> FastAPI:
 
         runner_id = await dispatcher.submit(req.a2a_request)
         return SubmitResponse(runner_id=runner_id)
-
-    @app.post("/v1/signal/{agent_id}")
-    async def signal(agent_id: str, req: SignalRequest) -> dict[str, str]:
-        await dispatcher.signal(agent_id, req.ctrl)
-        return {"status": "ok"}
 
     @app.get("/v1/status/{runner_id}")
     async def status(runner_id: str):

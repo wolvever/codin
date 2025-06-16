@@ -339,48 +339,31 @@ class CodeAgent(Agent):
         return tool_calls
 
     def _parse_structured_response(self, content: str) -> dict[str, _t.Any]:
-        parsed_response = {
-            "thinking": "",
-            "task_list": {"completed": [], "pending": []},
-            "tool_calls": [],
-            "message": "",
-            "should_continue": True,
-            "raw_content": content,
-        }
-        json_pattern = r"```json\s*(\{.*?\})\s*```"
-        json_matches = re.findall(json_pattern, content, re.DOTALL)
-        response_data = None
-        if json_matches:
-            try:
-                response_data = json.loads(json_matches[0])
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse JSON from markdown block: {e}")
-        if not response_data:
-            try:
-                response_data = json.loads(content.strip())
-            except json.JSONDecodeError:
-                logger.debug("No valid JSON found, extracting from text content")
-                parsed_response["message"] = content
-                parsed_response["tool_calls"] = self._parse_tool_calls(content)
-                return parsed_response
-        if response_data and isinstance(response_data, dict):
-            parsed_response["thinking"] = response_data.get("thinking", "")
-            parsed_response["message"] = response_data.get("message", "")
-            parsed_response["should_continue"] = response_data.get("should_continue", True)
-            task_list = response_data.get("task_list", {})
-            if isinstance(task_list, dict):
-                parsed_response["task_list"]["completed"] = task_list.get("completed", [])
-                parsed_response["task_list"]["pending"] = task_list.get("pending", [])
-            tool_calls_data = response_data.get("tool_calls", [])
-            if isinstance(tool_calls_data, list):
-                for call_data in tool_calls_data:
-                    if isinstance(call_data, dict) and "name" in call_data:
-                        call_id = str(uuid.uuid4())
-                        tool_call = ToolCall(
-                            call_id=call_id, name=call_data["name"], arguments=call_data.get("arguments", {})
-                        )
-                        parsed_response["tool_calls"].append(tool_call)
-        return parsed_response
+        # Import and use the shared implementation from base_planner
+        from .base_planner import BasePlanner
+        
+        # Create a temporary instance to use the shared method
+        temp_planner = BasePlanner()
+        parsed = temp_planner._parse_structured_response(content)
+        
+        # Convert ToolCall objects from base_planner to our format if needed
+        tool_calls = []
+        for call_data in parsed.get("tool_calls", []):
+            if hasattr(call_data, "call_id"):  # It's already a ToolCall object
+                tool_calls.append(ToolCall(
+                    call_id=call_data.call_id,
+                    name=call_data.name,
+                    arguments=call_data.arguments
+                ))
+            elif isinstance(call_data, dict):  # It's a dict
+                tool_calls.append(ToolCall(
+                    call_id=str(uuid.uuid4()),
+                    name=call_data.get("name", ""),
+                    arguments=call_data.get("arguments", {})
+                ))
+        
+        parsed["tool_calls"] = tool_calls
+        return parsed
 
     async def _execute_tool_call(self, tool_call: ToolCall, task_id: str = "default") -> ToolCallResult:
         await self._emit_event(
@@ -617,5 +600,10 @@ class CodeAgent(Agent):
         return None, tool_calls
     def _generate_intervention_and_fix(self, repeated_call: str, original_user_input: str, tool_calls: list[ToolCall]) -> tuple[str, list[ToolCall]]: # Omitted for brevity
         return "", []
-    def _clean_parameters(self, parameters: dict) -> dict: # Omitted for brevity
-        return {}
+    def _clean_parameters(self, parameters: dict) -> dict:
+        """Clean parameters to remove Undefined values and make them JSON serializable."""
+        # Import and use the shared implementation from base_planner
+        from .base_planner import BasePlanner
+        
+        temp_planner = BasePlanner()
+        return temp_planner._clean_parameters(parameters)

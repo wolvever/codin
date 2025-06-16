@@ -23,12 +23,14 @@ from pydantic import BaseModel, ConfigDict
 from .base import ModelOptions, PromptTemplate, PromptVariant
 # Import Client and ClientConfig from the correct location
 from ..client import Client, ClientConfig # MODIFIED: Assuming client is a submodule of codin
+from ..endpoint import EndpointConfig, EndpointManager, StorageConfig
 
 logger = logging.getLogger(__name__) # Added
 
 __all__ = [
     'FilesystemStorage',
     'HTTPStorage',
+    'Storage',
     'StorageBackend',
     'get_storage_backend',
 ]
@@ -286,7 +288,191 @@ class HTTPStorage(StorageBackend):
             raise RuntimeError(f'Failed to save template to remote storage: {e}') from e
 
 
-def get_storage_backend(endpoint: str) -> StorageBackend:
+class Storage(StorageBackend):
+    """Unified storage backend using the endpoint configuration system."""
+    
+    def __init__(self, config: StorageConfig | EndpointConfig | None = None):
+        if isinstance(config, StorageConfig):
+            self.config = config.endpoint
+        elif isinstance(config, EndpointConfig):
+            self.config = config
+        else:
+            # Auto-detect from environment
+            storage_config = StorageConfig.from_env()
+            self.config = storage_config.endpoint
+        self.manager = EndpointManager(self.config)
+        
+    async def load_template(self, name: str, version: str | None = None) -> PromptTemplate | None:
+        """Load a template by name and version."""
+        version = version or 'latest'
+        
+        try:
+            if self.config.is_local:
+                # Load from local filesystem through unified backend
+                return await self._load_from_local(name, version)
+            else:
+                # Load from remote HTTP through unified backend
+                return await self._load_from_remote(name, version)
+        except Exception as e:
+            logger.error(f"Failed to load template '{name}' version '{version}': {e}")
+            return None
+    
+    async def _load_from_local(self, name: str, version: str) -> PromptTemplate | None:
+        """Load template from local filesystem."""
+        # Try different file patterns
+        possible_files = [
+            f"{name}_{version}.yaml",
+            f"{name}.yaml" if version == 'latest' else None,
+        ]
+        
+        for filename in possible_files:
+            if filename is None:
+                continue
+                
+            try:
+                if await self.manager.exists(filename):
+                    data = await self.manager.read(filename)
+                    yaml_content = yaml.safe_load(data.decode('utf-8'))
+                    return self._parse_template_data(yaml_content, name, version)
+            except Exception:
+                continue
+        
+        # If version is 'latest', try to find any versioned file
+        if version == 'latest':
+            try:
+                files = await self.manager.list("")
+                versioned_files = [f for f in files if f.startswith(f"{name}_") and f.endswith('.yaml')]
+                if versioned_files:
+                    # Sort and get the latest
+                    versioned_files.sort()
+                    latest_file = versioned_files[-1]
+                    data = await self.manager.read(latest_file)
+                    yaml_content = yaml.safe_load(data.decode('utf-8'))
+                    return self._parse_template_data(yaml_content, name, version)
+            except Exception:
+                pass
+        
+        return None
+    
+    async def _load_from_remote(self, name: str, version: str) -> PromptTemplate | None:
+        """Load template from remote HTTP endpoint."""
+        try:
+            # Try to load the template from the remote endpoint
+            path = f"templates/{name}"
+            if version != 'latest':
+                path += f"?version={version}"
+            
+            data = await self.manager.read(path)
+            json_data = json.loads(data.decode('utf-8'))
+            return self._parse_template_data(json_data, name, version)
+        except Exception as e:
+            logger.debug(f"Failed to load remote template: {e}")
+            return None
+    
+    async def list_templates(self) -> list[tuple[str, str]]:
+        """List all available templates as (name, version) tuples."""
+        templates = []
+        
+        try:
+            if self.config.is_local:
+                # List YAML files in the directory
+                files = await self.manager.list("")
+                yaml_files = [f for f in files if f.endswith('.yaml')]
+                
+                for yaml_file in yaml_files:
+                    try:
+                        data = await self.manager.read(yaml_file)
+                        yaml_content = yaml.safe_load(data.decode('utf-8'))
+                        name = yaml_content.get('name', pathlib.Path(yaml_file).stem)
+                        version = yaml_content.get('version', 'latest')
+                        templates.append((name, version))
+                    except Exception:
+                        # Try to parse from filename
+                        stem = pathlib.Path(yaml_file).stem
+                        if '_' in stem:
+                            name, version = stem.rsplit('_', 1)
+                        else:
+                            name, version = stem, 'latest'
+                        templates.append((name, version))
+            else:
+                # List from remote endpoint
+                data = await self.manager.read("templates")
+                json_data = json.loads(data.decode('utf-8'))
+                
+                for item in json_data.get('templates', []):
+                    name = item.get('name')
+                    versions = item.get('versions', ['latest'])
+                    for version in versions:
+                        templates.append((name, version))
+        except Exception as e:
+            logger.error(f"Failed to list templates: {e}")
+        
+        return templates
+    
+    async def save_template(self, template: PromptTemplate) -> None:
+        """Save a template to storage."""
+        try:
+            if self.config.is_local:
+                await self._save_to_local(template)
+            else:
+                await self._save_to_remote(template)
+        except Exception as e:
+            logger.error(f"Failed to save template '{template.name}': {e}")
+            raise RuntimeError(f'Failed to save template: {e}') from e
+    
+    async def _save_to_local(self, template: PromptTemplate) -> None:
+        """Save template to local filesystem."""
+        version = template.version or 'latest'
+        filename = f"{template.name}_{version}.yaml" if version != 'latest' else f"{template.name}.yaml"
+        
+        data = self._template_to_dict(template)
+        yaml_content = yaml.dump(data, default_flow_style=False, allow_unicode=True)
+        await self.manager.write(filename, yaml_content.encode('utf-8'))
+    
+    async def _save_to_remote(self, template: PromptTemplate) -> None:
+        """Save template to remote HTTP endpoint."""
+        path = f"templates/{template.name}"
+        data = self._template_to_dict(template)
+        json_content = json.dumps(data, ensure_ascii=False)
+        await self.manager.write(path, json_content.encode('utf-8'))
+    
+    def _parse_template_data(self, data: dict, name: str, version: str) -> PromptTemplate:
+        """Parse template data from dict."""
+        # Use the same logic as FilesystemStorage
+        fs_storage = FilesystemStorage()
+        return fs_storage._parse_template_data(data, name, version)
+    
+    def _template_to_dict(self, template: PromptTemplate) -> dict:
+        """Convert template to dict."""
+        # Use the same logic as FilesystemStorage
+        fs_storage = FilesystemStorage()
+        return fs_storage._template_to_dict(template)
+    
+    async def close(self) -> None:
+        """Close the storage backend."""
+        await self.manager.close()
+
+
+def get_storage_backend(endpoint: str, use_unified: bool = True) -> StorageBackend:
+    """Get storage backend for the given endpoint.
+    
+    Args:
+        endpoint: Endpoint URL (fs://path, http://host:port, etc.)
+        use_unified: Whether to use the unified storage backend (default: True)
+    
+    Returns:
+        StorageBackend instance
+    """
+    if use_unified:
+        # Use the unified storage backend
+        try:
+            config = EndpointConfig(endpoint=endpoint)
+            return Storage(config)
+        except Exception:
+            # Fall back to legacy backends if unified fails
+            pass
+    
+    # Legacy backend selection
     parsed = urlparse(endpoint)
     if parsed.scheme == 'fs':
         path = '.' + parsed.path if parsed.netloc == '.' and parsed.path else (parsed.netloc if parsed.netloc and not parsed.path else parsed.path)

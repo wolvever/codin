@@ -1,4 +1,9 @@
-"""Metrics extension for tool execution."""
+"""Deprecated: Metrics are built into ToolExecutor.
+
+This module is part of an over-engineered extension system.
+The ToolExecutor in executor.py already includes comprehensive
+Prometheus and OpenTelemetry metrics out of the box.
+"""
 
 from __future__ import annotations
 

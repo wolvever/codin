@@ -117,7 +117,7 @@ class Memory(abc.ABC):
     async def add_message(self, message: Message) -> None: ...
 
     @abc.abstractmethod
-    async def get_history(self, limit: int = 50, query: str | None = None) -> list[Message]: ...
+    async def get_history(self, limit: int = 50, query: str | None = None, session_id: str | None = None) -> list[Message]: ...
 
     @abc.abstractmethod
     async def set_chunk_builder(
@@ -132,6 +132,14 @@ class Memory(abc.ABC):
 
 
 MemoryService = Memory
+
+# Import unified service as the recommended implementation
+try:  # pragma: no cover - optional
+    from .service import Memory as UnifiedMemory  # noqa: F401
+
+    __all__.append("UnifiedMemory")
+except Exception:  # pragma: no cover - ignore if not available
+    pass
 
 # Backwards-compatibility import
 try:  # pragma: no cover - optional

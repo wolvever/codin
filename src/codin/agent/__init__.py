@@ -13,7 +13,6 @@ from ..tool.base import Tool
 # Core interfaces and implementations
 from .base import Agent, Planner
 from .types import (
-    TaskControl,
     AgentRunInput,
     AgentRunOutput,
     StepType,
@@ -29,45 +28,12 @@ from .types import (
 )
 from .session import Session
 from .runner import AgentRunner as Runner
-from .agent import BasicAgent
+from .base_agent import BaseAgent
 from .planners import BasicPlanner, ReactivePlanner, CodingAssistantPlanner
-from .discovery import AgentRegistry
-from .distributed import RayAgent, AgentFactory
+from .factory import AgentFactory, create_agent, create_local_agent, create_remote_agent
+from .config import AgentEndpointConfig
 
 
-# Lazy imports to avoid circular dependencies
-def get_base_agent():
-    """Lazy import BaseAgent to avoid circular imports."""
-    from .base_agent import BaseAgent
-
-    return BaseAgent
-
-
-def get_base_planner():
-    """Lazy import BasePlanner to avoid circular imports."""
-    from .base_planner import BasePlanner, BasePlannerConfig
-
-    return BasePlanner, BasePlannerConfig
-
-
-def get_code_agent():
-    """Lazy import CodeAgent to avoid circular imports."""
-    from .code_agent import CodeAgent
-
-    return CodeAgent
-
-  
-def get_codeact_planner():
-    """Lazy import CodeActPlanner to avoid circular imports."""
-    from .codeact_planner import CodeActPlanner
-
-    return CodeActPlanner
-
-def get_search_agent():
-    """Lazy import SearchAgent to avoid circular imports."""
-    from .search_agent import SearchAgent
-
-    return SearchAgent
 
 
 __all__ = [
@@ -75,7 +41,6 @@ __all__ = [
     "Agent",
     "Planner",
     # Core types
-    "TaskControl",
     "AgentRunInput",
     "AgentRunOutput",
     "StepType",
@@ -91,25 +56,22 @@ __all__ = [
     # Core implementations
     "Session",
     "Runner",
-    "BasicAgent",
+    "BaseAgent",
     # Planners
     "BasicPlanner",
     "ReactivePlanner",
     "CodingAssistantPlanner",
     # Services
-    "AgentRegistry",
-    "RayAgent",
     "AgentFactory",
+    "AgentEndpointConfig",
+    "create_agent",
+    "create_local_agent", 
+    "create_remote_agent",
     # Legacy exports
     "Memory",
     "MemMemoryService",
     "BaseLLM",
     "Tool",
-    "get_base_agent",
-    "get_base_planner",
-    "get_code_agent",
-    "get_codeact_planner",
-    "get_search_agent",
 ]
 
 

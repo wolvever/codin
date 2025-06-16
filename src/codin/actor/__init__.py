@@ -11,7 +11,6 @@ from .actor_system import ActorSystem
 from .work_stealing import WorkStealingActorSystem
 from .dispatcher import Dispatcher, DispatchRequest, DispatchResult, LocalDispatcher # DispatchRequest might be deprecated
 from .mailbox import LocalMailbox, Mailbox # RayMailbox is conditionally imported in mailbox.py
-from .ray_scheduler import RayActorManager
 from .supervisor import ActorInfo, ActorSupervisor, LocalActorManager
 from .types import ActorRunInput, ActorRunOutput, CallableActor
 from .envelope_types import (
@@ -28,13 +27,6 @@ from .actors import AgentActor, PlainActor, AGENT_CAP
 from .task_manager import TaskInfo, TaskRegistry # Added TaskManager imports
 
 
-# Conditionally add RayMailbox to __all__ if it's available.
-_ray_mailbox_available = False
-try:
-    from .mailbox import RayMailbox as _RayMailbox_alias
-    _ray_mailbox_available = True
-except ImportError:
-    pass
 
 __all__ = [
     # Mailbox types
@@ -44,8 +36,6 @@ __all__ = [
     'ActorSupervisor',
     'LocalActorManager',
     'ActorInfo',
-    # Ray-specific actor manager
-    'RayActorManager',
     # Dispatcher types
     'Dispatcher',
     'LocalDispatcher',
@@ -76,5 +66,3 @@ __all__ = [
     'WorkStealingActorSystem',
 ]
 
-if _ray_mailbox_available:
-    __all__.append('RayMailbox')

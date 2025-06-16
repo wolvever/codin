@@ -16,6 +16,7 @@ import httpx
 import pydantic as _pyd
 import yaml
 
+from codin.endpoint import EndpointConfig, EndpointManager
 from .base import Tool, Toolset, ToolSpec
 
 __all__ = [
@@ -26,13 +27,23 @@ __all__ = [
 
 
 class ToolEndpoint(_pyd.BaseModel):
-    """Configuration for a tool endpoint."""
+    """Configuration for a tool endpoint using unified endpoint system."""
 
     endpoint: str = _pyd.Field(..., description='Endpoint URL (fs://path, http://host:port, etc.)')
     name: str = _pyd.Field(None, description='Optional name for the endpoint')
     auth: dict[str, _t.Any] | None = _pyd.Field(None, description='Authentication configuration')
     timeout: float = _pyd.Field(30.0, description='Request timeout in seconds')
     enabled: bool = _pyd.Field(True, description='Whether this endpoint is enabled')
+    fallback_endpoint: str | None = _pyd.Field(None, description='Fallback endpoint URL')
+
+    def to_endpoint_config(self) -> EndpointConfig:
+        """Convert to unified EndpointConfig."""
+        return EndpointConfig(
+            endpoint=self.endpoint,
+            fallback_endpoint=self.fallback_endpoint,
+            auth=self.auth,
+            timeout=int(self.timeout)
+        )
 
 
 class ToolRegistryConfig(_pyd.BaseModel):
@@ -106,17 +117,21 @@ class ToolRegistry:
                 self.logger.error(f'Failed to load from endpoint {endpoint_config.endpoint}: {e}')
 
     async def _load_from_endpoint(self, endpoint_config: ToolEndpoint) -> None:
-        """Load tools from a specific endpoint."""
-        parsed = urlparse(endpoint_config.endpoint)
-
-        if parsed.scheme == 'fs':
-            # File system endpoint
-            await self._load_from_filesystem(parsed.path)
-        elif parsed.scheme in ['http', 'https']:
-            # HTTP endpoint
-            await self._load_from_http(endpoint_config)
-        else:
-            raise ValueError(f'Unsupported endpoint scheme: {parsed.scheme}')
+        """Load tools from a specific endpoint using unified endpoint system."""
+        unified_config = endpoint_config.to_endpoint_config()
+        manager = EndpointManager(unified_config)
+        
+        try:
+            if unified_config.is_local:
+                # File system endpoint
+                await self._load_from_filesystem_unified(manager)
+            elif unified_config.is_remote:
+                # HTTP endpoint
+                await self._load_from_http_unified(manager, endpoint_config)
+            else:
+                raise ValueError(f'Unsupported endpoint scheme: {unified_config.parsed.scheme}')
+        finally:
+            await manager.close()
 
     async def _load_from_filesystem(self, path: str) -> None:
         """Load tools from filesystem path.
@@ -158,6 +173,58 @@ class ToolRegistry:
             except Exception as e:  # pragma: no cover - loading errors
                 self.logger.error(f'Failed to load tools from {file}: {e}')
 
+    async def _load_from_filesystem_unified(self, manager: EndpointManager) -> None:
+        """Load tools from filesystem using unified endpoint manager."""
+        # List Python files
+        try:
+            files = await manager.list("")
+            python_files = [f for f in files if f.endswith('.py')]
+            
+            for file_path in python_files:
+                try:
+                    # Read the Python file
+                    file_content = await manager.read(file_path)
+                    module_content = file_content.decode('utf-8')
+                    
+                    # Create a temporary file to import
+                    import tempfile
+                    import os
+                    
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as tmp_file:
+                        tmp_file.write(module_content)
+                        tmp_file.flush()
+                        
+                        try:
+                            module_name = Path(file_path).stem
+                            spec = importlib.util.spec_from_file_location(module_name, tmp_file.name)
+                            if spec and spec.loader:
+                                module = importlib.util.module_from_spec(spec)
+                                spec.loader.exec_module(module)  # type: ignore[attr-defined]
+
+                                # Register toolsets and tools
+                                if hasattr(module, 'get_toolsets'):
+                                    for ts in module.get_toolsets():
+                                        if isinstance(ts, Toolset):
+                                            self.register_toolset(ts)
+
+                                if hasattr(module, 'get_tools'):
+                                    for t in module.get_tools():
+                                        if isinstance(t, Tool):
+                                            self.register_tool(t)
+
+                                for attr in vars(module).values():
+                                    if isinstance(attr, Toolset):
+                                        self.register_toolset(attr)
+                                    elif isinstance(attr, Tool):
+                                        self.register_tool(attr)
+                        finally:
+                            os.unlink(tmp_file.name)
+                            
+                except Exception as e:
+                    self.logger.error(f'Failed to load tools from {file_path}: {e}')
+        except Exception as e:
+            self.logger.error(f'Failed to list tools from endpoint: {e}')
+
     async def _load_from_http(self, endpoint_config: ToolEndpoint) -> None:
         """Load tools from HTTP endpoint."""
         async with httpx.AsyncClient(timeout=endpoint_config.timeout) as client:
@@ -179,6 +246,22 @@ class ToolRegistry:
             for tool_data in tools_data.get('tools', []):
                 # This would create RemoteTool instances that delegate to the HTTP endpoint
                 self.logger.info(f'Would load remote tool: {tool_data.get("name")}')
+
+    async def _load_from_http_unified(self, manager: EndpointManager, endpoint_config: ToolEndpoint) -> None:
+        """Load tools from HTTP endpoint using unified endpoint manager."""
+        try:
+            # Use the unified backend to fetch tools
+            tools_data = await manager.read("tools")
+            tools_json = json.loads(tools_data.decode('utf-8'))
+            
+            # Process tool definitions
+            for tool_data in tools_json.get('tools', []):
+                # This would create RemoteTool instances that delegate to the HTTP endpoint
+                self.logger.info(f'Would load remote tool via unified endpoint: {tool_data.get("name")}')
+                # TODO: Implement RemoteTool creation
+                
+        except Exception as e:
+            self.logger.error(f'Failed to load tools from unified HTTP endpoint: {e}')
 
     def set_executor(self, executor) -> None:
         """Set the tool executor for this registry."""

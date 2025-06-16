@@ -91,7 +91,7 @@ class MemMemoryService(Memory):
         self._messages.setdefault(session_id, []).append(message)
 
     async def get_history(
-        self, session_id: str | None = None, *, limit: int = 50, query: str | None = None
+        self, limit: int = 50, query: str | None = None, session_id: str | None = None
     ) -> list[Message]:
         """Return conversation history for *session_id*.
 
@@ -141,23 +141,6 @@ class MemMemoryService(Memory):
         except Exception:
             return 0
 
-    # ------------------------------------------------------------------
-    # Convenience wrappers used in tests
-    # ------------------------------------------------------------------
-    async def create_memory_chunk(
-        self,
-        session_id: str,
-        messages: list[Message],
-        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None,
-    ) -> list[MemoryChunk]:
-        """Public wrapper for legacy chunk creation."""
-
-        return await self._create_memory_chunk_legacy(session_id, messages, llm_summarizer)
-
-    async def search_memory_chunks(self, session_id: str, query: str, limit: int = 5) -> list[MemoryChunk]:
-        """Alias for :meth:`search_chunk` for backward compatibility."""
-
-        return await self.search_chunk(session_id, query, limit)
 
     async def search_chunk(self, session_id: str, query: str, limit: int = 5) -> list[MemoryChunk]:
         if self._index:
@@ -192,115 +175,4 @@ class MemMemoryService(Memory):
         scored.sort(key=lambda x: x[0], reverse=True)
         return [c for _, c in scored[:limit]]
 
-    # ------------------------------------------------------------------
-    # Legacy compression utilities
-    # ------------------------------------------------------------------
-    def _simple_summarize(self, text: str) -> str:
-        lines = text.split("\n")
-        if len(lines) <= 3:
-            return text
-        summary_lines = lines[:2] + ["..."] + lines[-2:]
-        return "\n".join(summary_lines)
 
-    async def compress_old_messages(
-        self,
-        session_id: str,
-        keep_recent: int = 20,
-        chunk_size: int = 10,
-        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None,
-    ) -> int:
-        messages = self._messages.get(session_id, [])
-        if len(messages) <= keep_recent:
-            return 0
-        to_compress = messages[:-keep_recent]
-        chunk_groups_created = 0
-        for i in range(0, len(to_compress), chunk_size):
-            chunk_msgs = to_compress[i : i + chunk_size]
-            if chunk_msgs:
-                await self._create_memory_chunk_legacy(session_id, chunk_msgs, llm_summarizer)
-                chunk_groups_created += 1
-        self._messages[session_id] = messages[-keep_recent:]
-        return chunk_groups_created
-
-    async def _create_memory_chunk_legacy(
-        self,
-        session_id: str,
-        messages: list[Message],
-        llm_summarizer: _t.Callable[[str], _t.Awaitable[dict[str, _t.Any]]] | None = None,
-    ) -> list[MemoryChunk]:
-        if not messages:
-            raise ValueError("Cannot create memory chunk from empty message list")
-        doc_id = str(uuid.uuid4())
-        start_id = messages[0].messageId
-        end_id = messages[-1].messageId
-        text_content = []
-        for msg in messages:
-            role = "User" if msg.role == Role.user else "Assistant"
-            for part in msg.parts:
-                if hasattr(part, "text"):
-                    text_content.append(f"{role}: {part.text}")
-                elif hasattr(part, "root") and hasattr(part.root, "text"):
-                    text_content.append(f"{role}: {part.root.text}")
-        conversation_text = "\n".join(text_content)
-        if llm_summarizer:
-            try:
-                result = await llm_summarizer(conversation_text)
-                summary = result.get("summary", "Conversation summary")
-                entities = result.get("entities", {})
-                id_mappings = result.get("id_mappings", {})
-            except Exception:
-                summary = self._simple_summarize(conversation_text)
-                entities = {}
-                id_mappings = {}
-        else:
-            summary = self._simple_summarize(conversation_text)
-            entities = {}
-            id_mappings = {}
-        chunks: list[MemoryChunk] = []
-        summary_chunk = MemoryChunk(
-            doc_id=doc_id,
-            chunk_id=f"{doc_id}-summary",
-            session_id=session_id,
-            chunk_type=ChunkType.MEMORY_SUMMARY,
-            content=summary,
-            title=f"Conversation Summary ({len(messages)} messages)",
-            start_message_id=start_id,
-            end_message_id=end_id,
-            created_at=datetime.now(),
-            message_count=len(messages),
-        )
-        chunks.append(summary_chunk)
-        if entities:
-            entities_chunk = MemoryChunk(
-                doc_id=doc_id,
-                chunk_id=f"{doc_id}-entities",
-                session_id=session_id,
-                chunk_type=ChunkType.MEMORY_ENTITY,
-                content=entities,
-                title="Extracted Entities",
-                start_message_id=start_id,
-                end_message_id=end_id,
-                created_at=datetime.now(),
-                message_count=len(messages),
-            )
-            chunks.append(entities_chunk)
-        if id_mappings:
-            mapping_chunk = MemoryChunk(
-                doc_id=doc_id,
-                chunk_id=f"{doc_id}-mappings",
-                session_id=session_id,
-                chunk_type=ChunkType.MEMORY_ID_MAPPING,
-                content=id_mappings,
-                title="ID Mappings",
-                start_message_id=start_id,
-                end_message_id=end_id,
-                created_at=datetime.now(),
-                message_count=len(messages),
-            )
-            chunks.append(mapping_chunk)
-        for c in chunks:
-            self._chunks.setdefault(session_id, []).append(c)
-            self._chunk_map[c.chunk_id] = c
-            if self._index:
-                self._index.add(c)
-        return chunks

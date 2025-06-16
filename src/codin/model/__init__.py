@@ -9,6 +9,7 @@ Model abstractions and implementations for different LLM providers.
 from .anthropic_llm import AnthropicLLM
 from .base import BaseEmbedding, BaseLLM, BaseModel, BaseReranker, ModelType
 from .config import ModelConfig
+from .endpoint_config import ModelEndpointConfig
 from .factory import LLMFactory, create_llm_from_env
 from .gemini_llm import GeminiLLM
 from .http_utils import ModelAPIError, ContentExtractionError, StreamProcessingError, ModelResponseParsingError
@@ -31,6 +32,7 @@ __all__ = [
     'BaseReranker',
     # Config
     'ModelConfig',
+    'ModelEndpointConfig',
     # Registry
     'ModelRegistry',
     # Factory

@@ -1,4 +1,8 @@
-"""Authentication extension for tool execution."""
+"""Deprecated: Use ToolExecutionHook for authentication.
+
+This module is part of an over-engineered extension system.
+Create a custom ToolExecutionHook subclass for authentication logic.
+"""
 
 from __future__ import annotations
 

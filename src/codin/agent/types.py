@@ -15,7 +15,6 @@ Any = _t.Any
 
 
 if _t.TYPE_CHECKING:
-    from ..artifact.base import ArtifactService
     from ..tool.base import Tool
 
 
@@ -312,126 +311,6 @@ class AgentRunInput(_pyd.BaseModel):
 Part = TextPart | DataPart | FilePart | ToolUsePart
 
 
-# =============================================================================
-# Internal events and control types
-# =============================================================================
-
-
-class EventType(str, Enum):
-    """Types of events for EventStep."""
-
-    # A2A Events
-    TASK_STATUS_UPDATE = "task_status_update"
-    TASK_ARTIFACT_UPDATE = "task_artifact_update"
-
-    TASK_START = "task_start"
-    TASK_END = "task_end"
-    THINK = "think"
-    TOOL_CALL_START = "tool_call_start"
-    TOOL_CALL_END = "tool_call_end"
-    TURN_START = "turn_start"
-    TURN_END = "turn_end"
-    ERROR = "error"
-
-
-class RunEvent(BaseModel):
-    """Internal event type for non-A2A events."""
-
-    event_type: str
-    data: dict[str, _t.Any]
-    metadata: dict[str, _t.Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=datetime.now)
-
-
-# Union type for all events
-Event = TaskStatusUpdateEvent | TaskArtifactUpdateEvent | RunEvent
-
-
-# =============================================================================
-# Control and Runner Types for Bidirectional Mailbox
-# =============================================================================
-
-
-class ControlSignal(str, Enum):
-    """Control signals that can be sent through mailbox."""
-
-    PAUSE = "pause"
-    RESUME = "resume"
-    CANCEL = "cancel"
-    RESET = "reset"
-    STOP = "stop"
-
-
-class RunnerControl(BaseModel):
-    """Control message for runner/agent management."""
-
-    signal: ControlSignal
-    metadata: dict[str, _t.Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=datetime.now)
-
-
-class RunnerInput(BaseModel):
-    """Enhanced input for agents through bidirectional mailbox."""
-
-    message: Message | None = None
-    control: RunnerControl | None = None
-    metadata: dict[str, _t.Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=datetime.now)
-
-    @classmethod
-    def from_message(cls, message: Message) -> RunnerInput:
-        """Create RunnerInput from a message."""
-        return cls(message=message)
-
-    @classmethod
-    def from_control(cls, signal: ControlSignal, metadata: dict[str, _t.Any] | None = None) -> RunnerInput:
-        """Create RunnerInput from a control signal."""
-        control = RunnerControl(signal=signal, metadata=metadata or {})
-        return cls(control=control)
-
-
-# =============================================================================
-# Agent Types (from base.py) - Updated for A2A compatibility
-# =============================================================================
-
-# DEPRECATED: Use codin.actor.types.ActorRunInput instead.
-# This definition is kept for backward compatibility during transition
-# for any modules that might still directly import it.
-class AgentRunInput(_pyd.BaseModel):
-    """Input for agent execution.
-
-    DEPRECATED: New agent implementations should use `ActorRunInput`
-    from `codin.actor.types` for compatibility with the actor system.
-    """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    id: str | int | None = None
-    message: Message # Main message payload for the agent
-    metadata: dict[str, _t.Any] | None = None # Additional metadata
-    options: dict[str, _t.Any] | None = None # Configuration options for the run
-    session_id: str | None = None # Session identifier
-    task_id: str | None = None  # Optional task ID for continuing existing task
-
-
-# DEPRECATED: Use codin.actor.types.ActorRunOutput instead.
-# This definition is kept for backward compatibility during transition.
-# ActorRunOutput is 'Any', so results from BaseAgent (e.g. Message objects)
-# are compatible.
-class AgentRunOutput(_pyd.BaseModel):
-    """Output from agent execution.
-
-    DEPRECATED: New agent implementations should yield outputs compatible with
-    `ActorRunOutput` from `codin.actor.types` (which is currently `Any`).
-    The `BaseAgent` now yields `Message` objects or dictionaries directly,
-    which are compatible with `ActorRunOutput = Any`.
-    """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    id: str | int | None = None # ID of the step or output item
-    result: Task | Message | Event # The actual result data
-    metadata: dict[str, _t.Any] | None = None # Additional metadata about the output
 
 class RunConfig(BaseModel):
     """Budget constraints and agent configuration."""
@@ -543,7 +422,6 @@ class State(BaseModel):
     # Memory references (readonly)
     pending: list[Message] = Field(default_factory=list)
     history: list[Message] = Field(default_factory=list)
-    artifact_ref: ArtifactService | None = None  # Readonly reference
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
 
     # Performance metrics

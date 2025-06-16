@@ -25,7 +25,6 @@ from ..agent.base import Agent
 
 # Import concrete agent implementations
 from ..agent.base_agent import BaseAgent
-from ..agent.dag_planner import DAGExecutor, DAGPlanner
 from ..model.base import BaseLLM
 from ..protocol.types import AgentRunInput, AgentRunOutput, Message, TaskState, TextPart
 from ..protocol.types import TaskStatus as ProtocolTaskStatus
@@ -627,38 +626,23 @@ async def create_agent_host(
 
             span.set_attribute(f'agent.{agent_id}.type', agent_type)
 
-            # Create different types of agents
-            if agent_type == 'planner':
-                agent = DAGPlanner(
-                    llm=llm,
-                    name=agent_name,
-                    description=agent_desc,
-                    tools=tools or [],
-                )
-            elif agent_type == 'executor':
-                agent = DAGExecutor(
-                    llm=llm,
-                    name=agent_name,
-                    description=agent_desc,
-                    tools=tools or [],
-                )
-            else:
-                # Basic agent - use concrete BaseAgent implementation
-                from ..agent.base_planner import BasePlanner
-                from ..memory.base import MemMemoryService
-                
-                # Create a basic planner for the BaseAgent
-                planner = BasePlanner(llm=llm)
-                
-                agent = BaseAgent(
-                    agent_id=agent_id,
-                    name=agent_name,
-                    description=agent_desc,
-                    planner=planner,
-                    memory=MemMemoryService(),
-                    tools=tools or [],
-                    llm=llm,
-                )
+            # Create agent - only basic type supported now
+            # Basic agent - use concrete BaseAgent implementation
+            from ..agent.base_planner import BasePlanner
+            from ..memory.base import MemMemoryService
+            
+            # Create a basic planner for the BaseAgent
+            planner = BasePlanner(llm=llm)
+            
+            agent = BaseAgent(
+                agent_id=agent_id,
+                name=agent_name,
+                description=agent_desc,
+                planner=planner,
+                memory=MemMemoryService(),
+                tools=tools or [],
+                llm=llm,
+            )
 
             # Add the agent to the host
             host.add_agent(
@@ -713,51 +697,3 @@ async def create_single_agent_host(
         return host
 
 
-async def create_dag_agent_host(
-    llm: BaseLLM,
-    tools: list[Tool] | None = None,
-    session_id: str | None = None,
-    workspace_dir: str | Path | None = None,
-    interactive: bool = True,
-) -> AgentHost:
-    """Create a host with a DAG-based agent (planner + executor).
-
-    Args:
-        llm: Language model to use
-        tools: List of tools to provide to the agent
-        session_id: Optional session ID
-        workspace_dir: Directory for agent workspace
-        interactive: Whether to run in interactive mode
-
-    Returns:
-        An AgentHost instance with a DAG-based agent
-    """
-    with tracer.start_as_current_span('create_dag_agent_host'):
-        # Create DAG agent specs
-        agent_specs = [
-            {
-                'id': 'planner',
-                'name': 'Codin Planner',
-                'description': 'Creates plans for coding tasks',
-                'type': 'planner',
-            },
-            {
-                'id': 'executor',
-                'name': 'Codin Executor',
-                'description': 'Executes coding tasks according to a plan',
-                'type': 'executor',
-            },
-        ]
-
-        # Create the host
-        host = await create_agent_host(
-            llm=llm,
-            agent_specs=agent_specs,
-            session_id=session_id,
-            workspace_dir=workspace_dir,
-            tools=tools,
-        )
-
-        host.interactive = interactive
-
-        return host

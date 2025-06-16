@@ -1,4 +1,10 @@
-"""Extension system for cross-cutting concerns in tool execution."""
+"""Deprecated: Over-engineered extension system. Use ToolExecutionHook instead.
+
+This extension system adds unnecessary complexity. The ToolExecutor's hook system
+in executor.py provides the same functionality with a much simpler design.
+
+Use ToolExecutionHook, ApprovalHook, etc. from executor.py instead.
+"""
 
 from __future__ import annotations
 

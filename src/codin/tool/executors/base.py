@@ -1,4 +1,8 @@
-"""Base executor interfaces for the unified tool execution system."""
+"""Deprecated: Over-engineered executor system. Use ToolExecutor instead.
+
+This module represents unnecessary abstraction layers that complicate
+the tool execution system without providing significant benefits.
+"""
 
 from __future__ import annotations
 

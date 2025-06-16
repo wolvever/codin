@@ -26,13 +26,13 @@ class MemoryClient(Memory):
         session_id = message.contextId or self._current_session_id or "default"
         await self._client.post(f"/sessions/{session_id}/messages", json=message.model_dump())
 
-    async def get_history(self, limit: int = 50, query: str | None = None) -> list[Message]:
+    async def get_history(self, limit: int = 50, query: str | None = None, session_id: str | None = None) -> list[Message]:
         await self._client.prepare()
-        session_id = self._current_session_id or "default"
+        final_session_id = session_id or self._current_session_id or "default"
         params = {"limit": limit}
         if query:
             params["query"] = query
-        resp = await self._client.get(f"/sessions/{session_id}/history", params=params)
+        resp = await self._client.get(f"/sessions/{final_session_id}/history", params=params)
         resp.raise_for_status()
         data = resp.json()
         return [Message(**m) for m in data.get("messages", [])]

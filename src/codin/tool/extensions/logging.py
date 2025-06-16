@@ -1,4 +1,9 @@
-"""Logging extension for tool execution."""
+"""Deprecated: Logging is built into ToolExecutor.
+
+This module is part of an over-engineered extension system.
+The ToolExecutor in executor.py already includes comprehensive
+logging capabilities out of the box.
+"""
 
 from __future__ import annotations
 

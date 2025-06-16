@@ -1,7 +1,7 @@
-from ..planner import BasicPlanner
+from ..base_planner import BasePlanner
 
 
-class CodingAssistantPlanner(BasicPlanner):
+class CodingAssistantPlanner(BasePlanner):
     """Specialized planner for coding tasks."""
 
     def _default_system_prompt(self) -> str:

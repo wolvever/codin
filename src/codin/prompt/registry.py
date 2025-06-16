@@ -39,9 +39,14 @@ class PromptRegistry:
         if endpoint:
             self._endpoint = endpoint
         else:
-            # Use environment variable if available
-            template_dir = os.getenv('PROMPT_TEMPLATE_DIR', './prompt_templates')
-            self._endpoint = f'fs://{template_dir}'
+            # Use standardized environment variable if available, fallback to legacy
+            endpoint_env = os.getenv('CODIN_PROMPT_ENDPOINT')
+            if endpoint_env:
+                self._endpoint = endpoint_env
+            else:
+                # Legacy environment variable fallback
+                template_dir = os.getenv('PROMPT_TEMPLATE_DIR', './prompt_templates')
+                self._endpoint = f'fs://{template_dir}'
 
         self._storage = None
         self._in_memory_templates: dict[str, dict[str, PromptTemplate]] = {}

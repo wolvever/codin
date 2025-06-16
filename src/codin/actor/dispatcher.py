@@ -13,13 +13,11 @@ import asyncio
 import logging
 import typing as _t
 import uuid
-import warnings # Added for deprecation
 from abc import ABC, abstractmethod
 from datetime import datetime
 
 from pydantic import BaseModel, Field, ValidationError
 
-from .mailbox import Mailbox
 from .supervisor import ActorSupervisor, ActorInfo
 from .types import CallableActor, ActorRunInput, ActorRunOutput
 from .envelope_types import Envelope, EnvelopeKind, ControlPayload, Capability, ControlAction, TaskState
@@ -110,45 +108,6 @@ class LocalDispatcher(Dispatcher):
         self._run_tasks[runner_id] = async_task
         return runner_id
 
-    async def signal(self, actor_id: str, ctrl: str) -> None:
-        """Sends a control signal to a specific actor via its mailbox.
-
-        .. deprecated:: 0.1.0
-           Use envelope-based control by submitting an `Envelope` with
-           `kind=EnvelopeKind.CONTROL` and a `ControlPayload` instead.
-           This method will be removed in a future version.
-
-        Args:
-            actor_id: The ID of the target actor.
-            ctrl: The control string/message (specific to the old mechanism).
-
-        Raises:
-            ValueError: If the actor is not found.
-        """
-        warnings.warn(
-            "LocalDispatcher.signal() is deprecated and will be removed. "
-            "Use envelope-based control (EnvelopeKind.CONTROL) instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        logger.warning(
-            f"Deprecated LocalDispatcher.signal() called for actor_id '{actor_id}' with ctrl '{ctrl}'. "
-            f"Migrate to envelope-based control."
-        )
-        actor_info = await self.actor_manager.info(actor_id)
-        if not actor_info:
-            raise ValueError(f'Actor {actor_id} not found for signal.')
-        actor_instance = actor_info.agent
-        if hasattr(actor_instance, 'mailbox') and isinstance(actor_instance.mailbox, Mailbox):
-            from ..agent.types import Message, Role, TextPart # Local import for specific, deprecated message type
-            control_message = Message(
-                messageId=str(uuid.uuid4()), role=Role.system,
-                parts=[TextPart(text=f'Control signal: {ctrl}')], contextId=actor_id,
-                kind='message', metadata={'control': ctrl, 'signal_type': 'dispatcher_signal_deprecated'},
-            )
-            await actor_instance.mailbox.put_inbox(control_message)
-        else:
-            logger.warning(f"Actor {actor_id} does not have a mailbox for deprecated signal '{ctrl}'.")
 
     async def get_status(self, runner_id: str) -> DispatchResult | None:
         dispatch_result = self._active_runs.get(runner_id)

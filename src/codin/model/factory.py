@@ -11,6 +11,7 @@ import typing as _t
 from .anthropic_llm import AnthropicLLM
 from .base import BaseLLM
 from .config import ModelConfig  # Import ModelConfig
+from .endpoint_config import ModelEndpointConfig
 from .gemini_llm import GeminiLLM
 from .litellm_adapter import LiteLLMAdapter
 from .openai_llm import OpenAILLM
@@ -52,6 +53,7 @@ class LLMFactory:
         api_key: str | None = None,
         base_url: str | None = None,
         config: _t.Optional[ModelConfig] = None,
+        endpoint_config: _t.Optional[ModelEndpointConfig] = None,
     ) -> BaseLLM:
         """Create an LLM instance based on configuration.
 
@@ -64,6 +66,7 @@ class LLMFactory:
             api_key: API key (overrides LLM_API_KEY env var and config.api_key)
             base_url: Base URL (overrides LLM_BASE_URL env var and config.base_url)
             config: A ModelConfig object to source configuration from.
+            endpoint_config: A ModelEndpointConfig object for unified endpoint handling.
 
         Returns:
             A BaseLLM instance
@@ -71,31 +74,35 @@ class LLMFactory:
         Raises:
             ValueError: If provider is not supported or auto-detection fails
         """
-        # Create a base ModelConfig if none is provided
-        effective_config = config or ModelConfig()
+        # Handle endpoint_config if provided (preferred over legacy config)
+        if endpoint_config:
+            effective_endpoint_config = endpoint_config
+        elif config:
+            # Convert legacy config to endpoint config
+            effective_endpoint_config = ModelEndpointConfig.from_model_config(config)
+        else:
+            # Create from environment
+            effective_endpoint_config = ModelEndpointConfig.from_env(provider)
 
-        # Determine final configuration values: direct args > config object > env vars
+        # Determine final configuration values: direct args > endpoint_config > env vars
         final_provider = provider or \
-                         effective_config.provider or \
+                         effective_endpoint_config.provider or \
                          os.environ.get('LLM_PROVIDER', 'auto').lower()
 
         final_model = model or \
-                      effective_config.model_name or \
+                      effective_endpoint_config.model_name or \
                       os.environ.get('LLM_MODEL')
 
         final_api_key = api_key or \
-                        effective_config.api_key or \
+                        effective_endpoint_config.api_key or \
                         os.environ.get('LLM_API_KEY')
 
         final_base_url = base_url or \
-                         effective_config.base_url or \
+                         effective_endpoint_config.base_url or \
                          os.environ.get('LLM_BASE_URL')
 
-        # Other ModelConfig fields can be populated similarly if the factory needs to override them
-        # For now, we assume other fields in `effective_config` are used as is.
-
         if not final_model:
-            raise ValueError('Model name must be provided via parameter, ModelConfig, or LLM_MODEL env var')
+            raise ValueError('Model name must be provided via parameter, ModelEndpointConfig, or LLM_MODEL env var')
 
         # Auto-detect provider if needed
         if final_provider == 'auto':
@@ -107,22 +114,23 @@ class LLMFactory:
             supported_providers = ', '.join(cls.PROVIDER_CLASSES.keys())
             raise ValueError(f"Unsupported provider '{final_provider}'. Supported: {supported_providers}")
 
-        # Prepare the ModelConfig to be passed to the LLM constructor
-        # Prioritize specific settings passed to the factory, then existing config, then env.
-        instance_config = ModelConfig(
-            model_name=final_model, # Model name in config is for reference/consistency
-            api_key=final_api_key,
-            base_url=final_base_url,
+        # Create final endpoint configuration
+        final_endpoint_config = ModelEndpointConfig(
+            model_name=final_model,
             provider=final_provider,
-            # Carry over other settings from the input config if they weren't overridden by direct args
-            timeout=effective_config.timeout,
-            connect_timeout=effective_config.connect_timeout,
-            max_retries=effective_config.max_retries,
-            retry_min_wait=effective_config.retry_min_wait,
-            retry_max_wait=effective_config.retry_max_wait,
-            retry_on_status_codes=effective_config.retry_on_status_codes,
-            api_version=effective_config.api_version # Important for Anthropic
+            endpoint_config=effective_endpoint_config.endpoint_config,
+            api_key=final_api_key,
+            api_version=effective_endpoint_config.api_version,
+            timeout=effective_endpoint_config.timeout,
+            connect_timeout=effective_endpoint_config.connect_timeout,
+            max_retries=effective_endpoint_config.max_retries,
+            retry_min_wait=effective_endpoint_config.retry_min_wait,
+            retry_max_wait=effective_endpoint_config.retry_max_wait,
+            retry_on_status_codes=effective_endpoint_config.retry_on_status_codes,
         )
+
+        # Convert to legacy ModelConfig for backward compatibility with existing LLM classes
+        instance_config = final_endpoint_config.to_model_config()
 
         # Create the LLM instance
         llm_class = cls.PROVIDER_CLASSES[final_provider]

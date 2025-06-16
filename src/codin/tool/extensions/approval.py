@@ -1,4 +1,8 @@
-"""Approval extension for tool execution."""
+"""Deprecated: Use ApprovalHook from executor.py instead.
+
+This module is part of an over-engineered extension system.
+Use the simpler ApprovalHook class from codin.tool.executor instead.
+"""
 
 from __future__ import annotations
 

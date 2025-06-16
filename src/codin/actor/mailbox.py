@@ -8,28 +8,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..agent.types import Message
-    # Forward reference for LocalMailbox, and RayMailbox if it's conditionally imported
-    from .local_mailbox import LocalMailbox # Ensure LocalMailbox is recognized for type hints
-    # RayMailbox is conditionally imported below, but we might need its type.
-    # It will be properly imported for type checking in the try/except block if Ray is not present.
+    from .local_mailbox import LocalMailbox
 
 from .local_mailbox import LocalMailbox
 
 __all__ = ["Mailbox", "LocalMailbox"]
-
-try:
-    # Try to import Ray and RayMailbox for runtime availability.
-    import ray  # type: ignore
-    from .ray_mailbox import RayMailbox
-    __all__.append("RayMailbox")
-except ImportError:
-    # Ray is not installed or RayMailbox is not available at runtime.
-    # We still need the type hint for RayMailbox if type checking (e.g., mypy) is active,
-    # to allow for code that type-hints RayMailbox usage without causing a runtime error
-    # when Ray is absent.
-    if TYPE_CHECKING:
-        from .ray_mailbox import RayMailbox # Make type available for static analysis
-    pass
 
 
 class Mailbox(ABC):

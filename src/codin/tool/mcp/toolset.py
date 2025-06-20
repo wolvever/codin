@@ -81,7 +81,8 @@ class MCPToolset(Toolset):
         **kwargs:
             Additional arguments passed to the session manager
         """
-        super().__init__(name=name, description=description, tools=[])
+        super().__init__(name=name, tools=[])
+        self.description = description  # Store description separately since base class doesn't support it
         self._session_manager = MCPSessionManager.create(connection_params, **kwargs)
         self._tool_filter = tool_filter
         self._initialized = False

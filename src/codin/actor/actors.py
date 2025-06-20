@@ -15,7 +15,15 @@ from pydantic import BaseModel, ValidationError
 
 from .types import CallableActor, ActorRunInput, ActorRunOutput
 from .envelope_types import Capability, EnvelopeKind, TaskState
-from ..a2a.types import A2ATaskPayload # Import for A2A_TASK payload deserialization
+# Define A2ATaskPayload locally since a2a module doesn't exist
+class A2ATaskPayload(BaseModel):
+    """Payload for A2A task messages."""
+    task_id: str
+    data: Any
+    metadata: dict[str, Any] = {}
+    
+    class Config:
+        extra = "allow"
 from ..agent.types import Message as A2AMessage
 
 logger = logging.getLogger(__name__)

@@ -17,7 +17,7 @@ from .openai_compatible_llm import OpenAICompatibleBaseLLM # Import new base cla
 from .config import ModelConfig # Already here
 from .registry import register # Changed from ModelRegistry to module-level register
 # HTTP utils are used by the new base class, so direct imports might not be needed here
-# from .http_utils import (...)
+from .http_utils import make_post_request, process_sse_stream, ContentExtractionError, StreamProcessingError
 
 __all__ = [
     'OpenAILLM',
@@ -60,20 +60,20 @@ class OpenAILLM(OpenAICompatibleBaseLLM): # Inherit from new base
     # BASE_URL_ENV_VAR = 'OPENAI_API_BASE' # Already a default
     # MODEL_ENV_VAR = 'OPENAI_MODEL' # Already a default
 
-    async def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None):
+    def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None):
         """
         Initialize the OpenAI LLM.
-        Relies on OpenAICompatibleBaseLLM for client setup and core logic.
+        Defers I/O-bound setup to async prepare() method.
         """
         # Determine model name with OpenAILLM defaults before calling super().__init__
         # This ensures that if 'model' is None and config.model_name is None,
         # OpenAILLM's specific defaults (OPENAI_MODEL, self.DEFAULT_MODEL) are used.
 
-        final_config = config or ModelConfig()
+        self._config = config or ModelConfig()
 
         chosen_model = model
-        if chosen_model is None and final_config.model_name:
-            chosen_model = final_config.model_name
+        if chosen_model is None and self._config.model_name:
+            chosen_model = self._config.model_name
         if chosen_model is None: # Fallback to env vars specific to OpenAILLM or general LLM
             chosen_model = os.getenv(self.MODEL_ENV_VAR) or \
                            os.getenv(self.LLM_MODEL_ENV_VAR) or \
@@ -81,10 +81,21 @@ class OpenAILLM(OpenAICompatibleBaseLLM): # Inherit from new base
 
         final_model = chosen_model or self.DEFAULT_MODEL
 
-        # Call the async __init__ of the new base class
-        await super().__init__(config=final_config, model=final_model)
-        # Logger message from base class __init__ will cover initialization.
-        # logger.info(f'OpenAILLM specific initialization complete for model {self.model}') # Optional
+        # Call the sync parent constructor
+        super().__init__(final_model)
+        
+        # Mark as not prepared
+        self._is_prepared = False
+        self._client = None
+
+    async def prepare(self, config: _t.Optional[ModelConfig] = None):
+        """Async initialization for I/O-bound setup."""
+        if self._is_prepared:
+            return
+        # Use provided config or stored config
+        effective_config = config or self._config
+        # Delegate to parent class prepare method
+        await super().prepare(effective_config)
 
     @classmethod
     def supported_models(cls) -> list[str]: # Reinstated

@@ -13,8 +13,6 @@ from ..tool.base import Tool
 # Core interfaces and implementations
 from .base import Agent, Planner
 from .types import (
-    AgentRunInput,
-    AgentRunOutput,
     StepType,
     Step,
     MessageStep,
@@ -41,8 +39,6 @@ __all__ = [
     "Agent",
     "Planner",
     # Core types
-    "AgentRunInput",
-    "AgentRunOutput",
     "StepType",
     "Step",
     "MessageStep",

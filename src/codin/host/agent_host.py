@@ -26,8 +26,7 @@ from ..agent.base import Agent
 # Import concrete agent implementations
 from ..agent.base_agent import BaseAgent
 from ..model.base import BaseLLM
-from ..protocol.types import AgentRunInput, AgentRunOutput, Message, TaskState, TextPart
-from ..protocol.types import TaskStatus as ProtocolTaskStatus
+from ..agent.types import AgentRunInput, AgentRunOutput, Message, TaskState, TextPart
 from ..tool.base import Tool
 
 # Setup logging

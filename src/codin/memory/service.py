@@ -7,7 +7,7 @@ import typing as _t
 from datetime import datetime
 
 from codin.agent.types import Message
-from codin.endpoint import EndpointConfig, EndpointManager, MemoryConfig
+from codin.endpoint import EndpointConfig, EndpointResolver, MemoryConfig
 
 from .base import Memory as MemoryBase, MemoryChunk
 from .local import MemMemoryService

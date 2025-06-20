@@ -4,7 +4,8 @@ import asyncio
 import uuid
 from typing import Optional
 
-from ..actor.mailbox import LocalMailbox, Mailbox
+from ..actor.mailbox import Mailbox
+from ..actor.local_mailbox import LocalMailbox
 from ..session.base import SessionManager
 from ..replay import BaseReplay # Assuming this path for BaseReplay
 from .base import Agent # Changed from .base_agent import BaseAgent

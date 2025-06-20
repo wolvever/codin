@@ -9,8 +9,9 @@ protocols, task states, and control actions).
 
 from .actor_system import ActorSystem
 from .work_stealing import WorkStealingActorSystem
-from .dispatcher import Dispatcher, DispatchRequest, DispatchResult, LocalDispatcher # DispatchRequest might be deprecated
-from .mailbox import LocalMailbox, Mailbox # RayMailbox is conditionally imported in mailbox.py
+from .dispatcher import Dispatcher, DispatchResult, LocalDispatcher
+from .mailbox import Mailbox
+from .local_mailbox import LocalMailbox
 from .supervisor import ActorInfo, ActorSupervisor, LocalActorManager
 from .types import ActorRunInput, ActorRunOutput, CallableActor
 from .envelope_types import (
@@ -39,7 +40,6 @@ __all__ = [
     # Dispatcher types
     'Dispatcher',
     'LocalDispatcher',
-    'DispatchRequest',
     'DispatchResult',
     # Actor Core Protocol and I/O types
     'CallableActor',

@@ -488,4 +488,332 @@ class AgentSandboxIntegration:
 - Memory usage profiling
 - Response time benchmarking
 
+## Usage Examples
+
+### Example 1: Code Analysis Agent
+
+```python
+from codin.agent.base_agent import BaseAgent
+from codin.agent.code_planner import CodePlanner, CodePlannerConfig
+from codin.agent.types import AgentRunInput, RunConfig, Message, Role, TextPart
+from codin.memory.base import MemMemoryService
+from codin.tool.registry import ToolRegistry
+from codin.tool import SandboxToolset
+from codin.sandbox.local import LocalSandbox
+from codin.model.factory import LLMFactory
+
+async def create_code_analysis_agent():
+    """Create a specialized agent for code analysis tasks."""
+    
+    # Initialize sandbox and tools
+    sandbox = LocalSandbox()
+    await sandbox.up()
+    
+    tool_registry = ToolRegistry()
+    sandbox_toolset = SandboxToolset(sandbox)
+    await sandbox_toolset.up()
+    tool_registry.register_toolset(sandbox_toolset)
+    
+    # Create LLM for code analysis
+    llm = LLMFactory.create_llm(model="gpt-4")
+    
+    # Configure planner for code analysis
+    planner_config = CodePlannerConfig(
+        model="gpt-4",
+        max_tokens=4000,
+        temperature=0.1,  # Lower temperature for more deterministic analysis
+        max_tool_calls_per_turn=10,
+        thinking_enabled=True,
+        rules="Analyze code systematically for bugs, security issues, and improvements."
+    )
+    
+    planner = CodePlanner(
+        config=planner_config,
+        llm=llm,
+        tool_registry=tool_registry
+    )
+    
+    # Create agent with analysis-specific configuration
+    run_config = RunConfig(
+        turn_budget=15,
+        time_budget_seconds=300,
+        token_budget=8000
+    )
+    
+    agent = BaseAgent(
+        agent_id="code-analyzer",
+        name="CodeAnalysisAgent",
+        description="Specialized agent for analyzing code quality and security",
+        planner=planner,
+        memory=MemMemoryService(),
+        tools=tool_registry.get_tools(),
+        llm=llm,
+        default_config=run_config
+    )
+    
+    return agent, sandbox
+
+# Usage example
+async def analyze_codebase():
+    agent, sandbox = await create_code_analysis_agent()
+    
+    try:
+        # Create analysis task
+        task_message = Message(
+            messageId="analysis-task",
+            role=Role.user,
+            parts=[TextPart(text="""
+Analyze the Python files in the src/ directory for:
+1. Security vulnerabilities
+2. Code quality issues  
+3. Performance bottlenecks
+4. Best practice violations
+
+Provide a detailed report with specific recommendations.
+""")],
+            contextId="analysis-session",
+            kind="message"
+        )
+        
+        agent_input = AgentRunInput(
+            session_id="analysis-session",
+            message=task_message,
+            options={}
+        )
+        
+        # Execute analysis
+        async for output in agent.run(agent_input):
+            if hasattr(output, "result") and output.result:
+                for part in output.result.parts:
+                    if hasattr(part, "text"):
+                        print(f"Analysis: {part.text}")
+    
+    finally:
+        await agent.cleanup()
+        await sandbox.down()
+```
+
+### Example 2: Multi-Agent Development Team
+
+```python
+from codin.agent.base_agent import BaseAgent
+from codin.agent.plan_execute_agent import PlanExecuteAgent
+
+async def create_development_team():
+    """Create a team of specialized agents for software development."""
+    
+    # Shared resources
+    sandbox = LocalSandbox()
+    await sandbox.up()
+    tool_registry = ToolRegistry()
+    sandbox_toolset = SandboxToolset(sandbox)
+    await sandbox_toolset.up()
+    tool_registry.register_toolset(sandbox_toolset)
+    
+    # Architect Agent - Plans system architecture
+    architect_config = CodePlannerConfig(
+        model="gpt-4",
+        temperature=0.3,
+        rules="Focus on system design, architecture patterns, and scalability."
+    )
+    
+    architect = BaseAgent(
+        agent_id="architect",
+        name="SystemArchitect",
+        description="Designs software architecture and system components",
+        planner=CodePlanner(architect_config, LLMFactory.create_llm(), tool_registry),
+        memory=MemMemoryService(),
+        tools=tool_registry.get_tools(),
+        llm=LLMFactory.create_llm()
+    )
+    
+    # Developer Agent - Implements features
+    developer_config = CodePlannerConfig(
+        model="gpt-4",
+        temperature=0.2,
+        max_tool_calls_per_turn=15,
+        rules="Write clean, tested code following the architectural plan."
+    )
+    
+    developer = BaseAgent(
+        agent_id="developer",
+        name="SoftwareDeveloper", 
+        description="Implements features based on architectural specifications",
+        planner=CodePlanner(developer_config, LLMFactory.create_llm(), tool_registry),
+        memory=MemMemoryService(),
+        tools=tool_registry.get_tools(),
+        llm=LLMFactory.create_llm()
+    )
+    
+    # Tester Agent - Creates and runs tests
+    tester_config = CodePlannerConfig(
+        model="gpt-4",
+        temperature=0.1,
+        rules="Create comprehensive tests and validate functionality."
+    )
+    
+    tester = BaseAgent(
+        agent_id="tester",
+        name="QualityAssurance",
+        description="Creates tests and validates software quality",
+        planner=CodePlanner(tester_config, LLMFactory.create_llm(), tool_registry),
+        memory=MemMemoryService(),
+        tools=tool_registry.get_tools(),
+        llm=LLMFactory.create_llm()
+    )
+    
+    return {
+        "architect": architect,
+        "developer": developer, 
+        "tester": tester,
+        "sandbox": sandbox
+    }
+
+# Coordinate team to build a feature
+async def build_authentication_system():
+    team = await create_development_team()
+    
+    try:
+        # Step 1: Architecture phase
+        arch_task = Message(
+            role=Role.user,
+            parts=[TextPart(text="""
+Design a JWT-based authentication system with:
+- User registration and login
+- Token generation and validation
+- Password hashing and security
+- Session management
+Provide detailed architecture and file structure.
+""")],
+            contextId="auth-project"
+        )
+        
+        arch_input = AgentRunInput(session_id="auth-project", message=arch_task)
+        
+        print("🏗️ Architecture Phase:")
+        architecture_plan = None
+        async for output in team["architect"].run(arch_input):
+            if output.result:
+                architecture_plan = output.result.parts[0].text
+                print(f"Architecture: {architecture_plan}")
+        
+        # Step 2: Development phase  
+        dev_task = Message(
+            role=Role.user,
+            parts=[TextPart(text=f"""
+Based on this architecture plan:
+{architecture_plan}
+
+Implement the authentication system. Create all necessary files and code.
+""")],
+            contextId="auth-project"
+        )
+        
+        dev_input = AgentRunInput(session_id="auth-project", message=dev_task)
+        
+        print("💻 Development Phase:")
+        async for output in team["developer"].run(dev_input):
+            if output.result:
+                print(f"Implementation: {output.result.parts[0].text}")
+        
+        # Step 3: Testing phase
+        test_task = Message(
+            role=Role.user,
+            parts=[TextPart(text="""
+Create comprehensive tests for the authentication system:
+- Unit tests for all components
+- Integration tests for the API
+- Security tests for vulnerabilities
+- Performance tests for load handling
+""")],
+            contextId="auth-project"
+        )
+        
+        test_input = AgentRunInput(session_id="auth-project", message=test_task)
+        
+        print("🧪 Testing Phase:")
+        async for output in team["tester"].run(test_input):
+            if output.result:
+                print(f"Testing: {output.result.parts[0].text}")
+    
+    finally:
+        for agent in ["architect", "developer", "tester"]:
+            await team[agent].cleanup()
+        await team["sandbox"].down()
+```
+
+### Example 3: Plan-Execute Agent for Complex Tasks
+
+```python
+from codin.agent.plan_execute_agent import PlanExecuteAgent
+from codin.agent.plan_execute_planner import PlanExecutePlanner
+
+async def create_plan_execute_agent():
+    """Create an agent that plans and executes complex development tasks."""
+    
+    # Set up tools and resources
+    sandbox = LocalSandbox()
+    await sandbox.up()
+    
+    tool_registry = ToolRegistry()
+    sandbox_toolset = SandboxToolset(sandbox)
+    await sandbox_toolset.up()
+    tool_registry.register_toolset(sandbox_toolset)
+    
+    # Create plan-execute agent
+    agent = PlanExecuteAgent(
+        agent_id="plan-execute-dev",
+        llm=LLMFactory.create_llm(model="gpt-4"),
+        memory=MemMemoryService(),
+        tool_registry=tool_registry,
+        sandbox=sandbox
+    )
+    
+    return agent, sandbox
+
+# Use plan-execute pattern for complex task
+async def build_rest_api():
+    agent, sandbox = await create_plan_execute_agent()
+    
+    try:
+        complex_task = Message(
+            role=Role.user,
+            parts=[TextPart(text="""
+Build a complete REST API for a task management system with:
+
+1. Database models (User, Task, Project)
+2. Authentication endpoints (register, login, logout)
+3. CRUD operations for tasks and projects
+4. User authorization and permissions
+5. Input validation and error handling
+6. API documentation with OpenAPI/Swagger
+7. Unit and integration tests
+8. Docker containerization
+9. Basic CI/CD pipeline configuration
+
+Use Python with FastAPI framework and PostgreSQL database.
+""")],
+            contextId="api-project"
+        )
+        
+        agent_input = AgentRunInput(
+            session_id="api-project",
+            message=complex_task
+        )
+        
+        print("🎯 Plan-Execute Agent Building REST API:")
+        print("=" * 50)
+        
+        async for output in agent.run(agent_input):
+            if output.result:
+                for part in output.result.parts:
+                    if hasattr(part, "text"):
+                        print(part.text)
+                        print("-" * 30)
+    
+    finally:
+        await agent.cleanup()
+        await sandbox.down()
+```
+
 This design provides a flexible, scalable foundation for building AI agents that can work together in the CoDIN platform while maintaining protocol compliance and operational safety.

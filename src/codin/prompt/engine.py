@@ -194,7 +194,7 @@ class PromptEngine:
             from ..model.factory import create_llm_from_env
 
             try:
-                self.llm = create_llm_from_env()
+                self.llm = await create_llm_from_env()
             except Exception as e: # Broad exception to catch if create_llm_from_env fails
                  raise ValueError(
                     "LLM instance is required for execution, but none was provided or could be created from environment."

@@ -40,6 +40,8 @@ __all__ = [
     "RunnerControl",
     "RunnerInput",
     # Agent types
+    "AgentRunInput",
+    "AgentRunOutput", 
     "RunConfig",
     "Metrics",
     "State",
@@ -127,6 +129,25 @@ class Message(BaseModel):
                 output=result.output,
                 metadata={"error": result.error} if result.error else None,
             )
+        )
+
+    def get_text_content(self) -> str:
+        """Extract all text content from message parts."""
+        text_parts = []
+        for part in self.parts:
+            if isinstance(part, TextPart):
+                text_parts.append(part.text)
+            elif hasattr(part, 'text'):
+                text_parts.append(part.text)
+        return '\n'.join(text_parts)
+
+    @classmethod
+    def from_text(cls, text: str, role: Role = Role.agent, **kwargs) -> "Message":
+        """Create a message from text content."""
+        return cls(
+            role=role,
+            parts=[TextPart(text=text)],
+            **kwargs
         )
 
 class TaskState(str, Enum):
@@ -305,6 +326,17 @@ class AgentRunInput(_pyd.BaseModel):
     message: Message
     metadata: dict[str, _t.Any] | None = None
     """Additional metadata about the tool call or result"""
+
+
+class AgentRunOutput(_pyd.BaseModel):
+    """Output from agent execution."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    result: _t.Any = None
+    status: str = "completed"
+    artifacts: list[_t.Any] | None = None
+    metadata: dict[str, _t.Any] = Field(default_factory=dict)
 
 
 # Union type for message parts

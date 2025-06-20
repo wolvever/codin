@@ -119,9 +119,30 @@ async for output in agent.run(agent_input):
     print(f"Agent output: {output}")
 ```
 
+### CLI Tools
+
+CoDIN provides powerful CLI tools for development workflows:
+
+```bash
+# Code review with AI
+python -m codin.cli review --file src/main.py --project myapp
+
+# System architecture design
+python -m codin.cli architect --requirements "Build REST API with auth"
+
+# Test generation
+python -m codin.cli test --target UserService --file user_service.py
+
+# Interactive development session
+python -m codin.cli repl --agent code_agent
+
+# Run agent on specific task
+python -m codin.cli run --agent plan_execute --task "Implement user authentication"
+```
+
 ### Debug Sandbox
 
-Run commands under the same sandbox used by Codin. This mirrors the Rust debug helpers.
+Run commands under the same sandbox used by Codin:
 
 ```bash
 codin debug-sandbox --full-auto echo "hello sandbox"

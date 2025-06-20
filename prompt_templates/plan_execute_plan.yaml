@@ -1,0 +1,12 @@
+name: plan_execute_plan
+version: latest
+metadata:
+  description: "Prompt for generating a short plan from user input"
+  author: "codin"
+  created: "2024-01-01"
+variants:
+  - text: |
+      Create a concise step-by-step plan to fulfill the request below.
+      Use one short line per step.
+      
+      Request: {{ user_input }}

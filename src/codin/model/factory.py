@@ -14,6 +14,7 @@ from .config import ModelConfig  # Import ModelConfig
 from .endpoint_config import ModelEndpointConfig
 from .gemini_llm import GeminiLLM
 from .litellm_adapter import LiteLLMAdapter
+from .mock_llm import MockLLM
 from .openai_llm import OpenAILLM
 
 
@@ -43,6 +44,7 @@ class LLMFactory:
         'anthropic': AnthropicLLM,
         'gemini': GeminiLLM,
         'litellm': LiteLLMAdapter,
+        'mock': MockLLM,
     }
 
     @classmethod
@@ -132,12 +134,15 @@ class LLMFactory:
         # Convert to legacy ModelConfig for backward compatibility with existing LLM classes
         instance_config = final_endpoint_config.to_model_config()
 
-        # Create the LLM instance
+        # Create the LLM instance using proper sync constructor + async prepare pattern
         llm_class = cls.PROVIDER_CLASSES[final_provider]
-        # Pass the constructed config and the final_model directly.
-        # The model classes' __init__ are designed to use the direct model first.
-        # Model __init__ is now async
-        instance = await llm_class(config=instance_config, model=final_model)
+        
+        # Create instance with sync constructor  
+        instance = llm_class(config=instance_config, model=final_model)
+        
+        # Prepare async resources
+        if hasattr(instance, 'prepare'):
+            await instance.prepare(instance_config)
 
         logger.info(f"Created {final_provider} LLM instance for model '{final_model}'")
         if final_base_url: # Log if a non-default base_url was used
@@ -169,6 +174,8 @@ class LLMFactory:
             return 'openai'
 
         # Model name patterns for different providers
+        if any(pattern in model_lower for pattern in ['mock-', 'test-']):
+            return 'mock'
         if any(pattern in model_lower for pattern in ['gpt-', 'o1-', 'text-davinci', 'text-curie']):
             return 'openai'
         if any(pattern in model_lower for pattern in ['claude-', 'anthropic']):

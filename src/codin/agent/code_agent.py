@@ -29,7 +29,8 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from ..agent.base import Agent, AgentRunInput, AgentRunOutput
+from ..agent.base import Agent
+from ..agent.types import AgentRunInput, AgentRunOutput
 from ..agent.types import ToolCall, ToolCallResult
 from ..config import ApprovalMode
 from ..memory.base import MemMemoryService, MemoryService
@@ -37,7 +38,7 @@ from ..model.factory import LLMFactory
 from ..prompt import prompt_run
 from ..sandbox.base import Sandbox
 from ..sandbox.local import LocalSandbox
-from ..tool.base import ToolContext, Toolset, to_tool_definitions
+from ..tool.base import ToolContext, Toolset, to_definitions as to_tool_definitions
 from ..tool.executor import ToolExecutor
 from ..tool.registry import ToolRegistry
 from ..utils.message import ( # extract_text_from_message removed

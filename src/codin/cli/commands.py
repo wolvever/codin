@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 from codin.agent.types import Message, Role, TextPart
 
-from ..agent.base import AgentRunInput
+from ..agent.types import AgentRunInput
 from ..agent.code_agent import CodeAgent
 from ..config import (
     ApprovalMode,
@@ -22,6 +22,7 @@ from ..config import (
     get_api_key,
     get_config,
     get_default_model_configs,
+    get_default_provider_configs,
     load_agents_instructions,
 )
 from ..sandbox import LocalSandbox
@@ -39,7 +40,7 @@ load_dotenv()
 
 def validate_provider(provider: str) -> str:
     """Validate and return provider name."""
-    providers = get_default_model_configs()
+    providers = get_default_provider_configs()
     if provider not in providers:
         available = ", ".join(providers.keys())
         raise click.BadParameter(f"Unknown provider '{provider}'. Available: {available}")
@@ -450,8 +451,8 @@ def show_config_info(config_file: Path | None = None) -> None:
     click.echo()
 
     # Provider information
-    if config_file and config_file.stem in config_obj.model_configs:
-        provider_config = config_obj.model_configs[config_file.stem]
+    if config_file and config_file.stem in config_obj.provider_configs:
+        provider_config = config_obj.provider_configs[config_file.stem]
         click.echo(click.style(f"Provider: {provider_config.name}", bold=True))
         click.echo(f"  Base URL: {provider_config.base_url}")
         click.echo(f"  Environment Variable: {provider_config.env_key}")
@@ -464,7 +465,7 @@ def show_config_info(config_file: Path | None = None) -> None:
     elif not config_file:
         # All providers
         click.echo(click.style("Available Providers:", bold=True))
-        for name, provider_config in config_obj.model_configs.items():
+        for name, provider_config in config_obj.provider_configs.items():
             status_icon = "🟢" if get_api_key(name) else "🔴"
             click.echo(f"  {status_icon} {name:<12} {provider_config.name}")
 
@@ -523,7 +524,7 @@ def show_providers_info() -> None:
     click.echo(click.style("Available Providers", bold=True, fg="cyan"))
     click.echo("=" * 50)
 
-    for name, provider_config in config_obj.model_configs.items():
+    for name, provider_config in config_obj.provider_configs.items():
         api_key = get_api_key(name)
         status = click.style("🟢 CONFIGURED", fg="green") if api_key else click.style("🔴 NO API KEY", fg="red")
 

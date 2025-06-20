@@ -9,7 +9,9 @@ import json
 import os
 import typing as _t
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
+import time
 
 import yaml
 from pydantic import BaseModel, Field
@@ -30,16 +32,18 @@ __all__ = [
     "HistoryConfig",
     "MCPServerConfig",
     "ModelConfig",
+    "ProviderConfig",
     "AgentConfig",
     "get_default_model_configs",
+    "get_default_provider_configs",
     "get_api_key",
     "get_config",
     "load_agents_instructions",
     "load_config",
 ]
 
-# Import the canonical ModelConfig from src.codin.model.config
-from src.codin.model.config import ModelConfig
+# Import the canonical ModelConfig from codin.model.config
+from codin.model.config import ModelConfig
 
 
 class HistoryConfig(BaseModel):
@@ -58,6 +62,15 @@ class MCPServerConfig(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     url: str | None = None  # For SSE servers
     description: str = ""
+
+
+class ProviderConfig(BaseModel):
+    """Configuration for a provider with display information."""
+    
+    name: str
+    base_url: str
+    env_key: str
+    models: list[str] = Field(default_factory=list)
 
 
 class AgentConfig(BaseModel):
@@ -90,6 +103,9 @@ class CodinConfig(BaseModel):
 
     # Model configurations
     model_configs: dict[str, ModelConfig] = Field(default_factory=dict) # Use direct ModelConfig
+    
+    # Provider configurations (for CLI display)
+    provider_configs: dict[str, ProviderConfig] = Field(default_factory=dict)
 
     # Agent configurations
     agent_configs: dict[str, AgentConfig] = Field(default_factory=dict)
@@ -104,12 +120,10 @@ class CodinConfig(BaseModel):
     agents_files: list[str] = Field(default_factory=list)
 
 
-def get_default_model_configs() -> dict[str, ModelConfig]: # Use direct ModelConfig
-    """Get default model configurations using the new ModelConfig."""
-    # Old structure: provider_key: {name, base_url, env_key, models_list}
-    # New structure for ModelConfig: model_name, api_key, base_url, api_version, provider, timeouts, retries
-
-    old_defaults = {
+@lru_cache(maxsize=1)
+def _get_provider_defaults_static() -> dict[str, dict[str, _t.Any]]:
+    """Get static provider configuration data."""
+    return {
         "openai": {"name": "OpenAI", "base_url": "https://api.openai.com/v1", "env_key": "OPENAI_API_KEY", "models": ["gpt-4o-mini", "gpt-4o", "gpt-4", "gpt-3.5-turbo"]},
         "azure": {"name": "Azure OpenAI", "base_url": "https://YOUR_PROJECT_NAME.openai.azure.com/openai", "env_key": "AZURE_OPENAI_API_KEY", "models": ["gpt-4", "gpt-35-turbo"]},
         "openrouter": {"name": "OpenRouter", "base_url": "https://openrouter.ai/api/v1", "env_key": "OPENROUTER_API_KEY", "models": ["anthropic/claude-3.5-sonnet", "openai/gpt-4o"]},
@@ -121,43 +135,80 @@ def get_default_model_configs() -> dict[str, ModelConfig]: # Use direct ModelCon
         "groq": {"name": "Groq", "base_url": "https://api.groq.com/openai/v1", "env_key": "GROQ_API_KEY", "models": ["llama2-70b-4096", "mixtral-8x7b-32768"]},
         "arceeai": {"name": "ArceeAI", "base_url": "https://conductor.arcee.ai/v1", "env_key": "ARCEEAI_API_KEY", "models": ["arcee-agent", "arcee-nova"]},
         "anthropic": {"name": "Anthropic", "base_url": "https://api.anthropic.com", "env_key": "ANTHROPIC_API_KEY", "models": ["claude-3.5-sonnet", "claude-3-opus", "claude-3-haiku"]},
+        "mock": {"name": "Mock LLM", "base_url": "http://localhost:8000", "env_key": "MOCK_API_KEY", "models": ["mock-llm", "test-llm"]},
     }
 
-    new_defaults: dict[str, ModelConfig] = {} # Use direct ModelConfig
-    for provider_key, details in old_defaults.items():
+
+def get_default_model_configs() -> dict[str, ModelConfig]:
+    """Get default model configurations using the new ModelConfig."""
+    provider_defaults = _get_provider_defaults_static()
+    
+    new_defaults: dict[str, ModelConfig] = {}
+    for provider_key, details in provider_defaults.items():
         api_key_val = os.environ.get(details["env_key"])
         # For Ollama, API key is often not required or might be a model name itself.
-        # ModelConfig treats api_key as Optional[str].
         if provider_key == "ollama" and not api_key_val:
-            api_key_val = None # Explicitly set to None if empty for Ollama, or based on specific logic
+            api_key_val = None
 
-        new_defaults[provider_key] = ModelConfig( # Use direct ModelConfig
-            provider=provider_key, # Store the provider key
-            model_name=details["models"][0] if details["models"] else None, # Default to first model or None
+        new_defaults[provider_key] = ModelConfig(
+            provider=provider_key,
+            model_name=details["models"][0] if details["models"] else None,
             api_key=api_key_val,
             base_url=details["base_url"],
-            # api_version, timeouts, retries will use defaults from ModelClientConfig definition
         )
         # Special case for Anthropic default api_version
         if provider_key == "anthropic":
-            new_defaults[provider_key].api_version = "2023-06-01" # A common default for Anthropic
+            new_defaults[provider_key].api_version = "2023-06-01"
 
     return new_defaults
 
 
+@lru_cache(maxsize=1)
+def get_default_provider_configs() -> dict[str, ProviderConfig]:
+    """Get default provider configurations for CLI display."""
+    provider_defaults = _get_provider_defaults_static()
+    return {key: ProviderConfig(**details) for key, details in provider_defaults.items()}
+
+
+# Simple file-based cache with modification time checking
+_config_file_cache: dict[tuple[str, float], dict[str, _t.Any]] = {}
+
 def load_config_file(config_path: Path) -> dict[str, _t.Any]:
-    """Load configuration from a YAML or JSON file."""
+    """Load configuration from a YAML or JSON file with caching."""
+    global _config_file_cache
+    
     if not config_path.exists():
         return {}
+
+    # Check cache based on file path and modification time
+    file_path_str = str(config_path)
+    try:
+        mtime = config_path.stat().st_mtime
+        cache_key = (file_path_str, mtime)
+        
+        if cache_key in _config_file_cache:
+            return _config_file_cache[cache_key].copy()
+    except OSError:
+        # If we can't get mtime, skip caching
+        mtime = None
 
     try:
         content = config_path.read_text(encoding="utf-8")
 
         if config_path.suffix.lower() in [".yaml", ".yml"]:
-            return yaml.safe_load(content) or {}
-        if config_path.suffix.lower() == ".json":
-            return json.loads(content) or {}
-        raise ValueError(f"Unsupported config file format: {config_path.suffix}")
+            result = yaml.safe_load(content) or {}
+        elif config_path.suffix.lower() == ".json":
+            result = json.loads(content) or {}
+        else:
+            raise ValueError(f"Unsupported config file format: {config_path.suffix}")
+        
+        # Cache the result
+        if mtime is not None:
+            # Clean old cache entries for this file
+            _config_file_cache = {k: v for k, v in _config_file_cache.items() if k[0] != file_path_str}
+            _config_file_cache[cache_key] = result.copy()
+        
+        return result
 
     except Exception as e:
         raise ValueError(
@@ -402,6 +453,10 @@ def load_config(config_file: Path | str | None = None) -> CodinConfig:
     # Set up default model configurations if not configured
     if not config.model_configs:
         config.model_configs = get_default_model_configs()
+    
+    # Set up default provider configurations if not configured
+    if not config.provider_configs:
+        config.provider_configs = get_default_provider_configs()
 
     return config
 

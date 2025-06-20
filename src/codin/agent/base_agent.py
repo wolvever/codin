@@ -26,7 +26,8 @@ from .types import (
     TaskState, TaskStatus, TextPart, ThinkStep, ToolCallStep, ToolUsePart,
 )
 
-from ..actor.mailbox import LocalMailbox, Mailbox
+from ..actor.mailbox import Mailbox
+from ..actor.local_mailbox import LocalMailbox
 from ..memory.base import MemMemoryService, Memory
 from ..model.base import BaseLLM
 from ..tool.base import Tool, ToolContext

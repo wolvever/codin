@@ -611,4 +611,496 @@ class ActorSystemConfig:
 - Cache routing decisions
 - Cache compiled configurations
 
+## Usage Examples
+
+### Example 1: Agent Task Dispatcher
+
+```python
+from codin.actor.dispatcher import LocalDispatcher
+from codin.actor.supervisor import LocalActorManager
+from codin.actor.envelope_types import Envelope, EnvelopeKind, WorkPayload
+from codin.agent.base_agent import BaseAgent
+
+async def setup_agent_dispatcher():
+    """Set up actor system for dispatching agent tasks."""
+    
+    # Create actor supervisor to manage agent instances
+    supervisor = LocalActorManager(max_actors=5)
+    
+    # Create dispatcher for routing tasks to agents
+    dispatcher = LocalDispatcher(
+        supervisor=supervisor,
+        task_registry=TaskRegistry()
+    )
+    
+    return dispatcher, supervisor
+
+async def run_concurrent_tasks():
+    """Execute multiple agent tasks concurrently using the actor system."""
+    
+    dispatcher, supervisor = await setup_agent_dispatcher()
+    
+    # Task 1: Code review
+    code_review_envelope = {
+        "kind": "work",
+        "payload": {
+            "runner_id": "code_review_001",
+            "request_id": "req_001", 
+            "agent_id": "code_agent",
+            "input": {
+                "session_id": "review_session",
+                "message": {
+                    "messageId": "review_msg",
+                    "role": "user",
+                    "parts": [{
+                        "text": "Review the authentication module for security issues"
+                    }],
+                    "contextId": "review_session",
+                    "kind": "message"
+                },
+                "options": {"enable_tools": True}
+            }
+        }
+    }
+    
+    # Task 2: Test generation
+    test_gen_envelope = {
+        "kind": "work",
+        "payload": {
+            "runner_id": "test_gen_002", 
+            "request_id": "req_002",
+            "agent_id": "code_agent",
+            "input": {
+                "session_id": "test_session",
+                "message": {
+                    "messageId": "test_msg",
+                    "role": "user", 
+                    "parts": [{
+                        "text": "Generate unit tests for the UserService class"
+                    }],
+                    "contextId": "test_session",
+                    "kind": "message"
+                },
+                "options": {"enable_tools": True}
+            }
+        }
+    }
+    
+    # Submit tasks to dispatcher
+    print("🚀 Submitting tasks to actor system...")
+    review_runner = await dispatcher.submit(code_review_envelope)
+    test_runner = await dispatcher.submit(test_gen_envelope)
+    
+    print(f"✅ Code review task: {review_runner}")
+    print(f"✅ Test generation task: {test_runner}")
+    
+    # Monitor task progress
+    while True:
+        review_status = await dispatcher.get_status(review_runner)
+        test_status = await dispatcher.get_status(test_runner)
+        
+        print(f"📊 Review Status: {review_status.status if review_status else 'unknown'}")
+        print(f"📊 Test Status: {test_status.status if test_status else 'unknown'}")
+        
+        if (review_status and review_status.status in ["completed", "failed"] and
+            test_status and test_status.status in ["completed", "failed"]):
+            break
+            
+        await asyncio.sleep(2)
+    
+    print("🎉 All tasks completed!")
+```
+
+### Example 2: Auto-Scaling Agent Workforce
+
+```python
+from codin.actor.work_stealing import WorkStealingSystem
+from codin.actor.supervisor import ActorSupervisor
+
+class ScalableAgentSystem:
+    """Auto-scaling system for agent workloads."""
+    
+    def __init__(self, min_agents=2, max_agents=10):
+        self.min_agents = min_agents
+        self.max_agents = max_agents
+        self.supervisors = []
+        self.dispatcher = None
+        self.work_stealer = None
+        
+    async def initialize(self):
+        """Initialize the scalable agent system."""
+        
+        # Create multiple supervisors for load distribution
+        for i in range(3):  # Start with 3 supervisor nodes
+            supervisor = LocalActorManager(max_actors=self.max_agents // 3)
+            self.supervisors.append(supervisor)
+        
+        # Set up work stealing for load balancing
+        self.work_stealer = WorkStealingSystem(self.supervisors)
+        
+        # Create dispatcher with work stealing
+        self.dispatcher = LocalDispatcher(
+            supervisor=self.supervisors[0],  # Primary supervisor
+            work_stealer=self.work_stealer
+        )
+        
+        print(f"🏗️ Initialized scalable system with {len(self.supervisors)} supervisors")
+    
+    async def submit_batch_tasks(self, task_batch):
+        """Submit a batch of tasks and handle auto-scaling."""
+        
+        submitted_tasks = []
+        
+        for i, task in enumerate(task_batch):
+            # Select optimal supervisor based on load
+            supervisor = await self.work_stealer.select_supervisor("code_agent")
+            
+            envelope = {
+                "kind": "work",
+                "payload": {
+                    "runner_id": f"batch_task_{i}",
+                    "request_id": f"req_batch_{i}",
+                    "agent_id": "code_agent",
+                    "input": task
+                }
+            }
+            
+            runner_id = await self.dispatcher.submit(envelope)
+            submitted_tasks.append(runner_id)
+            
+            print(f"📤 Submitted task {i+1}/{len(task_batch)}: {runner_id}")
+        
+        return submitted_tasks
+    
+    async def monitor_system_health(self):
+        """Monitor system health and performance metrics."""
+        
+        while True:
+            total_active = 0
+            total_capacity = 0
+            
+            for supervisor in self.supervisors:
+                actors = await supervisor.list()
+                active_count = sum(1 for actor in actors if actor.status == "active")
+                total_active += active_count
+                total_capacity += supervisor.max_actors
+            
+            utilization = (total_active / total_capacity) * 100 if total_capacity > 0 else 0
+            
+            print(f"📈 System Utilization: {utilization:.1f}% ({total_active}/{total_capacity})")
+            
+            # Auto-scaling logic
+            if utilization > 80:
+                print("⚡ High load detected - scaling up...")
+                await self._scale_up()
+            elif utilization < 30:
+                print("📉 Low load detected - scaling down...")
+                await self._scale_down()
+            
+            await asyncio.sleep(10)  # Check every 10 seconds
+    
+    async def _scale_up(self):
+        """Scale up the system by adding more actors."""
+        for supervisor in self.supervisors:
+            if supervisor.max_actors < self.max_agents:
+                await supervisor.scale_up(2)  # Add 2 more actors
+                print(f"🔼 Scaled up supervisor to {supervisor.max_actors} actors")
+                break
+    
+    async def _scale_down(self):
+        """Scale down the system by removing idle actors.""" 
+        for supervisor in self.supervisors:
+            if supervisor.max_actors > self.min_agents:
+                await supervisor.scale_down(1)  # Remove 1 actor
+                print(f"🔽 Scaled down supervisor to {supervisor.max_actors} actors")
+                break
+
+# Usage example
+async def run_scalable_development_tasks():
+    system = ScalableAgentSystem(min_agents=3, max_agents=15)
+    await system.initialize()
+    
+    # Simulate varying workload
+    task_batches = [
+        # Light workload
+        [{"task": f"Review file_{i}.py"} for i in range(5)],
+        # Heavy workload  
+        [{"task": f"Refactor module_{i}"} for i in range(20)],
+        # Medium workload
+        [{"task": f"Generate tests for class_{i}"} for i in range(10)]
+    ]
+    
+    # Start system monitoring
+    monitor_task = asyncio.create_task(system.monitor_system_health())
+    
+    try:
+        for batch_num, batch in enumerate(task_batches):
+            print(f"\n🔄 Processing batch {batch_num + 1} with {len(batch)} tasks")
+            
+            # Submit batch
+            task_runners = await system.submit_batch_tasks(batch)
+            
+            # Wait for batch completion
+            await system._wait_for_batch_completion(task_runners)
+            
+            print(f"✅ Batch {batch_num + 1} completed")
+            
+            # Pause between batches
+            await asyncio.sleep(5)
+    
+    finally:
+        monitor_task.cancel()
+```
+
+### Example 3: Fault-Tolerant Agent Pipeline
+
+```python
+from codin.actor.supervisor import SupervisionStrategy
+from codin.actor.types import ActorInfo, TaskState
+
+class DevelopmentPipelineProcessor:
+    """Fault-tolerant pipeline for software development tasks."""
+    
+    def __init__(self):
+        self.dispatcher = LocalDispatcher(
+            supervisor=LocalActorManager(),
+            supervision_strategy=DevelopmentSupervisionStrategy()
+        )
+        
+        # Define pipeline stages in order
+        self.pipeline_stages = [
+            "requirement_analyzer",
+            "architect", 
+            "developer",
+            "tester",
+            "reviewer"
+        ]
+    
+    async def process_development_request(self, project_spec):
+        """Process a software development request through the pipeline."""
+        
+        pipeline_context = {
+            "project_id": project_spec["project_id"],
+            "requirements": project_spec["requirements"],
+            "stages_completed": [],
+            "artifacts": {}
+        }
+        
+        for stage_num, stage in enumerate(self.pipeline_stages):
+            try:
+                print(f"🔄 Stage {stage_num + 1}: {stage}")
+                
+                # Prepare stage input with context from previous stages
+                stage_input = {
+                    "session_id": f"{pipeline_context['project_id']}_{stage}",
+                    "message": {
+                        "messageId": f"stage_{stage}",
+                        "role": "user",
+                        "parts": [{
+                            "text": self._generate_stage_prompt(stage, pipeline_context)
+                        }],
+                        "contextId": pipeline_context["project_id"],
+                        "kind": "message"
+                    },
+                    "options": {"enable_tools": True}
+                }
+                
+                # Submit to appropriate agent
+                envelope = {
+                    "kind": "work",
+                    "payload": {
+                        "runner_id": f"{pipeline_context['project_id']}_{stage}",
+                        "request_id": f"req_{stage}",
+                        "agent_id": "code_agent",  # Using single agent type for simplicity
+                        "input": stage_input
+                    }
+                }
+                
+                runner_id = await self.dispatcher.submit(envelope)
+                
+                # Wait for stage completion with fault tolerance
+                stage_result = await self._wait_for_stage_with_retries(
+                    runner_id, stage, max_retries=3
+                )
+                
+                # Update pipeline context
+                pipeline_context["stages_completed"].append(stage)
+                pipeline_context["artifacts"][stage] = stage_result
+                
+                print(f"✅ Stage {stage} completed successfully")
+                
+            except Exception as e:
+                print(f"❌ Stage {stage} failed: {e}")
+                
+                # Attempt recovery
+                if await self._can_recover_from_failure(stage, e):
+                    print(f"🔄 Attempting recovery for stage {stage}")
+                    await self._recover_stage(stage, pipeline_context, e)
+                else:
+                    print(f"💥 Unrecoverable failure at stage {stage}")
+                    break
+        
+        return pipeline_context
+    
+    def _generate_stage_prompt(self, stage, context):
+        """Generate appropriate prompt for each pipeline stage."""
+        
+        prompts = {
+            "requirement_analyzer": f"""
+Analyze these software requirements and create a detailed specification:
+{context['requirements']}
+
+Provide:
+1. Functional requirements breakdown
+2. Non-functional requirements
+3. Technical constraints
+4. Success criteria
+""",
+            "architect": f"""
+Based on the analyzed requirements, design the system architecture:
+Previous analysis: {context['artifacts'].get('requirement_analyzer', 'None')}
+
+Provide:
+1. High-level system design
+2. Component architecture
+3. Technology stack recommendations
+4. Database schema design
+""",
+            "developer": f"""
+Implement the system based on this architecture:
+Architecture: {context['artifacts'].get('architect', 'None')}
+
+Provide:
+1. Core application code
+2. Database setup scripts
+3. Configuration files
+4. Documentation
+""",
+            "tester": f"""
+Create comprehensive tests for the implemented system:
+Implementation: {context['artifacts'].get('developer', 'None')}
+
+Provide:
+1. Unit test suite
+2. Integration tests  
+3. End-to-end tests
+4. Test automation setup
+""",
+            "reviewer": f"""
+Review the complete implementation and provide feedback:
+Implementation: {context['artifacts'].get('developer', 'None')}
+Tests: {context['artifacts'].get('tester', 'None')}
+
+Provide:
+1. Code review feedback
+2. Architecture assessment
+3. Quality recommendations
+4. Deployment readiness checklist
+"""
+        }
+        
+        return prompts.get(stage, f"Process stage: {stage}")
+    
+    async def _wait_for_stage_with_retries(self, runner_id, stage, max_retries=3):
+        """Wait for stage completion with retry logic."""
+        
+        for attempt in range(max_retries):
+            try:
+                # Wait for completion with timeout
+                timeout = 300  # 5 minutes per stage
+                start_time = time.time()
+                
+                while time.time() - start_time < timeout:
+                    status = await self.dispatcher.get_status(runner_id)
+                    
+                    if status and status.status == "completed":
+                        # Get results from stream
+                        stream_queue = await self.dispatcher.get_stream_queue(runner_id)
+                        if not stream_queue.empty():
+                            result = await stream_queue.get()
+                            return result
+                        return {"status": "completed", "stage": stage}
+                    
+                    elif status and status.status == "failed":
+                        error_msg = status.metadata.get("error", "Unknown error")
+                        raise Exception(f"Stage failed: {error_msg}")
+                    
+                    await asyncio.sleep(5)
+                
+                raise TimeoutError(f"Stage {stage} timed out after {timeout} seconds")
+                
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"⚠️ Stage {stage} attempt {attempt + 1} failed: {e}")
+                    print(f"🔄 Retrying in {2 ** attempt} seconds...")
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    raise
+    
+    async def _can_recover_from_failure(self, stage, error):
+        """Determine if a stage failure can be recovered."""
+        recoverable_errors = ["timeout", "memory", "temporary"]
+        error_str = str(error).lower()
+        return any(err in error_str for err in recoverable_errors)
+    
+    async def _recover_stage(self, stage, context, error):
+        """Implement stage-specific recovery logic."""
+        print(f"🛠️ Implementing recovery for {stage}: {error}")
+        # Recovery implementation would go here
+
+class DevelopmentSupervisionStrategy(SupervisionStrategy):
+    """Custom supervision strategy for development pipeline."""
+    
+    async def handle_actor_failure(self, actor_info, error, supervisor):
+        """Handle actor failures in development pipeline."""
+        
+        print(f"🚨 Actor failure: {actor_info.actor_id} - {error}")
+        
+        # Restart actor with exponential backoff
+        if actor_info.restart_count < 3:
+            backoff_time = 2 ** actor_info.restart_count
+            print(f"⏳ Restarting {actor_info.actor_id} in {backoff_time} seconds...")
+            await asyncio.sleep(backoff_time)
+            await supervisor.restart_actor(actor_info.actor_id)
+        else:
+            print(f"💀 Actor {actor_info.actor_id} exceeded restart limit")
+            actor_info.status = "permanently_failed"
+
+# Usage example
+async def run_development_pipeline():
+    processor = DevelopmentPipelineProcessor()
+    
+    project_spec = {
+        "project_id": "ecommerce_api",
+        "requirements": """
+Build a REST API for an e-commerce platform with:
+- User authentication and authorization
+- Product catalog management  
+- Shopping cart functionality
+- Order processing system
+- Payment integration
+- Inventory tracking
+- Admin dashboard
+
+Technology requirements:
+- Python/FastAPI backend
+- PostgreSQL database
+- Redis for caching
+- Docker containerization
+- Comprehensive testing
+"""
+    }
+    
+    print("🚀 Starting development pipeline...")
+    result = await processor.process_development_request(project_spec)
+    
+    print("\n📋 Pipeline Results:")
+    print(f"Project: {result['project_id']}")
+    print(f"Completed stages: {', '.join(result['stages_completed'])}")
+    print(f"Artifacts generated: {len(result['artifacts'])}")
+    
+    for stage, artifact in result['artifacts'].items():
+        print(f"  {stage}: {type(artifact)}")
+```
+
 This actor system design provides a robust foundation for concurrent agent execution with fault tolerance, load balancing, and comprehensive monitoring capabilities.

@@ -765,59 +765,758 @@ class PromptExecutionError(PromptError):
 
 ## Usage Examples
 
-### Basic Template Usage
+### Example 1: Development Workflow Prompts
 
 ```python
-# Create template
-template = PromptTemplate(
-    name="code_review",
-    version="1.0",
-    content="""
-You are a senior software engineer reviewing code.
+import asyncio
+from codin.prompt.base import PromptTemplate
+from codin.prompt.registry import PromptRegistry
+from codin.prompt.engine import PromptEngine
+from codin.prompt.storage import FileStorageBackend
+from codin.model.factory import LLMFactory
 
-Review the following {{language}} code:
+async def setup_development_prompts():
+    """Set up prompt system with development-focused templates."""
+    
+    # Create storage backend and registry
+    storage = FileStorageBackend(base_path="prompts/development")
+    registry = PromptRegistry(storage_backend=storage)
+    
+    # Create prompt engine with LLM factory
+    llm_factory = LLMFactory()
+    engine = PromptEngine(registry=registry, llm_factory=llm_factory)
+    
+    # Code Review Template
+    code_review_template = PromptTemplate(
+        name="code_review",
+        version="2.0",
+        content="""You are an expert software engineer conducting a thorough code review.
 
+**Code to Review:**
 ```{{language}}
 {{code}}
 ```
 
-Provide feedback on:
-1. Code quality and best practices
-2. Potential bugs or issues
-3. Performance considerations
-4. Suggestions for improvement
+**Review Context:**
+- Project: {{project_name}}
+- File: {{file_path}}
+- Author: {{author}}
+- Purpose: {{purpose}}
 
-Format your response as structured feedback.
+**Review Criteria:**
+Evaluate the code against these criteria:
+
+1. **Code Quality & Style**
+   - Follows language conventions and best practices
+   - Clear and descriptive naming
+   - Appropriate code organization
+
+2. **Functionality & Logic**
+   - Correct implementation of requirements
+   - Proper error handling
+   - Edge case consideration
+
+3. **Security & Performance**
+   - No security vulnerabilities
+   - Efficient algorithms and data structures
+   - Resource usage optimization
+
+4. **Maintainability**
+   - Code readability and documentation
+   - Testability and modularity
+   - Future extensibility
+
+**Output Format:**
+Provide your review as structured feedback:
+
+## Summary
+Brief overall assessment (1-2 sentences)
+
+## Issues Found
+{{#if issues_found}}
+### Critical Issues
+- [List critical issues that must be fixed]
+
+### Minor Issues  
+- [List minor issues and suggestions]
+{{/if}}
+
+## Recommendations
+- [Specific actionable recommendations]
+
+## Code Quality Score: X/10
+[Justification for the score]
 """,
-    variables=["language", "code"],
-    metadata={
-        "description": "Code review template",
-        "category": "development",
-        "variables": {
-            "language": {"type": "string", "description": "Programming language"},
-            "code": {"type": "string", "description": "Code to review"}
+        variables=["language", "code", "project_name", "file_path", "author", "purpose"],
+        metadata={
+            "description": "Comprehensive code review template",
+            "category": "development",
+            "version": "2.0",
+            "variables": {
+                "language": {"type": "string", "description": "Programming language"},
+                "code": {"type": "string", "description": "Code to review"},
+                "project_name": {"type": "string", "description": "Project name"},
+                "file_path": {"type": "string", "description": "File path"},
+                "author": {"type": "string", "description": "Code author"},
+                "purpose": {"type": "string", "description": "Code purpose/feature"}
+            }
         }
-    }
-)
+    )
+    
+    # Architecture Design Template
+    architecture_template = PromptTemplate(
+        name="system_architecture",
+        version="1.5",
+        content="""You are a senior software architect designing a system architecture.
 
-# Register template
-await registry.register_template(template)
+**Requirements:**
+{{requirements}}
 
-# Execute template
-result = await engine.execute(
-    "code_review",
-    variables={
-        "language": "python",
-        "code": "def hello():\n    print('Hello, World!')"
-    },
-    llm_config={
-        "provider": "openai",
-        "model": "gpt-4",
-        "temperature": 0.3
-    }
-)
+**Constraints:**
+- Budget: {{budget}}
+- Timeline: {{timeline}}
+- Team size: {{team_size}}
+- Technology preferences: {{tech_preferences}}
+- Scalability requirements: {{scalability_needs}}
 
-print(result.llm_result.messages[0].content[0].text)
+**Design Approach:**
+Create a comprehensive system architecture that addresses:
+
+1. **High-Level Architecture**
+   - System components and their relationships
+   - Data flow between components
+   - Technology stack selection
+
+2. **Detailed Design**
+   - Database schema design
+   - API design and endpoints
+   - Security architecture
+   - Deployment architecture
+
+3. **Implementation Plan**
+   - Development phases
+   - Risk assessment
+   - Performance considerations
+
+**Output Format:**
+## Architecture Overview
+[High-level system description]
+
+## System Components
+### Component 1: [Name]
+- **Purpose:** [Description]
+- **Technology:** [Tech stack]
+- **Interfaces:** [APIs/connections]
+
+[Repeat for each component]
+
+## Database Design
+[Schema and relationships]
+
+## API Specification
+[Key endpoints and data formats]
+
+## Security Architecture
+[Authentication, authorization, data protection]
+
+## Deployment Strategy
+[Infrastructure and scaling approach]
+
+## Implementation Roadmap
+### Phase 1: [Foundation]
+- [Tasks and deliverables]
+
+### Phase 2: [Core Features]
+- [Tasks and deliverables]
+
+### Phase 3: [Advanced Features]
+- [Tasks and deliverables]
+
+## Risk Assessment
+[Potential risks and mitigation strategies]
+""",
+        variables=["requirements", "budget", "timeline", "team_size", "tech_preferences", "scalability_needs"],
+        metadata={
+            "description": "System architecture design template",
+            "category": "development",
+            "variables": {
+                "requirements": {"type": "string", "description": "System requirements"},
+                "budget": {"type": "string", "description": "Budget constraints"},
+                "timeline": {"type": "string", "description": "Timeline requirements"},
+                "team_size": {"type": "string", "description": "Development team size"},
+                "tech_preferences": {"type": "string", "description": "Technology preferences"},
+                "scalability_needs": {"type": "string", "description": "Scalability requirements"}
+            }
+        }
+    )
+    
+    # Test Generation Template
+    test_generation_template = PromptTemplate(
+        name="test_generation",
+        version="1.0",
+        content="""You are a test automation expert creating comprehensive test suites.
+
+**Code to Test:**
+```{{language}}
+{{code}}
+```
+
+**Testing Context:**
+- Function/Class: {{target_name}}
+- Test Framework: {{test_framework}}
+- Coverage Requirements: {{coverage_requirements}}
+- Test Types Needed: {{test_types}}
+
+**Test Generation Guidelines:**
+Generate tests that cover:
+
+1. **Happy Path Testing**
+   - Normal input scenarios
+   - Expected behavior validation
+
+2. **Edge Case Testing**
+   - Boundary conditions
+   - Null/empty inputs
+   - Maximum/minimum values
+
+3. **Error Handling Testing**
+   - Invalid inputs
+   - Exception scenarios
+   - Error message validation
+
+4. **Integration Testing** (if applicable)
+   - Component interactions
+   - External dependencies
+
+**Output Format:**
+```{{language}}
+{{#if test_framework == "pytest"}}
+import pytest
+from unittest.mock import Mock, patch
+{{/if}}
+{{#if test_framework == "jest"}}
+const { {{target_name}} } = require('./{{module_name}}');
+{{/if}}
+
+# Test class/describe block
+{{#if test_framework == "pytest"}}
+class Test{{target_name}}:
+{{/if}}
+{{#if test_framework == "jest"}}
+describe('{{target_name}}', () => {
+{{/if}}
+    
+    # Happy path tests
+    def test_{{target_name}}_normal_case(self):
+        # Test normal operation
+        pass
+    
+    # Edge case tests
+    def test_{{target_name}}_edge_cases(self):
+        # Test boundary conditions
+        pass
+    
+    # Error handling tests
+    def test_{{target_name}}_error_handling(self):
+        # Test error scenarios
+        pass
+    
+    # Performance tests (if needed)
+    def test_{{target_name}}_performance(self):
+        # Test performance requirements
+        pass
+
+{{#if test_framework == "jest"}}
+});
+{{/if}}
+```
+
+## Test Plan Summary
+- **Total Tests:** [Number]
+- **Coverage Areas:** [List of areas covered]
+- **Test Data:** [Required test data/fixtures]
+- **Dependencies:** [External dependencies to mock]
+""",
+        variables=["language", "code", "target_name", "test_framework", "coverage_requirements", "test_types"],
+        metadata={
+            "description": "Comprehensive test generation template",
+            "category": "development",
+            "variables": {
+                "language": {"type": "string", "description": "Programming language"},
+                "code": {"type": "string", "description": "Code to test"},
+                "target_name": {"type": "string", "description": "Function/class name"},
+                "test_framework": {"type": "string", "description": "Test framework (pytest, jest, etc.)"},
+                "coverage_requirements": {"type": "string", "description": "Coverage requirements"},
+                "test_types": {"type": "string", "description": "Types of tests needed"}
+            }
+        }
+    )
+    
+    # Register all templates
+    await registry.register_template(code_review_template)
+    await registry.register_template(architecture_template)
+    await registry.register_template(test_generation_template)
+    
+    return registry, engine
+
+# Usage example
+async def conduct_code_review():
+    """Demonstrate code review using prompt templates."""
+    
+    registry, engine = await setup_development_prompts()
+    
+    # Code to review
+    sample_code = '''
+def user_login(username, password):
+    user = db.query("SELECT * FROM users WHERE username = '" + username + "'")
+    if user and user.password == password:
+        session['user_id'] = user.id
+        return {"success": True, "user_id": user.id}
+    return {"success": False, "error": "Invalid credentials"}
+'''
+    
+    # Execute code review
+    review_result = await engine.execute(
+        template_name="code_review",
+        variables={
+            "language": "python",
+            "code": sample_code,
+            "project_name": "UserAuth System",
+            "file_path": "src/auth/login.py",
+            "author": "junior_dev",
+            "purpose": "User authentication endpoint"
+        },
+        llm_config={
+            "provider": "anthropic",
+            "model": "claude-3-sonnet",
+            "temperature": 0.2
+        }
+    )
+    
+    print("🔍 Code Review Results:")
+    print("=" * 50)
+    print(review_result.llm_result.messages[0].content[0].text)
+
+async def design_system_architecture():
+    """Demonstrate architecture design using prompt templates."""
+    
+    registry, engine = await setup_development_prompts()
+    
+    # Execute architecture design
+    arch_result = await engine.execute(
+        template_name="system_architecture",
+        variables={
+            "requirements": """
+Build a real-time chat application with:
+- User authentication and profiles
+- Public and private chat rooms
+- Message history and search
+- File sharing capabilities
+- Mobile and web clients
+- Support for 100,000 concurrent users
+""",
+            "budget": "$500,000",
+            "timeline": "6 months",
+            "team_size": "8 developers",
+            "tech_preferences": "Python/FastAPI backend, React frontend, PostgreSQL",
+            "scalability_needs": "Horizontal scaling, global deployment"
+        },
+        llm_config={
+            "provider": "openai",
+            "model": "gpt-4",
+            "temperature": 0.3
+        }
+    )
+    
+    print("🏗️ System Architecture Design:")
+    print("=" * 50)
+    print(arch_result.llm_result.messages[0].content[0].text)
+
+async def generate_tests():
+    """Demonstrate test generation using prompt templates."""
+    
+    registry, engine = await setup_development_prompts()
+    
+    # Code to test
+    target_code = '''
+class UserService:
+    def __init__(self, db_connection):
+        self.db = db_connection
+    
+    def create_user(self, username, email, password):
+        if not username or not email or not password:
+            raise ValueError("All fields are required")
+        
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        
+        # Check if user exists
+        existing = self.db.query("SELECT id FROM users WHERE username = ? OR email = ?", 
+                               [username, email])
+        if existing:
+            raise ValueError("User already exists")
+        
+        # Hash password and create user
+        hashed_password = hash_password(password)
+        user_id = self.db.execute(
+            "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+            [username, email, hashed_password]
+        )
+        
+        return {"id": user_id, "username": username, "email": email}
+'''
+    
+    # Execute test generation
+    test_result = await engine.execute(
+        template_name="test_generation",
+        variables={
+            "language": "python",
+            "code": target_code,
+            "target_name": "UserService",
+            "test_framework": "pytest",
+            "coverage_requirements": "100% line coverage",
+            "test_types": "unit tests, integration tests, error handling tests"
+        },
+        llm_config={
+            "provider": "anthropic",
+            "model": "claude-3-sonnet",
+            "temperature": 0.1
+        }
+    )
+    
+    print("🧪 Generated Tests:")
+    print("=" * 50)
+    print(test_result.llm_result.messages[0].content[0].text)
+
+if __name__ == "__main__":
+    print("🚀 Prompt System Examples")
+    print("=" * 50)
+    
+    # Run all examples
+    asyncio.run(conduct_code_review())
+    print("\n" + "=" * 50)
+    asyncio.run(design_system_architecture())
+    print("\n" + "=" * 50) 
+    asyncio.run(generate_tests())
+```
+
+### Example 2: CLI Integration with Prompts
+
+```python
+#!/usr/bin/env python3
+"""
+CLI tool for CoDIN prompt system.
+
+Usage:
+    python prompt_cli.py review --file main.py --project myapp
+    python prompt_cli.py architect --requirements requirements.txt
+    python prompt_cli.py test --target UserService --file user_service.py
+"""
+
+import asyncio
+import click
+from pathlib import Path
+import json
+
+from codin.prompt.registry import PromptRegistry
+from codin.prompt.engine import PromptEngine
+from codin.model.factory import LLMFactory
+
+class PromptCLI:
+    """CLI interface for prompt system."""
+    
+    def __init__(self):
+        self.registry = None
+        self.engine = None
+    
+    async def initialize(self):
+        """Initialize prompt system."""
+        # Load prompts from development directory
+        self.registry = PromptRegistry()
+        await self.registry.from_config({
+            "toolsets": {
+                "development": {"endpoint": "fs://prompts/development"}
+            }
+        })
+        
+        self.engine = PromptEngine(
+            registry=self.registry,
+            llm_factory=LLMFactory()
+        )
+
+@click.group()
+def cli():
+    """CoDIN Prompt System CLI"""
+    pass
+
+@cli.command()
+@click.option('--file', required=True, help='Code file to review')
+@click.option('--project', required=True, help='Project name')
+@click.option('--author', default='unknown', help='Code author')
+@click.option('--model', default='gpt-4', help='LLM model to use')
+def review(file, project, author, model):
+    """Review code using prompt templates."""
+    asyncio.run(_run_review(file, project, author, model))
+
+@cli.command()
+@click.option('--requirements', required=True, help='Requirements file or text')
+@click.option('--budget', default='not specified', help='Budget constraints')
+@click.option('--timeline', default='not specified', help='Timeline')
+@click.option('--team-size', default='not specified', help='Team size')
+@click.option('--model', default='gpt-4', help='LLM model to use')
+def architect(requirements, budget, timeline, team_size, model):
+    """Design system architecture."""
+    asyncio.run(_run_architect(requirements, budget, timeline, team_size, model))
+
+@cli.command()
+@click.option('--target', required=True, help='Target class/function name')
+@click.option('--file', required=True, help='Source code file')
+@click.option('--framework', default='pytest', help='Test framework')
+@click.option('--model', default='gpt-4', help='LLM model to use')
+def test(target, file, framework, model):
+    """Generate tests for code."""
+    asyncio.run(_run_test(target, file, framework, model))
+
+# CLI command implementations
+async def _run_review(file_path, project, author, model):
+    """Run code review."""
+    cli_instance = PromptCLI()
+    await cli_instance.initialize()
+    
+    try:
+        # Read code file
+        if not Path(file_path).exists():
+            click.echo(f"❌ File not found: {file_path}", err=True)
+            return
+        
+        with open(file_path, 'r') as f:
+            code_content = f.read()
+        
+        # Detect language from file extension
+        language = Path(file_path).suffix[1:]  # Remove the dot
+        if language == 'py':
+            language = 'python'
+        elif language == 'js':
+            language = 'javascript'
+        
+        # Execute review
+        result = await cli_instance.engine.execute(
+            template_name="code_review",
+            variables={
+                "language": language,
+                "code": code_content,
+                "project_name": project,
+                "file_path": file_path,
+                "author": author,
+                "purpose": "Code review requested via CLI"
+            },
+            llm_config={
+                "provider": "openai",
+                "model": model,
+                "temperature": 0.2
+            }
+        )
+        
+        click.echo("🔍 Code Review Results:")
+        click.echo("=" * 50)
+        click.echo(result.llm_result.messages[0].content[0].text)
+        
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+
+async def _run_architect(requirements_input, budget, timeline, team_size, model):
+    """Run architecture design."""
+    cli_instance = PromptCLI()
+    await cli_instance.initialize()
+    
+    try:
+        # Read requirements from file or use as text
+        if Path(requirements_input).exists():
+            with open(requirements_input, 'r') as f:
+                requirements = f.read()
+        else:
+            requirements = requirements_input
+        
+        # Execute architecture design
+        result = await cli_instance.engine.execute(
+            template_name="system_architecture",
+            variables={
+                "requirements": requirements,
+                "budget": budget,
+                "timeline": timeline,
+                "team_size": team_size,
+                "tech_preferences": "Modern stack (determined by architect)",
+                "scalability_needs": "Standard web application scaling"
+            },
+            llm_config={
+                "provider": "openai",
+                "model": model,
+                "temperature": 0.3
+            }
+        )
+        
+        click.echo("🏗️ System Architecture Design:")
+        click.echo("=" * 50)
+        click.echo(result.llm_result.messages[0].content[0].text)
+        
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+
+async def _run_test(target_name, file_path, framework, model):
+    """Run test generation."""
+    cli_instance = PromptCLI()
+    await cli_instance.initialize()
+    
+    try:
+        # Read source file
+        if not Path(file_path).exists():
+            click.echo(f"❌ File not found: {file_path}", err=True)
+            return
+        
+        with open(file_path, 'r') as f:
+            code_content = f.read()
+        
+        # Detect language
+        language = Path(file_path).suffix[1:]
+        if language == 'py':
+            language = 'python'
+        elif language == 'js':
+            language = 'javascript'
+        
+        # Execute test generation
+        result = await cli_instance.engine.execute(
+            template_name="test_generation",
+            variables={
+                "language": language,
+                "code": code_content,
+                "target_name": target_name,
+                "test_framework": framework,
+                "coverage_requirements": "Comprehensive coverage",
+                "test_types": "unit, integration, edge cases"
+            },
+            llm_config={
+                "provider": "openai",
+                "model": model,
+                "temperature": 0.1
+            }
+        )
+        
+        click.echo("🧪 Generated Tests:")
+        click.echo("=" * 50)
+        click.echo(result.llm_result.messages[0].content[0].text)
+        
+        # Optionally save to file
+        test_file = f"test_{Path(file_path).stem}.py"
+        save = click.confirm(f"Save tests to {test_file}?")
+        if save:
+            with open(test_file, 'w') as f:
+                f.write(result.llm_result.messages[0].content[0].text)
+            click.echo(f"✅ Tests saved to {test_file}")
+        
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+
+if __name__ == '__main__':
+    cli()
+```
+
+### Example 3: Agent Integration with Prompts
+
+```python
+from codin.agent.base_agent import BaseAgent
+from codin.prompt.registry import PromptRegistry
+from codin.prompt.engine import PromptEngine
+
+class PromptAwareAgent(BaseAgent):
+    """Agent that uses prompt templates for structured responses."""
+    
+    def __init__(self, agent_id: str, prompt_registry: PromptRegistry, **kwargs):
+        super().__init__(agent_id=agent_id, **kwargs)
+        self.prompt_engine = PromptEngine(registry=prompt_registry)
+    
+    async def _use_template(self, template_name: str, variables: dict, context: str = ""):
+        """Use a prompt template to generate structured response."""
+        
+        # Add context to variables
+        enhanced_variables = variables.copy()
+        enhanced_variables["agent_context"] = context
+        enhanced_variables["agent_id"] = self.agent_id
+        
+        # Execute template
+        result = await self.prompt_engine.execute(
+            template_name=template_name,
+            variables=enhanced_variables,
+            llm_config={
+                "provider": "openai",
+                "model": "gpt-4",
+                "temperature": 0.3
+            }
+        )
+        
+        return result.llm_result.messages[0].content[0].text
+
+# Usage with agent
+async def create_code_review_agent():
+    """Create an agent specialized in code review using prompts."""
+    
+    # Set up prompt registry
+    registry = PromptRegistry()
+    await registry.from_config({
+        "toolsets": {
+            "development": {"endpoint": "fs://prompts/development"}
+        }
+    })
+    
+    # Create agent
+    agent = PromptAwareAgent(
+        agent_id="code_reviewer",
+        prompt_registry=registry,
+        llm=LLMFactory.create_llm(),
+        memory=MemMemoryService()
+    )
+    
+    return agent
+
+# Agent usage
+async def automated_code_review():
+    """Demonstrate automated code review with prompt-aware agent."""
+    
+    agent = await create_code_review_agent()
+    
+    # Code to review (could come from git hooks, CI/CD, etc.)
+    code_changes = '''
+def process_payment(amount, user_id, card_token):
+    # Process payment
+    if amount > 0:
+        charge = stripe.charge.create(
+            amount=amount * 100,  # Convert to cents
+            currency='usd',
+            source=card_token,
+            description=f'Payment for user {user_id}'
+        )
+        return charge.id
+    return None
+'''
+    
+    # Use prompt template for structured review
+    review = await agent._use_template(
+        template_name="code_review",
+        variables={
+            "language": "python",
+            "code": code_changes,
+            "project_name": "E-commerce Platform",
+            "file_path": "src/payments/processor.py",
+            "author": "payment_dev",
+            "purpose": "Payment processing functionality"
+        },
+        context="Automated review from CI/CD pipeline"
+    )
+    
+    print("🤖 Automated Code Review:")
+    print(review)
+
+if __name__ == "__main__":
+    asyncio.run(automated_code_review())
 ```
 
 This prompt system design provides a robust foundation for managing and executing prompt templates with versioning, validation, and multi-backend support while maintaining integration with the broader CoDIN platform.

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import inspect
 import typing as _t
+from functools import lru_cache
 
 import pydantic as _pyd
 
@@ -18,6 +19,64 @@ __all__ = [
     'SandboxTool',
     'SandboxToolset',
 ]
+
+
+# Cache for method schemas - maps method signatures to Pydantic models
+_method_schema_cache: dict[str, type[_pyd.BaseModel]] = {}
+
+
+def _create_method_schema_cached(method: _t.Callable, tool_name: str) -> type[_pyd.BaseModel]:
+    """Create and cache a Pydantic model for a method signature.
+    
+    Args:
+        method: The method to create a schema for
+        tool_name: The name of the tool (for model naming)
+    
+    Returns:
+        A Pydantic model class for the method inputs
+    """
+    # Create cache key based on method signature
+    sig = inspect.signature(method)
+    cache_key = f"{method.__module__}.{getattr(method, '__qualname__', method.__name__)}:{str(sig)}"
+    
+    # Check cache first
+    if cache_key in _method_schema_cache:
+        return _method_schema_cache[cache_key]
+    
+    # Create schema from method signature
+    fields = {}
+    
+    for param_name, param in sig.parameters.items():
+        # Skip 'self' parameter
+        if param_name == 'self':
+            continue
+
+        # Get type annotation
+        annotation = param.annotation if param.annotation != inspect.Parameter.empty else _t.Any
+
+        # Get default value
+        if param.default != inspect.Parameter.empty:
+            default = param.default
+        else:
+            default = ...  # Required field
+
+        # Create field description from parameter name
+        description = f'Parameter {param_name}'
+
+        # Add field
+        if default is ...:
+            fields[param_name] = (annotation, _pyd.Field(..., description=description))
+        else:
+            fields[param_name] = (annotation, _pyd.Field(default, description=description))
+
+    # Create input schema
+    model_name = f'{tool_name.title().replace("_", "")}Input'
+    input_schema = _pyd.create_model(model_name, **fields, __module__=__name__)
+    
+    # Cache the result
+    _method_schema_cache[cache_key] = input_schema
+    
+    return input_schema
 
 
 class SandboxTool(Tool):
@@ -46,8 +105,13 @@ class SandboxTool(Tool):
         is_generative : bool, optional
             Whether this tool produces streaming output, by default False
         """
-        super().__init__(name=name, description=description, input_schema=input_schema, is_generative=is_generative)
+        super().__init__(name=name, description=description, input_schema=input_schema)
         self.sandbox = sandbox
+        self.is_generative = is_generative
+
+    async def execute(self, args: dict[str, _t.Any], ctx: ToolContext) -> _t.Any:
+        """Execute the sandbox tool. Must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement execute method")
 
     async def _up(self) -> None:
         """Bring up the sandbox tool by checking sandbox availability."""
@@ -77,36 +141,8 @@ class SandboxMethodTool(Tool):
         sandbox : Sandbox
             The sandbox instance
         """
-        # Get method signature and create input schema
-        sig = inspect.signature(method)
-        fields = {}
-
-        for param_name, param in sig.parameters.items():
-            # Skip 'self' parameter
-            if param_name == 'self':
-                continue
-
-            # Get type annotation
-            annotation = param.annotation if param.annotation != inspect.Parameter.empty else _t.Any
-
-            # Get default value
-            if param.default != inspect.Parameter.empty:
-                default = param.default
-            else:
-                default = ...  # Required field
-
-            # Create field description from parameter name
-            description = f'Parameter {param_name}'
-
-            # Add field
-            if default is ...:
-                fields[param_name] = (annotation, _pyd.Field(..., description=description))
-            else:
-                fields[param_name] = (annotation, _pyd.Field(default, description=description))
-
-        # Create input schema
-        model_name = f'{name.title().replace("_", "")}Input'
-        input_schema = _pyd.create_model(model_name, **fields)
+        # Create input schema using cached method
+        input_schema = _create_method_schema_cached(method, name)
 
         # Get description from method docstring
         description = inspect.getdoc(method) or f'Tool based on sandbox method {method.__name__}'
@@ -120,7 +156,7 @@ class SandboxMethodTool(Tool):
         self.method = method
         self.sandbox = sandbox
 
-    async def run(self, args: dict[str, _t.Any], tool_context: ToolContext) -> _t.Any:
+    async def execute(self, args: dict[str, _t.Any], ctx: ToolContext) -> _t.Any:
         """Execute the sandbox method."""
         # Call the method with the provided arguments
         return await self.method(**args)
@@ -159,9 +195,10 @@ class SandboxToolset(Toolset):
 
         super().__init__(
             name='sandbox',
-            description='Tools for interacting with a sandbox environment (auto-generated from sandbox methods)',
             tools=tools,
         )
+        # Store description separately since base class doesn't support it
+        self.description = 'Tools for interacting with a sandbox environment (auto-generated from sandbox methods)'
 
         # Store sandbox reference
         self.sandbox = sandbox

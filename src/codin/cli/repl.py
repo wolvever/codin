@@ -13,7 +13,7 @@ import click
 # Use agent protocol types
 from codin.agent.types import Message, Role, TextPart
 
-from ..agent.base import AgentRunInput
+from ..agent.types import AgentRunInput
 from ..agent.code_agent import CodeAgent
 from ..config import (
     ApprovalMode,

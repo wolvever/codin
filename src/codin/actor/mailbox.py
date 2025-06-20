@@ -8,11 +8,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..agent.types import Message
-    from .local_mailbox import LocalMailbox
 
-from .local_mailbox import LocalMailbox
-
-__all__ = ["Mailbox", "LocalMailbox"]
+__all__ = ["Mailbox"]
 
 
 class Mailbox(ABC):

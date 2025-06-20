@@ -13,7 +13,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import AsyncIterator, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Any
 from .types import CallableActor, ActorRunInput, ActorRunOutput
 from .envelope_types import Capability, EnvelopeKind, TaskState # Added TaskState for potential use in _DefaultSupervisorActor
 
@@ -28,16 +29,15 @@ __all__ = [
 
 class ActorInfo(BaseModel):
     """Information about a managed actor instance, including its capabilities."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     actor_id: str
     actor_type: str
-    agent: CallableActor
+    agent: Any  # CallableActor protocol - use Any for pydantic compatibility
     capability: Capability
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.now)
     last_accessed: datetime = Field(default_factory=datetime.now)
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class ActorSupervisor(ABC):

@@ -9,7 +9,7 @@ from datetime import datetime
 
 from ..id import new_id
 from ..prompt.run import prompt_run
-from ..tool.base import to_tool_definitions
+from ..tool.base import to_definitions as to_tool_definitions
 from ..utils.message import (
     format_history_for_prompt, # extract_text_from_message removed
     format_tool_results_for_conversation,

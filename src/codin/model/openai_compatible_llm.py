@@ -48,30 +48,22 @@ class OpenAICompatibleBaseLLM(BaseLLM):
     MODEL_ENV_VAR = 'OPENAI_MODEL' # Fallback generic OpenAI model
     LLM_MODEL_ENV_VAR = 'LLM_MODEL' # Generic model
 
-    def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None):
-        # This __init__ must be async due to client setup.
-        # The prompt says "async def __init__ ... similar to OpenAILLM"
-        # This was a mistake in my plan, as I just refactored OpenAILLM to have async __init__.
-        # This class's __init__ must also be async.
-        # Re-correcting the thought process for the actual implementation.
-        pass # Will be implemented as async in the actual tool call.
+    def __init__(self, model: str):
+        """Lightweight constructor for OpenAI-compatible LLMs."""
+        super().__init__(model)
+        self._is_prepared = False
+        self._client = None
 
 
-    async def _init_client(self, config: _t.Optional[ModelConfig] = None, model_name_arg: str | None = None):
+    async def prepare(self, config: _t.Optional[ModelConfig] = None):
         """
-        Asynchronous part of initialization. Called by __init__.
-        Sets up model name, configuration, and HTTP client.
+        Asynchronous initialization for I/O-bound setup.
+        Sets up configuration and HTTP client.
         """
+        if self._is_prepared:
+            return
+            
         self.config = config or ModelConfig()
-
-        chosen_model = model_name_arg
-        if chosen_model is None and self.config.model_name:
-            chosen_model = self.config.model_name
-        if chosen_model is None:
-            chosen_model = os.getenv(self.LLM_MODEL_ENV_VAR) or os.getenv(self.MODEL_ENV_VAR)
-
-        self.model = chosen_model or self.DEFAULT_MODEL
-        super().__init__(self.model)
 
         api_key = self.config.api_key or os.getenv(self.LLM_API_KEY_ENV_VAR) or os.getenv(self.API_KEY_ENV_VAR)
         if not api_key:
@@ -98,30 +90,22 @@ class OpenAICompatibleBaseLLM(BaseLLM):
         # For Azure compatibility primarily
         if self.API_TYPE_ENV_VAR and os.getenv(self.API_TYPE_ENV_VAR):
             headers['api-type'] = os.environ[self.API_TYPE_ENV_VAR]
-        if self.API_VERSION_ENV_VAR and os.getenv(self.API_VERSION_ENV_VAR) and self.config.api_version is None: # config takes precedence
-            # This is usually passed as a query param for Azure, e.g. ?api-version=YYYY-MM-DD
-            # Or handled by specific Azure clients. For generic OpenAI-compatible, it might be a header or not used.
-            # For now, if an api_version is in config, it will be used for header construction if needed by a subclass.
-            # Let's assume it's a header if specified in config for generic case, or subclass handles it.
-             pass
-        if self.config.api_version: # If api_version is in ModelConfig
-            # How it's used depends on the provider. OpenAI doesn't use it in headers.
-            # Azure might use it as a query param "api-version". Some custom OpenAI-compatible might use a header.
-            # For now, let's assume it's not a default header unless a subclass adds it.
-            # If using Azure, specific Azure client or logic in subclass would handle it.
+        if self.API_VERSION_ENV_VAR and os.getenv(self.API_VERSION_ENV_VAR) and self.config.api_version is None:
             pass
-
+        if self.config.api_version:
+            pass
 
         client_kwargs['default_headers'] = headers
 
         client_config = ClientConfig(**client_kwargs)
         self._client = Client(client_config)
-        # No await self._client.prepare() as Client.__init__ is now synchronous and complete.
+        self._is_prepared = True
         logger.info(f'{self.__class__.__name__} initialized for model {self.model} at {base_url}')
 
-    # Actual __init__ must be async to call _init_client
-    async def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None):
-        await self._init_client(config=config, model_name_arg=model)
+    async def _ensure_prepared(self):
+        """Ensure the LLM is prepared before use."""
+        if not self._is_prepared:
+            await self.prepare()
 
     @classmethod
     def supported_models(cls) -> list[str]:
@@ -197,8 +181,7 @@ class OpenAICompatibleBaseLLM(BaseLLM):
         stop_sequences: list[str] | None = None,
         # Add other common OpenAI params like top_p, presence_penalty, frequency_penalty if needed
     ) -> _t.AsyncIterator[str] | str:
-        if not self._client:
-            raise RuntimeError(f'{self.__class__.__name__} client not initialized. This should not happen after async __init__.')
+        await self._ensure_prepared()
 
         messages = self._prepare_messages(prompt)
         payload: dict[str, _t.Any] = {'model': self.model, 'messages': messages, 'stream': stream}
@@ -303,8 +286,7 @@ class OpenAICompatibleBaseLLM(BaseLLM):
         max_tokens: int | None = None,
         tool_choice: _t.Optional[str | dict] = "auto", # OpenAI specific: "auto", "none", or {"type": "function", "function": {"name": "my_function"}}
     ) -> dict | _t.AsyncIterator[dict]:
-        if not self._client:
-            raise RuntimeError(f'{self.__class__.__name__} client not initialized. This should not happen after async __init__.')
+        await self._ensure_prepared()
 
         messages = self._prepare_messages(prompt)
         payload: dict[str, _t.Any] = {

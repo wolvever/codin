@@ -16,7 +16,7 @@ import httpx
 import pydantic as _pyd
 import yaml
 
-from codin.endpoint import EndpointConfig, EndpointManager
+from codin.endpoint import EndpointConfig, EndpointResolver
 from .base import Tool, Toolset, ToolSpec
 
 __all__ = [
@@ -119,7 +119,7 @@ class ToolRegistry:
     async def _load_from_endpoint(self, endpoint_config: ToolEndpoint) -> None:
         """Load tools from a specific endpoint using unified endpoint system."""
         unified_config = endpoint_config.to_endpoint_config()
-        manager = EndpointManager(unified_config)
+        manager = EndpointResolver(unified_config)
         
         try:
             if unified_config.is_local:
@@ -173,7 +173,7 @@ class ToolRegistry:
             except Exception as e:  # pragma: no cover - loading errors
                 self.logger.error(f'Failed to load tools from {file}: {e}')
 
-    async def _load_from_filesystem_unified(self, manager: EndpointManager) -> None:
+    async def _load_from_filesystem_unified(self, manager: EndpointResolver) -> None:
         """Load tools from filesystem using unified endpoint manager."""
         # List Python files
         try:
@@ -247,7 +247,7 @@ class ToolRegistry:
                 # This would create RemoteTool instances that delegate to the HTTP endpoint
                 self.logger.info(f'Would load remote tool: {tool_data.get("name")}')
 
-    async def _load_from_http_unified(self, manager: EndpointManager, endpoint_config: ToolEndpoint) -> None:
+    async def _load_from_http_unified(self, manager: EndpointResolver, endpoint_config: ToolEndpoint) -> None:
         """Load tools from HTTP endpoint using unified endpoint manager."""
         try:
             # Use the unified backend to fetch tools

@@ -7,6 +7,7 @@ agent execution steps, enabling debugging and performance analysis.
 from abc import ABC, abstractmethod
 from typing import Any
 
+
 class BaseReplay(ABC):
     """Base class for replay services."""
 

@@ -1,13 +1,13 @@
-import pytest
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
-from unittest.mock import patch, AsyncMock # For HttpPersistor test
+from unittest.mock import AsyncMock, patch  # For HttpPersistor test
 
-from codin.session import SessionManager, Session
-from codin.session.persistence import LocalFilePersistor, HttpPersistor, SessionPersistor
-from httpx import AsyncClient, MockTransport, Response, Request # For HttpPersistor test
+import pytest
+
+from codin.session import Session, SessionManager
+from codin.session.persistence import HttpPersistor, LocalFilePersistor
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_session_manager_with_http_endpoint_loads_and_saves(mocker):
 
     # Mock HttpPersistor instance that SessionManager will create
     mock_persistor_instance = AsyncMock(spec=HttpPersistor)
-    mock_persistor_instance.load_session.return_value = Session(session_id=session_id, context={"loaded": True}, created_at=datetime.now(timezone.utc))
+    mock_persistor_instance.load_session.return_value = Session(session_id=session_id, context={"loaded": True}, created_at=datetime.now(UTC))
 
     # Patch the HttpPersistor class within the base module where SessionManager looks for it
     with patch('codin.session.base.HttpPersistor', return_value=mock_persistor_instance) as mock_http_persistor_class:
@@ -255,7 +255,7 @@ async def test_session_manager_cleanup_inactive_sessions(tmp_path: Path, mocker)
     s_inactive.context["status"] = "inactive"
     # Simulate past activity: current time - (max_age_seconds + some buffer)
     # Default max_age_seconds is 3600.
-    s_inactive.metrics["last_activity"] = datetime.now(timezone.utc).timestamp() - (3600 + 60)
+    s_inactive.metrics["last_activity"] = datetime.now(UTC).timestamp() - (3600 + 60)
 
     assert s_active_id in manager._sessions
     assert s_inactive_id in manager._sessions

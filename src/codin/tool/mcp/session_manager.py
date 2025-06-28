@@ -10,28 +10,29 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import json
 import logging
 import os
 import sys
 import typing as _t
 from contextlib import AsyncExitStack
-import json
 
 import httpx
 import pydantic
+import pydantic as _pyd
 
+from . import mcp_types
+from .exceptions import (
+    MCPConnectionError,
+    MCPError,
+    MCPHttpError,
+    MCPProtocolError,
+    MCPTimeoutError,
+)
 from .server_connection import (
     HttpServerParams,
     SseServerParams,
     StdioServerParams,
-)
-from . import mcp_types
-from .exceptions import (
-    MCPError,
-    MCPConnectionError,
-    MCPTimeoutError,
-    MCPProtocolError,
-    MCPHttpError,
 )
 
 try:
@@ -39,8 +40,8 @@ try:
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.sse import sse_client
     from mcp.client.stdio import stdio_client
-    from mcp.protocol import Response as MCPResponseProtocol # Renamed to avoid clash
-    from mcp.exceptions import MCPError as MCPLibError # Assuming mcp-lib has a base error
+    from mcp.exceptions import MCPError as MCPLibError  # Assuming mcp-lib has a base error
+    from mcp.protocol import Response as MCPResponseProtocol  # Renamed to avoid clash
 
     HAS_MCP_CLIENT = True
 except ImportError:
@@ -185,7 +186,7 @@ class HttpSessionManager(MCPSessionManager):
             )
         return self._client
 
-    async def _send_request(self, request_obj: mcp_types.JSONRPCRequest, response_model: _t.Type[_pyd.BaseModel] | None) -> _pyd.BaseModel | None:
+    async def _send_request(self, request_obj: mcp_types.JSONRPCRequest, response_model: type[_pyd.BaseModel] | None) -> _pyd.BaseModel | None:
         client = await self.get_client()
         # Assuming a single RPC endpoint for all MCP JSON-RPC calls.
         # This might need to be configurable if servers use method names as paths.
@@ -209,7 +210,7 @@ class HttpSessionManager(MCPSessionManager):
                 if "error" in error_content:
                     json_rpc_err = mcp_types.JSONRPCError.model_validate(error_content)
                     raise MCPProtocolError(f"MCP Error from server: {json_rpc_err.error.message}", underlying_error=e) from e
-            except (json.JSONDecodeError, pydantic.ValidationError):
+            except (json.JSONDecodeError, _pyd.ValidationError):
                 pass # Not a valid JSONRPCError structure
             raise MCPHttpError(
                 f"HTTP error {e.response.status_code} for {request_obj.method}.",
@@ -238,7 +239,7 @@ class HttpSessionManager(MCPSessionManager):
             if "result" not in response_data:
                  raise MCPProtocolError(f"JSON-RPC response for {request_obj.method} is missing 'result' field.")
             return response_model.model_validate(response_data["result"])
-        except pydantic.ValidationError as e:
+        except _pyd.ValidationError as e:
             _logger.error(f"Pydantic validation error for {request_obj.method} response: {e}")
             raise MCPProtocolError(f"Invalid response structure for {request_obj.method}.", underlying_error=e) from e
 
@@ -415,7 +416,7 @@ class StdioSessionManagerBase(MCPSessionManager):
                 # _logger.info(f"MCP Stdio/SSE session initialized via explicit InitializeRequest. Server: {init_result.serverInfo.name}")
                  _logger.warning("Could not automatically retrieve detailed server capabilities for Stdio/SSE session after mcp-lib initialize. ServerCapabilities will be None.")
 
-        except pydantic.ValidationError as e:
+        except _pyd.ValidationError as e:
             _logger.error(f"Stdio/Sse: Failed to validate server capabilities from mcp-lib: {e}")
             self.server_capabilities = None # Ensure it's None if validation fails
             raise MCPProtocolError("Failed to validate server capabilities structure from mcp-lib.", underlying_error=e) from e
@@ -428,7 +429,7 @@ class StdioSessionManagerBase(MCPSessionManager):
             raise MCPConnectionError(f"Failed to send/process typed InitializeRequest: {e}", underlying_error=e) from e
 
 
-    async def _make_rpc_call(self, method: str, params: _t.Optional[pydantic.BaseModel], result_type: _t.Type[pydantic.BaseModel] | None) -> _pydantic.BaseModel | None:
+    async def _make_rpc_call(self, method: str, params: _pyd.BaseModel | None, result_type: type[_pyd.BaseModel] | None) -> _pyd.BaseModel | None:
         if self._session is None:
             # This should ideally be caught by _ensure_session before _make_rpc_call is invoked.
             _logger.error(f"Session not available for MCP call {method}")
@@ -451,7 +452,7 @@ class StdioSessionManagerBase(MCPSessionManager):
                     raw_response = await api_call(params_dict)
             elif hasattr(session, '_send_request_obj') and hasattr(mcp_types, 'MCPProtocolRequest'): # mcp.protocol.Request
                 # Hypothetical: Using a generic sender if specific method not found
-                from mcp.protocol import Request as MCPInternalRequest # Avoid circular if mcp_types imports this
+                from mcp.protocol import Request as MCPInternalRequest  # Avoid circular if mcp_types imports this
                 mcp_req = MCPInternalRequest(id=request_id, method=method, params=params_dict)
                 _logger.debug(f"Stdio/Sse: Using generic _send_request_obj for {method}")
                 raw_response = await session._send_request_obj(mcp_req) # This is speculative
@@ -481,7 +482,7 @@ class StdioSessionManagerBase(MCPSessionManager):
             _logger.error(f"Stdio/Sse: Connection error calling {method}: {e}")
             await self.close() # Ensure session is marked as unusable
             raise MCPConnectionError(f"Connection error on {method}: {e}", underlying_error=e) from e
-        except asyncio.TimeoutError as e: # If mcp-lib operations cause asyncio timeout
+        except TimeoutError as e: # If mcp-lib operations cause asyncio timeout
             _logger.error(f"Stdio/Sse: Timeout calling {method}: {e}")
             await self.close()
             raise MCPTimeoutError(f"Timeout on {method}: {e}", underlying_error=e) from e
@@ -632,13 +633,12 @@ class StdioSessionManager(StdioSessionManagerBase):
                     await asyncio.wait_for(session_to_close.close(), timeout=1.0) # Increased timeout slightly
                 if exit_stack_to_close:
                     await asyncio.wait_for(exit_stack_to_close.aclose(), timeout=1.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _logger.warning("StdioSessionManager: Timeout during cleanup of session/exit_stack.")
         except Exception as e:
             _logger.debug(f"StdioSessionManager: Exception during cleanup: {e}", exc_info=True) # Log with traceback for debug
         finally:
             sys.stderr = original_stderr
-            warnings.showwarning = original_showwarning
 
 
 class SseSessionManager(StdioSessionManagerBase):
@@ -723,7 +723,7 @@ class SseSessionManager(StdioSessionManagerBase):
         try:
             if session_to_close and hasattr(session_to_close, 'close'):
                 await asyncio.wait_for(session_to_close.close(), timeout=1.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _logger.warning("SseSessionManager: Timeout during session.close().")
         except Exception as e:
             _logger.debug(f'SseSessionManager: Error closing mcp.ClientSession gracefully: {e}', exc_info=True)
@@ -731,7 +731,7 @@ class SseSessionManager(StdioSessionManagerBase):
         try:
             if exit_stack_to_close: # Ensure it was set
                 await asyncio.wait_for(exit_stack_to_close.aclose(), timeout=1.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _logger.warning("SseSessionManager: Timeout during exit_stack.aclose().")
         except RuntimeError as e: # e.g. "Attempted to exit cancel scope in a different task"
             _logger.debug(f'SseSessionManager: RuntimeError during exit stack cleanup: {e}', exc_info=True)

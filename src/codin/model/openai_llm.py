@@ -11,13 +11,15 @@ import logging
 import os
 import typing as _t
 
+from .config import ModelConfig  # Already here
+
+# HTTP utils are used by the new base class, so direct imports might not be needed here
+from .http_utils import ContentExtractionError, StreamProcessingError, make_post_request, process_sse_stream
+
 # Removed direct Client, ClientConfig imports if not used directly by OpenAILLM itself
 # from ..client import Client, ClientConfig
-from .openai_compatible_llm import OpenAICompatibleBaseLLM # Import new base class
-from .config import ModelConfig # Already here
-from .registry import register # Changed from ModelRegistry to module-level register
-# HTTP utils are used by the new base class, so direct imports might not be needed here
-from .http_utils import make_post_request, process_sse_stream, ContentExtractionError, StreamProcessingError
+from .openai_compatible_llm import OpenAICompatibleBaseLLM  # Import new base class
+from .registry import register  # Changed from ModelRegistry to module-level register
 
 __all__ = [
     'OpenAILLM',
@@ -60,7 +62,7 @@ class OpenAILLM(OpenAICompatibleBaseLLM): # Inherit from new base
     # BASE_URL_ENV_VAR = 'OPENAI_API_BASE' # Already a default
     # MODEL_ENV_VAR = 'OPENAI_MODEL' # Already a default
 
-    def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None):
+    def __init__(self, config: ModelConfig | None = None, model: str | None = None):
         """
         Initialize the OpenAI LLM.
         Defers I/O-bound setup to async prepare() method.
@@ -88,7 +90,7 @@ class OpenAILLM(OpenAICompatibleBaseLLM): # Inherit from new base
         self._is_prepared = False
         self._client = None
 
-    async def prepare(self, config: _t.Optional[ModelConfig] = None):
+    async def prepare(self, config: ModelConfig | None = None):
         """Async initialization for I/O-bound setup."""
         if self._is_prepared:
             return
@@ -142,7 +144,7 @@ class OpenAILLM(OpenAICompatibleBaseLLM): # Inherit from new base
             return await self._stream_response(payload)
         return await self._complete_response(payload)
 
-    def _extract_content_from_response(self, response_data: dict) -> _t.Optional[str]:
+    def _extract_content_from_response(self, response_data: dict) -> str | None:
         """Helper to extract content from OpenAI's non-streaming response JSON."""
         choices = response_data.get('choices')
         if choices and isinstance(choices, list) and len(choices) > 0:
@@ -151,7 +153,7 @@ class OpenAILLM(OpenAICompatibleBaseLLM): # Inherit from new base
                 return message.get('content')
         return None
 
-    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> _t.Optional[str]:
+    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> str | None:
         """Helper to extract content delta from OpenAI's streaming response chunk."""
         choices = data_chunk.get('choices')
         if choices and isinstance(choices, list) and len(choices) > 0:

@@ -8,7 +8,6 @@ Prometheus and OpenTelemetry metrics out of the box.
 from __future__ import annotations
 
 import time
-from typing import Any
 
 try:
     import prometheus_client as prom
@@ -22,7 +21,7 @@ try:
 except ImportError:
     HAS_OTEL = False
 
-from ..executors.base import ExecutionResult, ExecutionStatus
+from ..executors.base import ExecutionResult
 from .base import Extension, ExtensionContext
 
 __all__ = ['MetricsExtension']

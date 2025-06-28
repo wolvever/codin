@@ -1,8 +1,8 @@
 """Base configuration for all Codin components using unified endpoint pattern."""
 
 import os
-from typing import Optional
 from abc import ABC, abstractmethod
+
 from pydantic import BaseModel
 
 from .config import EndpointConfig
@@ -12,7 +12,7 @@ class ComponentConfig(BaseModel, ABC):
     """Base configuration class for all Codin components."""
     
     endpoint: EndpointConfig
-    name: Optional[str] = None
+    name: str | None = None
     enabled: bool = True
     
     @classmethod
@@ -105,9 +105,9 @@ class ReplayConfig(ComponentConfig):
 class ModelConfig(ComponentConfig):
     """Configuration for Model service."""
     
-    model_name: Optional[str] = None
-    api_key: Optional[str] = None
-    provider: Optional[str] = None
+    model_name: str | None = None
+    api_key: str | None = None
+    provider: str | None = None
     
     @classmethod
     def default_endpoint(cls) -> str:

@@ -1,13 +1,13 @@
 import asyncio
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
-from codin.actor.supervisor import LocalActorManager, ActorInfo, ActorSupervisor
-from codin.actor.types import CallableActor
-from codin.agent.base_agent import BaseAgent
+import pytest
+
+from codin.actor.supervisor import ActorInfo, ActorSupervisor, LocalActorManager
 from codin.agent.base import Planner
-from codin.agent.types import AgentRunInput, AgentRunOutput, Message, TextPart, Role
+from codin.agent.base_agent import BaseAgent
+from codin.agent.types import AgentRunInput, AgentRunOutput, Message, Role, TextPart
 
 
 class MockPlanner(Planner):

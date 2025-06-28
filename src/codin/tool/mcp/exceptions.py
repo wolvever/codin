@@ -1,7 +1,7 @@
 """Custom exceptions for MCP related errors."""
 
 from __future__ import annotations
-import typing as _t
+
 
 class MCPError(Exception):
     """Base class for MCP related errors."""

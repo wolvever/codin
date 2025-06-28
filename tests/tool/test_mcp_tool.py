@@ -1,15 +1,16 @@
-from __future__ import annotations
-
 """Tests for `codin.tool.mcp.MCPTool`."""
 
-import httpx
+from __future__ import annotations
+
 import json
+
+import httpx
 import pytest
 
-from src.codin.tool.mcp.session_manager import MCPSessionManager
-from src.codin.tool.mcp.server_connection import HttpServerParams
-from src.codin.tool.mcp.mcp_tool import MCPTool
 from src.codin.tool.base import ToolContext
+from src.codin.tool.mcp.mcp_tool import MCPTool
+from src.codin.tool.mcp.server_connection import HttpServerParams
+from src.codin.tool.mcp.session_manager import MCPSessionManager
 
 
 @pytest.mark.asyncio

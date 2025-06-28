@@ -12,12 +12,11 @@ from ..client import Client, ClientConfig
 from .base import BaseLLM
 from .config import ModelConfig
 from .http_utils import (
-    make_post_request,
-    extract_content_from_json,
-    process_sse_stream,
-    ContentExtractionError,
     ModelResponseParsingError,
-    StreamProcessingError
+    StreamProcessingError,
+    extract_content_from_json,
+    make_post_request,
+    process_sse_stream,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,8 +38,8 @@ class OpenAICompatibleBaseLLM(BaseLLM):
     DEFAULT_RETRY_MAX_WAIT = 10.0
     DEFAULT_RETRY_STATUS_CODES = [429, 500, 502, 503, 504]
 
-    API_TYPE_ENV_VAR: _t.Optional[str] = None # e.g. "OPENAI_API_TYPE" for Azure
-    API_VERSION_ENV_VAR: _t.Optional[str] = None # e.g. "OPENAI_API_VERSION" for Azure
+    API_TYPE_ENV_VAR: str | None = None # e.g. "OPENAI_API_TYPE" for Azure
+    API_VERSION_ENV_VAR: str | None = None # e.g. "OPENAI_API_VERSION" for Azure
     API_KEY_ENV_VAR = 'OPENAI_API_KEY' # Fallback generic OpenAI key
     LLM_API_KEY_ENV_VAR = 'LLM_API_KEY' # Generic key
     BASE_URL_ENV_VAR = 'OPENAI_API_BASE' # Fallback generic OpenAI base
@@ -55,7 +54,7 @@ class OpenAICompatibleBaseLLM(BaseLLM):
         self._client = None
 
 
-    async def prepare(self, config: _t.Optional[ModelConfig] = None):
+    async def prepare(self, config: ModelConfig | None = None):
         """
         Asynchronous initialization for I/O-bound setup.
         Sets up configuration and HTTP client.
@@ -118,7 +117,7 @@ class OpenAICompatibleBaseLLM(BaseLLM):
         # TODO: Potentially validate message structure here
         return prompt
 
-    def _extract_content_from_response(self, response_data: dict) -> _t.Optional[str]:
+    def _extract_content_from_response(self, response_data: dict) -> str | None:
         """Helper to extract content from OpenAI's non-streaming chat response JSON."""
         choices = response_data.get('choices')
         if choices and isinstance(choices, list) and len(choices) > 0:
@@ -127,7 +126,7 @@ class OpenAICompatibleBaseLLM(BaseLLM):
                 return message.get('content')
         return None
 
-    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> _t.Optional[str]:
+    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> str | None:
         """Helper to extract content delta from OpenAI's streaming chat response chunk."""
         choices = data_chunk.get('choices')
         if choices and isinstance(choices, list) and len(choices) > 0:
@@ -194,7 +193,7 @@ class OpenAICompatibleBaseLLM(BaseLLM):
             return await self._handle_streaming_response(payload)
         return await self._handle_completion_response(payload)
 
-    def _parse_tool_calls_from_response(self, response_data: dict) -> _t.Optional[list[dict]]:
+    def _parse_tool_calls_from_response(self, response_data: dict) -> list[dict] | None:
         """Helper to extract tool_calls from OpenAI's non-streaming response."""
         choices = response_data.get('choices')
         if choices and isinstance(choices, list) and len(choices) > 0:
@@ -284,7 +283,7 @@ class OpenAICompatibleBaseLLM(BaseLLM):
         stream: bool = False,
         temperature: float | None = None,
         max_tokens: int | None = None,
-        tool_choice: _t.Optional[str | dict] = "auto", # OpenAI specific: "auto", "none", or {"type": "function", "function": {"name": "my_function"}}
+        tool_choice: str | dict | None = "auto", # OpenAI specific: "auto", "none", or {"type": "function", "function": {"name": "my_function"}}
     ) -> dict | _t.AsyncIterator[dict]:
         await self._ensure_prepared()
 

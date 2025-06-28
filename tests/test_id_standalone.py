@@ -11,6 +11,7 @@ sys.path.insert(0, str(src_path))
 
 # Load the id module directly
 import importlib.util
+
 spec = importlib.util.spec_from_file_location("id_module", src_path / "codin" / "id.py")
 id_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(id_module)

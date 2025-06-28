@@ -8,15 +8,13 @@ It supports both a default global registry and instance-based registries.
 from __future__ import annotations
 
 import functools
+import importlib  # For dynamic class loading
 import logging
 import re
 import typing as _t
-import asyncio
-import importlib # For dynamic class loading
 
 from .base import BaseEmbedding, BaseLLM, BaseModel, BaseReranker, ModelType
 from .config import ModelConfig
-
 
 __all__ = [
     'ModelRegistry',
@@ -151,17 +149,17 @@ class ModelRegistry:
             logger.debug(f'Registry {id(self)}: Multiple matches for {model_name}: {candidates}')
         return candidates[0][1]
 
-    async def create_llm(self, model_name: str, config: _t.Optional[ModelConfig] = None) -> BaseLLM:
+    async def create_llm(self, model_name: str, config: ModelConfig | None = None) -> BaseLLM:
         """Create a new LLM instance from this registry. (Now async)"""
         model_cls = self.resolve_model_class(model_name, ModelType.LLM)
         return _t.cast(BaseLLM, await model_cls(model=model_name, config=config))
 
-    async def create_embedding(self, model_name: str, config: _t.Optional[ModelConfig] = None) -> BaseEmbedding:
+    async def create_embedding(self, model_name: str, config: ModelConfig | None = None) -> BaseEmbedding:
         """Create a new embedding model instance from this registry. (Now async)"""
         model_cls = self.resolve_model_class(model_name, ModelType.EMBEDDING)
         return _t.cast(BaseEmbedding, await model_cls(model=model_name, config=config))
 
-    def create_reranker(self, model_name: str, config: _t.Optional[ModelConfig] = None) -> BaseReranker:
+    def create_reranker(self, model_name: str, config: ModelConfig | None = None) -> BaseReranker:
         """Create a new reranker model instance from this registry. (Remains synchronous)"""
         model_cls = self.resolve_model_class(model_name, ModelType.RERANKER)
         if hasattr(model_cls, '__init__') and 'config' in model_cls.__init__.__code__.co_varnames:
@@ -191,15 +189,15 @@ def resolve_model_class(model_name: str, model_type: ModelType | None = None) ->
     """Resolves a model class from the default global model registry."""
     return default_model_registry.resolve_model_class(model_name, model_type)
 
-async def create_llm(model_name: str, config: _t.Optional[ModelConfig] = None) -> BaseLLM:
+async def create_llm(model_name: str, config: ModelConfig | None = None) -> BaseLLM:
     """Creates an LLM instance from the default global model registry. (async)"""
     return await default_model_registry.create_llm(model_name, config)
 
-async def create_embedding(model_name: str, config: _t.Optional[ModelConfig] = None) -> BaseEmbedding:
+async def create_embedding(model_name: str, config: ModelConfig | None = None) -> BaseEmbedding:
     """Creates an embedding model instance from the default global model registry. (async)"""
     return await default_model_registry.create_embedding(model_name, config)
 
-def create_reranker(model_name: str, config: _t.Optional[ModelConfig] = None) -> BaseReranker:
+def create_reranker(model_name: str, config: ModelConfig | None = None) -> BaseReranker:
     """Creates a reranker instance from the default global model registry. (sync)"""
     return default_model_registry.create_reranker(model_name, config)
 

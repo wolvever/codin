@@ -1,13 +1,11 @@
 """Tests for the prompt.registry module."""
 
-import os
-import pathlib
-import pytest
-import typing as _t
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open
+from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
-from codin.prompt.registry import PromptRegistry
+import pytest
+
 from codin.prompt.base import PromptTemplate
+from codin.prompt.registry import PromptRegistry
 
 
 class TestPromptRegistry:

@@ -20,7 +20,7 @@ except ImportError:
 
 from .base import BaseLLM
 from .config import ModelConfig
-from .registry import register # Changed
+from .registry import register  # Changed
 
 __all__ = [
     'LiteLLMAdapter',
@@ -40,7 +40,7 @@ class LiteLLMAdapter(BaseLLM):
         LITELLM_CACHE: Whether to enable LiteLLM caching (true/false)
     """
 
-    def __init__(self, model: str, config: _t.Optional[ModelConfig] = None):
+    def __init__(self, model: str, config: ModelConfig | None = None):
         """Initialize the LiteLLM Adapter.
 
         Args:

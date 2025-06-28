@@ -1,18 +1,17 @@
 """Agent factory with unified endpoint configuration."""
 
 import logging
-import typing as _t
 
 from codin.memory import Memory
 from codin.model.factory import LLMFactory
 from codin.prompt.registry import PromptRegistry
 from codin.sandbox.base import Sandbox
 from codin.sandbox.local import LocalSandbox
-from codin.tool.registry import ToolRegistry, ToolEndpoint
 from codin.tool.base import Toolset
+from codin.tool.registry import ToolEndpoint, ToolRegistry
 
-from .config import AgentEndpointConfig
 from .code_agent import CodeAgent
+from .config import AgentEndpointConfig
 
 logger = logging.getLogger(__name__)
 

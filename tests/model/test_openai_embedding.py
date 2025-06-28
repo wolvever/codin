@@ -1,13 +1,14 @@
-import pytest
+import json  # For JSONDecodeError
 from unittest.mock import AsyncMock, MagicMock, patch
-import os
 
-import json # For JSONDecodeError
-import httpx # For mock_http_response spec
-from src.codin.model.openai_embedding import OpenAIEmbedding
+import httpx  # For mock_http_response spec
+import pytest
+
+from src.codin.client import Client  # For spec if needed
 from src.codin.model.config import ModelConfig
-from src.codin.client import Client # For spec if needed
-from src.codin.model.http_utils import ModelResponseParsingError, ContentExtractionError # For new tests
+from src.codin.model.http_utils import ContentExtractionError, ModelResponseParsingError  # For new tests
+from src.codin.model.openai_embedding import OpenAIEmbedding
+
 
 @pytest.fixture
 def mock_embedding_client():

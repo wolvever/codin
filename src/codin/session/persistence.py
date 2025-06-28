@@ -1,13 +1,14 @@
 import abc
-import typing as _t
-import os
 import json
+import os
+import typing as _t
+
 import aiofiles
-import aiofiles.os # For async os operations like path.exists, remove
+import aiofiles.os  # For async os operations like path.exists, remove
 import httpx
 
 if _t.TYPE_CHECKING:
-    from .base import Session # Forward reference for type hinting
+    from .base import Session  # Forward reference for type hinting
 
 class SessionPersistor(abc.ABC):
     """Abstract base class for session persistence mechanisms."""
@@ -62,7 +63,7 @@ class LocalFilePersistor(SessionPersistor):
         try:
             if not await aiofiles.os.path.exists(filepath): # type: ignore
                 return None
-            async with aiofiles.open(filepath, mode='r', encoding='utf-8') as f:
+            async with aiofiles.open(filepath, encoding='utf-8') as f:
                 data = await f.read()
             session_data = json.loads(data)
 

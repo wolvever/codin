@@ -30,24 +30,24 @@ from enum import Enum
 from pydantic import BaseModel
 
 from ..agent.base import Agent
-from ..agent.types import AgentRunInput, AgentRunOutput
-from ..agent.types import ToolCall, ToolCallResult
+from ..agent.types import AgentRunInput, AgentRunOutput, ToolCall, ToolCallResult
 from ..config import ApprovalMode
 from ..memory.base import MemMemoryService, MemoryService
 from ..model.factory import LLMFactory
 from ..prompt import prompt_run
 from ..sandbox.base import Sandbox
 from ..sandbox.local import LocalSandbox
-from ..tool.base import ToolContext, Toolset, to_definitions as to_tool_definitions
+from ..tool.base import ToolContext, Toolset
+from ..tool.base import to_definitions as to_tool_definitions
 from ..tool.executor import ToolExecutor
 from ..tool.registry import ToolRegistry
-from ..utils.message import ( # extract_text_from_message removed
+from ..utils.message import (  # extract_text_from_message removed
     format_history_for_prompt,
     format_tool_results_for_conversation,
 )
 
 # Use protocol types directly
-from .types import Message, Role, TextPart # TextPart might not be directly needed after changes
+from .types import Message, Role  # TextPart might not be directly needed after changes
 
 __all__: list[str] = [
     "AgentEvent",

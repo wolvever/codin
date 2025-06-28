@@ -1,7 +1,8 @@
 """Tests that use mocking for the imports."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # Create mock classes

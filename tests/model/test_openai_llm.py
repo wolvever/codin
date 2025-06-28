@@ -1,17 +1,19 @@
 """Tests for the model.openai_llm module."""
 
-import asyncio
 import json
-import os
-import pytest
-import typing as _t
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx # Keep this if it's used by Client or other parts, otherwise can be removed
+import httpx  # Keep this if it's used by Client or other parts, otherwise can be removed
+import pytest
+
+from codin.client import Client  # Assuming Client is imported for spec or type hinting
 from codin.model.openai_llm import OpenAILLM
-from codin.client import Client # Assuming Client is imported for spec or type hinting
 from src.codin.model.config import ModelConfig
-from src.codin.model.http_utils import ModelResponseParsingError, ContentExtractionError, StreamProcessingError # Added for new tests
+from src.codin.model.http_utils import (  # Added for new tests
+    ContentExtractionError,
+    ModelResponseParsingError,
+    StreamProcessingError,
+)
 
 
 @pytest.fixture

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import asyncio
-import json
-from datetime import datetime
 import typing as _t
+from datetime import datetime
 
 # It's good practice to import aiohttp conditionally or handle ImportError
 # if it's an optional dependency. For a conceptual design, we'll assume it's available.
@@ -21,7 +19,7 @@ class HttpReplay(BaseReplay):
     Conceptual Replay backend that sends message exchanges to an HTTP endpoint.
     """
 
-    def __init__(self, session_id: str, endpoint_url: str, client_session: _t.Optional[aiohttp.ClientSession] = None):
+    def __init__(self, session_id: str, endpoint_url: str, client_session: aiohttp.ClientSession | None = None):
         """
         Initializes HttpReplay.
 

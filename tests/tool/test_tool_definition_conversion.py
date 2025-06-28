@@ -1,12 +1,11 @@
-from __future__ import annotations
-
 """Tests for Tool to ToolDefinition conversion functionality."""
 
-import pytest
-import pydantic as pyd
+from __future__ import annotations
 
-from src.codin.tool.base import Tool, ToolDefinition, ToolContext, Toolset
-from src.codin.tool.base import to_tool_definition, to_tool_definitions
+import pydantic as pyd
+import pytest
+
+from src.codin.tool.base import Tool, ToolContext, ToolDefinition, Toolset, to_tool_definition, to_tool_definitions
 
 
 class ToolInputSchema(pyd.BaseModel):

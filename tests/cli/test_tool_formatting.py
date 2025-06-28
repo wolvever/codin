@@ -1,7 +1,9 @@
 """Test cases for tool argument formatting in REPL."""
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, patch
+
 from codin.cli.repl import ReplSession
 from codin.config import CodinConfig
 

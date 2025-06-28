@@ -4,10 +4,9 @@ Pydantic models for MCP (Model Context Protocol) types.
 Generated from schema.json version 2025-03-26.
 """
 import enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Literal, Union
 
 from pydantic import BaseModel, Field
-from typing_extensions import Literal
 
 # Base JSON-RPC Types
 RequestId = Union[str, int]
@@ -16,7 +15,7 @@ class JSONRPCRequest(BaseModel):
     jsonrpc: Literal["2.0"] = "2.0"
     method: str
     id: RequestId
-    params: Optional[Dict[str, Any]] = None
+    params: dict[str, Any] | None = None
 
 class JSONRPCResponse(BaseModel):
     jsonrpc: Literal["2.0"] = "2.0"
@@ -26,7 +25,7 @@ class JSONRPCResponse(BaseModel):
 class JSONRPCErrorData(BaseModel):
     code: int
     message: str
-    data: Optional[Any] = None
+    data: Any | None = None
 
 class JSONRPCError(BaseModel):
     jsonrpc: Literal["2.0"] = "2.0"
@@ -36,21 +35,21 @@ class JSONRPCError(BaseModel):
 class JSONRPCNotification(BaseModel):
     jsonrpc: Literal["2.0"] = "2.0"
     method: str
-    params: Optional[Dict[str, Any]] = None
+    params: dict[str, Any] | None = None
 
 # Client and Server Capabilities
 class ClientCapabilities(BaseModel):
-    experimental: Optional[Dict[str, Dict[str, Any]]] = None
-    roots: Optional[Dict[str, Any]] = None # Further definition if needed: {"listChanged": bool}
-    sampling: Optional[Dict[str, Any]] = None # additionalProperties: true
+    experimental: dict[str, dict[str, Any]] | None = None
+    roots: dict[str, Any] | None = None # Further definition if needed: {"listChanged": bool}
+    sampling: dict[str, Any] | None = None # additionalProperties: true
 
 class ServerCapabilities(BaseModel):
-    completions: Optional[Dict[str, Any]] = None # additionalProperties: true
-    experimental: Optional[Dict[str, Dict[str, Any]]] = None
-    logging: Optional[Dict[str, Any]] = None # additionalProperties: true
-    prompts: Optional[Dict[str, Any]] = None # Further definition if needed: {"listChanged": bool}
-    resources: Optional[Dict[str, Any]] = None # Further definition if needed: {"listChanged": bool, "subscribe": bool}
-    tools: Optional[Dict[str, Any]] = None # Further definition if needed: {"listChanged": bool}
+    completions: dict[str, Any] | None = None # additionalProperties: true
+    experimental: dict[str, dict[str, Any]] | None = None
+    logging: dict[str, Any] | None = None # additionalProperties: true
+    prompts: dict[str, Any] | None = None # Further definition if needed: {"listChanged": bool}
+    resources: dict[str, Any] | None = None # Further definition if needed: {"listChanged": bool, "subscribe": bool}
+    tools: dict[str, Any] | None = None # Further definition if needed: {"listChanged": bool}
 
 class Implementation(BaseModel):
     name: str
@@ -70,24 +69,24 @@ class InitializeResult(BaseModel):
     capabilities: ServerCapabilities
     serverInfo: Implementation
     protocolVersion: str
-    instructions: Optional[str] = None
-    _meta: Optional[Dict[str, Any]] = None
+    instructions: str | None = None
+    _meta: dict[str, Any] | None = None
 
 
 # Tools
 class ListToolsRequestParams(BaseModel):
-    cursor: Optional[str] = None
+    cursor: str | None = None
 
 class ListToolsRequest(JSONRPCRequest):
     method: Literal["tools/list"] = "tools/list"
-    params: Optional[ListToolsRequestParams] = None
+    params: ListToolsRequestParams | None = None
 
 class ToolAnnotation(BaseModel): # Corresponds to ToolAnnotations in schema
-    title: Optional[str] = None
-    readOnlyHint: Optional[bool] = Field(default=False)
-    idempotentHint: Optional[bool] = Field(default=False)
-    destructiveHint: Optional[bool] = Field(default=True)
-    openWorldHint: Optional[bool] = Field(default=True)
+    title: str | None = None
+    readOnlyHint: bool | None = Field(default=False)
+    idempotentHint: bool | None = Field(default=False)
+    destructiveHint: bool | None = Field(default=True)
+    openWorldHint: bool | None = Field(default=True)
 
 
 # class ToolInputSchema(BaseModel):
@@ -98,74 +97,74 @@ class ToolAnnotation(BaseModel): # Corresponds to ToolAnnotations in schema
 
 class Tool(BaseModel):
     name: str
-    inputSchema: Dict[str, Any] # As per instruction: "schema for inputSchema can be dict for now"
-    description: Optional[str] = None
-    annotations: Optional[ToolAnnotation] = None
+    inputSchema: dict[str, Any] # As per instruction: "schema for inputSchema can be dict for now"
+    description: str | None = None
+    annotations: ToolAnnotation | None = None
 
 
 class ListToolsResult(BaseModel):
-    tools: List[Tool]
-    nextCursor: Optional[str] = None
-    _meta: Optional[Dict[str, Any]] = None
+    tools: list[Tool]
+    nextCursor: str | None = None
+    _meta: dict[str, Any] | None = None
 
 
 class CallToolRequestParams(BaseModel):
     name: str
-    arguments: Optional[Dict[str, Any]] = None
+    arguments: dict[str, Any] | None = None
 
 class CallToolRequest(JSONRPCRequest):
     method: Literal["tools/call"] = "tools/call"
     params: CallToolRequestParams
 
 class Annotations(BaseModel):
-    priority: Optional[float] = None # Min 0, Max 1
-    audience: Optional[List[Literal["user", "assistant"]]] = None
+    priority: float | None = None # Min 0, Max 1
+    audience: list[Literal["user", "assistant"]] | None = None
 
 
 class TextContent(BaseModel):
     type: Literal["text"] = "text"
     text: str
-    annotations: Optional[Annotations] = None
+    annotations: Annotations | None = None
 
 class ImageContent(BaseModel):
     type: Literal["image"] = "image"
     mimeType: str
     data: str # base64 encoded
-    annotations: Optional[Annotations] = None
+    annotations: Annotations | None = None
 
 class AudioContent(BaseModel):
     type: Literal["audio"] = "audio"
     mimeType: str
     data: str # base64 encoded
-    annotations: Optional[Annotations] = None
+    annotations: Annotations | None = None
 
 class TextResourceContents(BaseModel):
     uri: str # format: uri
     text: str
-    mimeType: Optional[str] = None
+    mimeType: str | None = None
 
 class BlobResourceContents(BaseModel):
     uri: str # format: uri
     blob: str # format: byte (base64 encoded)
-    mimeType: Optional[str] = None
+    mimeType: str | None = None
 
 class EmbeddedResource(BaseModel):
     type: Literal["resource"] = "resource"
-    resource: Union[TextResourceContents, BlobResourceContents]
-    annotations: Optional[Annotations] = None
+    resource: TextResourceContents | BlobResourceContents
+    annotations: Annotations | None = None
 
 CallToolResultContent = Union[TextContent, ImageContent, AudioContent, EmbeddedResource]
 
 class CallToolResult(BaseModel):
-    content: List[CallToolResultContent]
-    isError: Optional[bool] = False
-    _meta: Optional[Dict[str, Any]] = None
+    content: list[CallToolResultContent]
+    isError: bool | None = False
+    _meta: dict[str, Any] | None = None
 
 
 # Notifications
 class CancelledNotificationParams(BaseModel):
     requestId: RequestId
-    reason: Optional[str] = None
+    reason: str | None = None
 
 class CancelledNotification(JSONRPCNotification):
     method: Literal["notifications/cancelled"] = "notifications/cancelled"
@@ -176,8 +175,8 @@ ProgressToken = Union[str, int]
 class ProgressNotificationParams(BaseModel):
     progressToken: ProgressToken
     progress: float
-    total: Optional[float] = None
-    message: Optional[str] = None
+    total: float | None = None
+    message: str | None = None
 
 class ProgressNotification(JSONRPCNotification):
     method: Literal["notifications/progress"] = "notifications/progress"
@@ -185,44 +184,44 @@ class ProgressNotification(JSONRPCNotification):
 
 # Resources
 class ListResourcesRequestParams(BaseModel):
-    cursor: Optional[str] = None
+    cursor: str | None = None
 
 class ListResourcesRequest(JSONRPCRequest):
     method: Literal["resources/list"] = "resources/list"
-    params: Optional[ListResourcesRequestParams] = None
+    params: ListResourcesRequestParams | None = None
 
 class Resource(BaseModel):
     name: str
     uri: str # format: uri
-    description: Optional[str] = None
-    mimeType: Optional[str] = None
-    size: Optional[int] = None
-    annotations: Optional[Annotations] = None
+    description: str | None = None
+    mimeType: str | None = None
+    size: int | None = None
+    annotations: Annotations | None = None
 
 class ListResourcesResult(BaseModel):
-    resources: List[Resource]
-    nextCursor: Optional[str] = None
-    _meta: Optional[Dict[str, Any]] = None
+    resources: list[Resource]
+    nextCursor: str | None = None
+    _meta: dict[str, Any] | None = None
 
 
 class ListResourceTemplatesRequestParams(BaseModel):
-    cursor: Optional[str] = None
+    cursor: str | None = None
 
 class ListResourceTemplatesRequest(JSONRPCRequest):
     method: Literal["resources/templates/list"] = "resources/templates/list"
-    params: Optional[ListResourceTemplatesRequestParams] = None
+    params: ListResourceTemplatesRequestParams | None = None
 
 class ResourceTemplate(BaseModel):
     name: str
     uriTemplate: str # format: uri-template
-    description: Optional[str] = None
-    mimeType: Optional[str] = None
-    annotations: Optional[Annotations] = None
+    description: str | None = None
+    mimeType: str | None = None
+    annotations: Annotations | None = None
 
 class ListResourceTemplatesResult(BaseModel):
-    resourceTemplates: List[ResourceTemplate]
-    nextCursor: Optional[str] = None
-    _meta: Optional[Dict[str, Any]] = None
+    resourceTemplates: list[ResourceTemplate]
+    nextCursor: str | None = None
+    _meta: dict[str, Any] | None = None
 
 
 class ReadResourceRequestParams(BaseModel):
@@ -235,8 +234,8 @@ class ReadResourceRequest(JSONRPCRequest):
 ReadResourceResultContents = Union[TextResourceContents, BlobResourceContents]
 
 class ReadResourceResult(BaseModel):
-    contents: List[ReadResourceResultContents]
-    _meta: Optional[Dict[str, Any]] = None
+    contents: list[ReadResourceResultContents]
+    _meta: dict[str, Any] | None = None
 
 
 # Subscription
@@ -257,31 +256,31 @@ class UnsubscribeRequest(JSONRPCRequest):
 
 # Prompts
 class ListPromptsRequestParams(BaseModel):
-    cursor: Optional[str] = None
+    cursor: str | None = None
 
 class ListPromptsRequest(JSONRPCRequest):
     method: Literal["prompts/list"] = "prompts/list"
-    params: Optional[ListPromptsRequestParams] = None
+    params: ListPromptsRequestParams | None = None
 
 class PromptArgument(BaseModel):
     name: str
-    description: Optional[str] = None
-    required: Optional[bool] = None
+    description: str | None = None
+    required: bool | None = None
 
 class Prompt(BaseModel):
     name: str
-    arguments: Optional[List[PromptArgument]] = None
-    description: Optional[str] = None
+    arguments: list[PromptArgument] | None = None
+    description: str | None = None
 
 class ListPromptsResult(BaseModel):
-    prompts: List[Prompt]
-    nextCursor: Optional[str] = None
-    _meta: Optional[Dict[str, Any]] = None
+    prompts: list[Prompt]
+    nextCursor: str | None = None
+    _meta: dict[str, Any] | None = None
 
 
 class GetPromptRequestParams(BaseModel):
     name: str
-    arguments: Optional[Dict[str, str]] = None
+    arguments: dict[str, str] | None = None
 
 class GetPromptRequest(JSONRPCRequest):
     method: Literal["prompts/get"] = "prompts/get"
@@ -298,9 +297,9 @@ class PromptMessage(BaseModel):
     content: PromptMessageContent
 
 class GetPromptResult(BaseModel):
-    messages: List[PromptMessage]
-    description: Optional[str] = None
-    _meta: Optional[Dict[str, Any]] = None
+    messages: list[PromptMessage]
+    description: str | None = None
+    _meta: dict[str, Any] | None = None
 
 
 # Logging
@@ -337,7 +336,7 @@ class ResourceReference(BaseModel):
 
 class CompleteRequestParams(BaseModel):
     argument: CompleteRequestParamsArgument
-    ref: Union[PromptReference, ResourceReference]
+    ref: PromptReference | ResourceReference
 
 
 class CompleteRequest(JSONRPCRequest):
@@ -345,13 +344,13 @@ class CompleteRequest(JSONRPCRequest):
     params: CompleteRequestParams
 
 class CompletionData(BaseModel):
-    values: List[str]
-    hasMore: Optional[bool] = None
-    total: Optional[int] = None
+    values: list[str]
+    hasMore: bool | None = None
+    total: int | None = None
 
 class CompleteResult(BaseModel):
     completion: CompletionData
-    _meta: Optional[Dict[str, Any]] = None
+    _meta: dict[str, Any] | None = None
 
 
 # __all__ definition

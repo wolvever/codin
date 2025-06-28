@@ -1,9 +1,10 @@
 """Backend interfaces for unified endpoint handling."""
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
 from pathlib import Path
-import aiohttp
+from typing import Any
+
 import aiofiles
+import aiohttp
 
 
 class Backend(ABC):
@@ -99,11 +100,11 @@ class LocalBackend(Backend):
 class RemoteBackend(Backend):
     """Remote HTTP backend."""
     
-    def __init__(self, base_url: str, auth: Optional[Dict[str, Any]] = None, timeout: int = 30):
+    def __init__(self, base_url: str, auth: dict[str, Any] | None = None, timeout: int = 30):
         self.base_url = base_url.rstrip('/')
         self.auth = auth or {}
         self.timeout = timeout
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
     
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session."""

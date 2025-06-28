@@ -7,16 +7,15 @@ from __future__ import annotations
 import logging
 import typing as _t
 
-from .base import BaseLLM, BaseEmbedding, BaseReranker
+from .base import BaseEmbedding, BaseLLM, BaseReranker
 from .config import ModelConfig
 from .factory import LLMFactory
-# Import module-level functions from registry to use default_model_registry
-from .registry import (
-    create_embedding as global_create_embedding,
-    ModelRegistry # Keep for type hinting if a custom registry is passed
-)
+
 # Specific model classes that might be instantiated by default
-from .openai_embedding import OpenAIEmbedding
+from .registry import ModelRegistry  # Keep for type hinting if a custom registry is passed
+
+# Import module-level functions from registry to use default_model_registry
+from .registry import create_embedding as global_create_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +29,14 @@ class ModelFacade:
 
     def __init__(self,
                  llm: BaseLLM,
-                 embedding: _t.Optional[BaseEmbedding] = None,
-                 reranker: _t.Optional[BaseReranker] = None):
+                 embedding: BaseEmbedding | None = None,
+                 reranker: BaseReranker | None = None):
         """
         Private constructor. Use `create` classmethod for instantiation.
         """
         self._llm: BaseLLM = llm
-        self._embedding: _t.Optional[BaseEmbedding] = embedding
-        self._reranker: _t.Optional[BaseReranker] = reranker
+        self._embedding: BaseEmbedding | None = embedding
+        self._reranker: BaseReranker | None = reranker
         logger.info(f"ModelFacade initialized with LLM: {llm.model}")
         if embedding:
             logger.info(f"Embedding client configured: {embedding.model}")
@@ -49,8 +48,8 @@ class ModelFacade:
                      provider: str | None = None,
                      model_name: str | None = None,
                      config: ModelConfig | None = None,
-                     llm_factory: _t.Optional[LLMFactory] = None,
-                     model_registry: _t.Optional[ModelRegistry] = None,
+                     llm_factory: LLMFactory | None = None,
+                     model_registry: ModelRegistry | None = None,
                      embedding_model_name: str | None = None, # Allow explicit embedding model
                      # reranker_model_name: str | None = None, # For future
                     ) -> ModelFacade:
@@ -86,7 +85,7 @@ class ModelFacade:
         logger.debug(f"Primary LLM '{primary_llm.model}' (provider: {primary_llm.config.provider}) instantiated for ModelFacade.")
 
         # 2. Instantiate Embedding Model (conditionally)
-        embedding_client: _t.Optional[BaseEmbedding] = None
+        embedding_client: BaseEmbedding | None = None
 
         # Determine the provider of the instantiated LLM
         llm_provider = primary_llm.config.provider
@@ -134,7 +133,7 @@ class ModelFacade:
                 embedding_client = None
 
         # 3. Instantiate Reranker Model (placeholder for now)
-        reranker_client: _t.Optional[BaseReranker] = None
+        reranker_client: BaseReranker | None = None
         # if reranker_model_name:
         #     try:
         #         # ... similar logic for reranker ...

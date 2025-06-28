@@ -5,11 +5,10 @@ from __future__ import annotations
 
 import logging
 import os
-import typing as _t
 
-from .openai_compatible_llm import OpenAICompatibleBaseLLM
 from .config import ModelConfig
-from .registry import register # Changed
+from .openai_compatible_llm import OpenAICompatibleBaseLLM
+from .registry import register  # Changed
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class VLLMClient(OpenAICompatibleBaseLLM):
     BASE_URL_ENV_VAR = 'VLLM_BASE_URL'
     MODEL_ENV_VAR = 'VLLM_MODEL' # Specific model identifier for vLLM server
 
-    async def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None):
+    async def __init__(self, config: ModelConfig | None = None, model: str | None = None):
         """
         Initialize the VLLMClient.
 

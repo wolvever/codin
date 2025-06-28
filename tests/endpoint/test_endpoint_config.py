@@ -1,11 +1,12 @@
-import pytest
+from typing import Any
 from unittest.mock import Mock, patch
-from typing import Dict, Any
 
-from codin.endpoint.config import EndpointConfig
-from codin.endpoint.base_config import BaseEndpointConfig
-from codin.endpoint.resolver import EndpointResolver
+import pytest
+
 from codin.endpoint.backends import EndpointBackend
+from codin.endpoint.base_config import BaseEndpointConfig
+from codin.endpoint.config import EndpointConfig
+from codin.endpoint.resolver import EndpointResolver
 
 
 class MockEndpointBackend(EndpointBackend):
@@ -13,10 +14,10 @@ class MockEndpointBackend(EndpointBackend):
         self.name = name
         self.config = {}
     
-    def validate_config(self, config: Dict[str, Any]) -> bool:
+    def validate_config(self, config: dict[str, Any]) -> bool:
         return True
     
-    def get_client(self, config: Dict[str, Any]):
+    def get_client(self, config: dict[str, Any]):
         return Mock()
 
 

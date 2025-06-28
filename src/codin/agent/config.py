@@ -1,12 +1,11 @@
 """Unified agent configuration using endpoint system."""
 
 import os
-import typing as _t
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
+from codin.config import ApprovalMode
 from codin.endpoint import EndpointConfig
 from codin.model.endpoint_config import ModelEndpointConfig
-from codin.config import ApprovalMode
 
 
 @dataclass

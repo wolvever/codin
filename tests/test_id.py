@@ -1,6 +1,5 @@
 """Comprehensive tests for the codin.id module."""
 
-import re
 import sys
 import uuid
 from pathlib import Path
@@ -227,7 +226,6 @@ class TestNewId:
     def test_concurrent_generation_uniqueness(self):
         """Test that concurrent ID generation maintains uniqueness."""
         import concurrent.futures
-        import threading
         
         def generate_ids(count):
             return [new_id("concurrent") for _ in range(count)]
@@ -255,8 +253,6 @@ class TestNewId:
         # by checking that we can call the function without pre-importing
         
         # Clear any existing imports in the module namespace
-        import sys
-        import codin.id
         
         # The function should work even if we haven't imported the dependencies globally
         result = new_id("import_test")

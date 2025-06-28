@@ -1,9 +1,9 @@
 """Centralized endpoint resolver for consistent endpoint handling."""
 import asyncio
 import logging
-from typing import Optional, Union
-from .config import EndpointConfig
+
 from .backends import Backend, LocalBackend, RemoteBackend
+from .config import EndpointConfig
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class EndpointResolver:
                     timeout=5.0
                 )
             return primary_backend
-        except (asyncio.TimeoutError, Exception) as e:
+        except (TimeoutError, Exception) as e:
             logger.warning(
                 f"Primary endpoint {config.endpoint} failed ({e}), "
                 f"falling back to {config.fallback_endpoint}"
@@ -113,7 +113,7 @@ class EndpointManager:
     
     def __init__(self, config: EndpointConfig):
         self.config = config
-        self._backend: Optional[Backend] = None
+        self._backend: Backend | None = None
     
     async def get_backend(self) -> Backend:
         """Get backend with fallback support."""

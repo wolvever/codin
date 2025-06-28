@@ -2,11 +2,11 @@ import pytest
 
 from codin.agent.base_agent import BaseAgent
 from codin.agent.codeact_planner import CodeActPlanner
+from codin.agent.types import AgentRunInput, Message, Role, RunConfig, State, TextPart
+from codin.artifact.base import ArtifactService
 from codin.memory.local import MemMemoryService
 from codin.sandbox.local import LocalSandbox
-from codin.agent.types import AgentRunInput, Message, TextPart, Role, State, RunConfig
 from codin.tool.base import Tool
-from codin.artifact.base import ArtifactService
 
 # rebuild pydantic models for tests
 State.model_rebuild(force=True, _types_namespace={

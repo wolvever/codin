@@ -1,10 +1,9 @@
 """Tests for the client.tracers module."""
 
-import asyncio
 import logging
+from unittest.mock import MagicMock, patch
+
 import pytest
-import typing as _t
-from unittest.mock import AsyncMock, MagicMock, patch
 
 # Mock the imports
 with patch.dict('sys.modules', {

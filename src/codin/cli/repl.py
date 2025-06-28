@@ -13,8 +13,8 @@ import click
 # Use agent protocol types
 from codin.agent.types import Message, Role, TextPart
 
-from ..agent.types import AgentRunInput
 from ..agent.code_agent import CodeAgent
+from ..agent.types import AgentRunInput
 from ..config import (
     ApprovalMode,
     get_config,
@@ -114,7 +114,7 @@ class ReplSession:
                 click.echo(f"[OK] Initialized sandbox: {type(sandbox).__name__}")
 
             # Create sandbox toolset (now auto-generates tools from sandbox methods)
-            from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
+            from codin.tool import SandboxToolset  # Changed from codin.tool.sandbox
 
             sandbox_toolset = SandboxToolset(sandbox)
             await sandbox_toolset.up()

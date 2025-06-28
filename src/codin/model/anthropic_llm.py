@@ -14,14 +14,14 @@ import typing as _t
 from ..client import Client, ClientConfig, LoggingTracer
 from .base import BaseLLM
 from .config import ModelConfig
-from .registry import register # Changed
 from .http_utils import (
-    make_post_request,
-    extract_content_from_json,
-    process_sse_stream,
     ContentExtractionError,
-    StreamProcessingError
+    StreamProcessingError,
+    extract_content_from_json,
+    make_post_request,
+    process_sse_stream,
 )
+from .registry import register  # Changed
 
 __all__ = [
     'AnthropicLLM',
@@ -54,7 +54,7 @@ class AnthropicLLM(BaseLLM):
     # Anthropic doesn't have explicit connect_timeout in ClientConfig, but we can use ModelConfig's
     # Default retry policies are often handled by the underlying HTTP client library if not specified.
 
-    async def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None): # Changed to async
+    async def __init__(self, config: ModelConfig | None = None, model: str | None = None): # Changed to async
         """Initialize and prepare the Anthropic LLM.
 
         Args:
@@ -202,7 +202,7 @@ class AnthropicLLM(BaseLLM):
             return self._stream_response(payload) # Use self._client internally
         return await self._complete_response(payload) # Use self._client internally
 
-    def _extract_content_from_response(self, response_data: dict) -> _t.Optional[str]:
+    def _extract_content_from_response(self, response_data: dict) -> str | None:
         """Helper to extract content from Anthropic's non-streaming response JSON."""
         content_blocks = response_data.get('content')
         if not content_blocks or not isinstance(content_blocks, list):
@@ -216,7 +216,7 @@ class AnthropicLLM(BaseLLM):
                 text_parts.append(block.get('text', ''))
         return "".join(text_parts)
 
-    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> _t.Optional[str]:
+    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> str | None:
         """Helper to extract content delta from Anthropic's streaming response chunk."""
         if data_chunk.get('type') == 'content_block_delta':
             delta = data_chunk.get('delta')

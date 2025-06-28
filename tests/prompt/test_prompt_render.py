@@ -1,11 +1,11 @@
 """Tests for the codin.prompt.run.prompt_render function."""
 
+
 import pytest
-from typing import Any
 
 from codin.prompt import prompt_render
-from codin.prompt.registry import get_registry, PromptRegistry
 from codin.prompt.base import PromptTemplate, PromptVariant
+from codin.prompt.registry import get_registry
 
 # The env_setup fixture from tests/conftest.py will be automatically used
 # as it's defined there and sets up PROMPT_TEMPLATE_DIR.

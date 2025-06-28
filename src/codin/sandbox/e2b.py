@@ -5,15 +5,15 @@ E2B cloud sandboxes for secure remote code execution.
 """
 
 import asyncio
+import os  # For path manipulation
 import shlex
 import tempfile
 import typing as _t
 import zipfile
 from pathlib import Path
-import os # For path manipulation
 
 from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
-from .common_exec import CommonCodeExecutionMixin # Added import
+from .common_exec import CommonCodeExecutionMixin  # Added import
 
 __all__ = ['E2BSandbox']
 
@@ -216,7 +216,7 @@ class E2BSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
             try:
                 # E2B SDK returns FileInfo objects
                 return [fi.path for fi in self._sandbox.filesystem.list(query_path)]
-            except Exception as e: # Catch E2B specific errors if any
+            except Exception: # Catch E2B specific errors if any
                 # print(f"E2B list_files error for path '{query_path}': {e}")
                 return [] # Return empty list on error, or re-raise
 
@@ -271,9 +271,9 @@ class E2BSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
                 # It creates parent directories if they don't exist.
                 self._sandbox.filesystem.write(effective_path, content)
             except Exception as e:
-                raise IOError(f"Failed to write file to E2B at '{effective_path}': {e}") from e
+                raise OSError(f"Failed to write file to E2B at '{effective_path}': {e}") from e
 
         try:
             await loop.run_in_executor(None, _write_file_async_wrapper)
-        except IOError: # Re-raise
+        except OSError: # Re-raise
             raise

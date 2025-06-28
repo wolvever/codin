@@ -8,26 +8,24 @@ protocols, task states, and control actions).
 """
 
 from .actor_system import ActorSystem
-from .work_stealing import WorkStealingActorSystem
+from .actors import AGENT_CAP, AgentActor, PlainActor
 from .dispatcher import Dispatcher, DispatchResult, LocalDispatcher
-from .mailbox import Mailbox
-from .local_mailbox import LocalMailbox
-from .supervisor import ActorInfo, ActorSupervisor, LocalActorManager
-from .types import ActorRunInput, ActorRunOutput, CallableActor
 from .envelope_types import (
-    Envelope,
-    EnvelopeKind,
-    EnvelopeHeaders,
     AuthDetails,
-    ControlPayload,
     Capability,
-    TaskState,
     ControlAction,
+    ControlPayload,
+    Envelope,
+    EnvelopeHeaders,
+    EnvelopeKind,
+    TaskState,
 )
-from .actors import AgentActor, PlainActor, AGENT_CAP
-from .task_manager import TaskInfo, TaskRegistry # Added TaskManager imports
-
-
+from .local_mailbox import LocalMailbox
+from .mailbox import Mailbox
+from .supervisor import ActorInfo, ActorSupervisor, LocalActorManager
+from .task_manager import TaskInfo, TaskRegistry  # Added TaskManager imports
+from .types import ActorRunInput, ActorRunOutput, CallableActor
+from .work_stealing import WorkStealingActorSystem
 
 __all__ = [
     # Mailbox types

@@ -1,7 +1,7 @@
 """Unified endpoint configuration for all Codin components."""
 import os
-from typing import Optional
-from urllib.parse import urlparse, ParseResult
+from urllib.parse import ParseResult, urlparse
+
 from pydantic import BaseModel, validator
 
 
@@ -9,8 +9,8 @@ class EndpointConfig(BaseModel):
     """Unified endpoint configuration supporting fs:// and http:// schemes."""
     
     endpoint: str
-    fallback_endpoint: Optional[str] = None
-    auth: Optional[dict] = None
+    fallback_endpoint: str | None = None
+    auth: dict | None = None
     timeout: int = 30
     
     @validator('endpoint')
@@ -36,7 +36,7 @@ class EndpointConfig(BaseModel):
         return urlparse(self.endpoint)
     
     @property
-    def parsed_fallback(self) -> Optional[ParseResult]:
+    def parsed_fallback(self) -> ParseResult | None:
         """Parse the fallback endpoint URL."""
         return urlparse(self.fallback_endpoint) if self.fallback_endpoint else None
     
@@ -51,14 +51,14 @@ class EndpointConfig(BaseModel):
         return self.parsed.scheme in ['http', 'https']
     
     @property
-    def local_path(self) -> Optional[str]:
+    def local_path(self) -> str | None:
         """Get local filesystem path for fs:// endpoints."""
         if self.is_local:
             return self.parsed.path
         return None
     
     @property
-    def base_url(self) -> Optional[str]:
+    def base_url(self) -> str | None:
         """Get base URL for http:// endpoints."""
         if self.is_remote:
             parsed = self.parsed

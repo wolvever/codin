@@ -10,15 +10,15 @@ combined with additional OS-level sandboxing (e.g. containers).
 import asyncio
 import os
 import platform
+import shutil  # Added for copytree and copy2
 import subprocess
 import tempfile
 import typing as _t
 import zipfile
 from pathlib import Path
-import shutil # Added for copytree and copy2
 
 from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
-from .common_exec import CommonCodeExecutionMixin # Added import
+from .common_exec import CommonCodeExecutionMixin  # Added import
 
 __all__ = ['LocalSandbox']
 
@@ -381,7 +381,7 @@ class LocalSandbox(Sandbox, CommonCodeExecutionMixin): # Inherit from mixin
             if not abs_file_path.is_file():
                 # Use the original relative path in the error for user clarity
                 raise FileNotFoundError(f"File not found at '{path}' (resolved to '{abs_file_path}')")
-            with open(abs_file_path, 'r', encoding='utf-8') as f:
+            with open(abs_file_path, encoding='utf-8') as f:
                 return f.read()
 
         try:

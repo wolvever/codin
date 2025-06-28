@@ -1,14 +1,13 @@
 """Test debug event functionality in CodeAgent."""
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from src.codin.agent.code_agent import CodeAgent, AgentEvent
-from src.codin.sandbox import LocalSandbox
-from src.codin.tool.registry import ToolRegistry
+import pytest
+
 from codin.agent.types import Role, TextPart
-from src.codin.agent.types import Message, AgentRunInput
+from src.codin.agent.code_agent import AgentEvent, CodeAgent
+from src.codin.agent.types import AgentRunInput, Message
 
 
 class TestDebugEvents:
@@ -170,7 +169,7 @@ class TestDebugEvents:
         agent_input = AgentRunInput(message=user_message)
         try:
             await asyncio.wait_for(agent_with_debug.run(agent_input), timeout=10.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pytest.fail("Agent run timed out - this suggests the test is hanging")
 
         # Get the debug event

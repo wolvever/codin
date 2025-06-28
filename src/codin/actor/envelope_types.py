@@ -7,10 +7,10 @@ which are used to wrap, describe, and manage messages or tasks sent to actors.
 
 from __future__ import annotations
 
-import uuid # Moved import to the top
-from typing import Any, Optional
-from typing import Set as PySet
+import uuid  # Moved import to the top
 from enum import Enum
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -41,14 +41,14 @@ class AuthDetails(BaseModel):
 
 class EnvelopeHeaders(BaseModel):
     """Defines headers for an Envelope."""
-    ce_source: Optional[str] = Field(None, alias="ce-source")
-    ce_time: Optional[str] = Field(None, alias="ce-time")
-    traceparent: Optional[str] = None
-    tracestate: Optional[str] = None
-    reply_to: Optional[str] = Field(None, alias="reply-to")
-    priority: Optional[int] = None
-    expires_at: Optional[str] = Field(None, alias="expires-at")
-    auth: Optional[AuthDetails] = None
+    ce_source: str | None = Field(None, alias="ce-source")
+    ce_time: str | None = Field(None, alias="ce-time")
+    traceparent: str | None = None
+    tracestate: str | None = None
+    reply_to: str | None = Field(None, alias="reply-to")
+    priority: int | None = None
+    expires_at: str | None = Field(None, alias="expires-at")
+    auth: AuthDetails | None = None
 
     class Config:
         allow_population_by_field_name = True
@@ -58,10 +58,10 @@ class Envelope(BaseModel):
     """Represents an envelope that wraps a payload for actor communication."""
     version: str = "1.0"
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    session_id: Optional[str] = None
+    session_id: str | None = None
     kind: EnvelopeKind
-    task_id: Optional[str] = None # Crucial for CONTROL kind to target specific tasks
-    actor_hint: Optional[str] = None
+    task_id: str | None = None # Crucial for CONTROL kind to target specific tasks
+    actor_hint: str | None = None
     headers: EnvelopeHeaders = Field(default_factory=EnvelopeHeaders)
     payload: Any
 
@@ -82,13 +82,13 @@ class ControlPayload(BaseModel):
                   related to the control signal (e.g., data needed for resume).
     """
     task_control: ControlAction # Changed from str to ControlAction Enum
-    followup: Optional[dict[str, Any]] = None
+    followup: dict[str, Any] | None = None
 
 
 class Capability(BaseModel):
     """Describes the capabilities of an actor."""
-    accepts: PySet[EnvelopeKind]
-    payload_schema: Optional[type] = None
+    accepts: set[EnvelopeKind]
+    payload_schema: type | None = None
 
     class Config:
         arbitrary_types_allowed = True

@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..base import ToolContext
-from ..specs.base import ToolSpec
 from ..executors.base import ExecutionResult
+from ..specs.base import ToolSpec
 
 __all__ = [
     'ExtensionPriority',
@@ -197,10 +197,10 @@ class ExtensionChain:
         manager = ExtensionManager()
         
         # Register default extensions in priority order
-        from .logging import LoggingExtension
-        from .metrics import MetricsExtension
         from .approval import ApprovalExtension
         from .auth import AuthExtension
+        from .logging import LoggingExtension
+        from .metrics import MetricsExtension
         
         manager.register(AuthExtension(priority=ExtensionPriority.HIGHEST))
         manager.register(ApprovalExtension(priority=ExtensionPriority.HIGH))

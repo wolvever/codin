@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import inspect
 import typing as _t
-from functools import lru_cache
 
 import pydantic as _pyd
 

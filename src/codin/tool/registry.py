@@ -10,13 +10,13 @@ import json
 import logging
 import typing as _t
 from pathlib import Path
-from urllib.parse import urlparse
 
 import httpx
 import pydantic as _pyd
 import yaml
 
 from codin.endpoint import EndpointConfig, EndpointResolver
+
 from .base import Tool, Toolset, ToolSpec
 
 __all__ = [
@@ -187,8 +187,8 @@ class ToolRegistry:
                     module_content = file_content.decode('utf-8')
                     
                     # Create a temporary file to import
-                    import tempfile
                     import os
+                    import tempfile
                     
                     with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as tmp_file:
                         tmp_file.write(module_content)

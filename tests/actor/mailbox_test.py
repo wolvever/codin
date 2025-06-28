@@ -1,21 +1,16 @@
 """Tests for the actor mailbox system implementation."""
 
 import asyncio
-import pytest
 from datetime import datetime
 
-from codin.agent.types import Message, Role, TextPart
+import pytest
 
 from codin.actor import (
-    Mailbox,
-    LocalMailbox,
-    ActorSupervisor,
     LocalActorManager,
-    ActorInfo,
-    Dispatcher,
     LocalDispatcher,
+    LocalMailbox,
 )
-from codin.agent.types import ControlSignal, RunnerControl, RunnerInput
+from codin.agent.types import ControlSignal, Message, Role, RunnerControl, RunnerInput, TextPart
 
 
 @pytest.mark.asyncio

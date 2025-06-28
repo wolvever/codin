@@ -1,8 +1,9 @@
-import pytest
-from unittest.mock import Mock, AsyncMock
-from typing import Dict, Any
+from typing import Any
+from unittest.mock import Mock
 
-from codin.tool.base import Tool, Toolset, ToolContext
+import pytest
+
+from codin.tool.base import Tool, ToolContext, Toolset
 from codin.tool.specs.base import ToolSpec
 
 
@@ -24,7 +25,7 @@ class MockToolSpec(ToolSpec):
     def get_description(self) -> str:
         return self.description
     
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         return self.parameters
 
 

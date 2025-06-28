@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Any
 
-from ..executors.base import ExecutionResult, ExecutionStatus
+from ..executors.base import ExecutionResult
 from .base import Extension, ExtensionContext
 
 __all__ = ['LoggingExtension']

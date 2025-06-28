@@ -1,11 +1,10 @@
 """Tests for the model.registry module."""
 
-import re
-import pytest
 import typing as _t
-from unittest.mock import MagicMock, patch
 
-from codin.model.base import BaseModel, BaseLLM, BaseEmbedding, BaseReranker, ModelType
+import pytest
+
+from codin.model.base import BaseEmbedding, BaseLLM, BaseModel, BaseReranker, ModelType
 from codin.model.registry import ModelRegistry
 
 

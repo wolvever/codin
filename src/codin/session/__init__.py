@@ -5,7 +5,7 @@ tracking state, and coordinating multi-agent conversations.
 """
 
 from .base import Session, SessionManager
-from .persistence import SessionPersistor, LocalFilePersistor, HttpPersistor
+from .persistence import HttpPersistor, LocalFilePersistor, SessionPersistor
 
 __all__ = [
     'Session',

@@ -5,34 +5,50 @@ in handling A2A (Agent-to-Agent) messages. It uses a planner-driven execution
 loop to process these messages.
 """
 
-import asyncio
 import logging
 import time
 import typing as _t
 import uuid
 from datetime import datetime
 from enum import Enum
-from pydantic import ValidationError # For input validation
+
+from pydantic import ValidationError  # For input validation
+
+from ..actor.actors import AgentActor  # Inherit from AgentActor
+from ..actor.envelope_types import EnvelopeKind
+from ..actor.local_mailbox import LocalMailbox
+from ..actor.mailbox import Mailbox
 
 # Actor system imports
 from ..actor.types import ActorRunInput, ActorRunOutput
-from ..actor.actors import AgentActor # Inherit from AgentActor
-from ..actor.envelope_types import EnvelopeKind
+from ..id import new_id  # For generating default agent ID
+from ..memory.base import MemMemoryService, Memory
+from ..prompt import PromptEngine
+from ..tool.base import Tool, ToolContext
+from .base import Planner  # BaseAgent uses a Planner
 
 # Agent-specific data structures and control types (used for internal logic)
 from .types import (
-    ControlSignal, EventStep, FinishStep, Message as A2AMessage, # Renamed Message to A2AMessage for clarity
-    MessageStep, Metrics, Role, RunConfig, RunnerControl, State, Step, StepType, Task,
-    TaskState, TaskStatus, TextPart, ThinkStep, ToolCallStep, ToolUsePart,
+    EventStep,  # Renamed Message to A2AMessage for clarity
+    FinishStep,
+    MessageStep,
+    Metrics,
+    Role,
+    RunConfig,
+    State,
+    Step,
+    StepType,
+    Task,
+    TaskState,
+    TaskStatus,
+    TextPart,
+    ThinkStep,
+    ToolCallStep,
+    ToolUsePart,
 )
-
-from ..actor.mailbox import Mailbox
-from ..actor.local_mailbox import LocalMailbox
-from ..memory.base import MemMemoryService, Memory
-from ..model.base import BaseLLM
-from ..tool.base import Tool, ToolContext
-from .base import Planner # BaseAgent uses a Planner
-from ..id import new_id # For generating default agent ID
+from .types import (
+    Message as A2AMessage,
+)
 
 __all__ = ["BaseAgent", "ContinueDecision"] # ContinueDecision might be unused now or refactored
 logger = logging.getLogger("codin.agent.base_agent")
@@ -59,49 +75,34 @@ class BaseAgent(AgentActor):
         self,
         *,
         agent_id: str | None = None, # This will be the actor_id
-        name: str = "BaseAgent",
-        description: str = "A planner-driven agent for A2A messages.",
-        version: str = "1.0.0",
         planner: Planner,
+        prompt: PromptEngine,
         tools: list[Tool] | None = None,
         memory: Memory | None = None,
-        llm: BaseLLM | None = None,
         mailbox: Mailbox | None = None,
-        default_config: RunConfig | None = None,
-        debug: bool = False,
         # **kwargs: Any # From AgentActor's __init__ if it were to take more
     ):
         """Initializes the `BaseAgent`.
 
         Args:
             agent_id: Unique ID for this agent/actor. If None, an ID is generated.
-            name: Name of the agent.
-            description: Description of the agent.
-            version: Agent version.
             planner: The `Planner` instance for decision-making.
+            prompt: The `PromptEngine` instance for handling prompts and LLM interactions.
             tools: List of `Tool` instances available to the agent.
             memory: `Memory` instance for history and context. Defaults to `MemMemoryService`.
-            llm: Optional `BaseLLM` instance, may be used by the planner.
             mailbox: `Mailbox` for communication. Defaults to `LocalMailbox`.
-            default_config: Default `RunConfig` for execution parameters.
-            debug: Enable debug logging.
         """
         # Initialize attributes specific to BaseAgent's operation
-        self.id = agent_id or new_id(prefix=name) # Used for actor_id
-        self.name: str = name
-        self.description: str = description
-        self.version: str = version
+        self.id = agent_id or new_id(prefix="BaseAgent") # Used for actor_id
         self.tools: list[Tool] = tools or []
 
         # Call super().__init__ from AgentActor, providing the actor_id
         super().__init__(actor_id=self.id) # Removed **kwargs as AgentActor doesn't use them meaningfully
 
         self.planner: Planner = planner
+        self.prompt: PromptEngine = prompt
         self.memory: Memory = memory or MemMemoryService()
-        self.llm: BaseLLM | None = llm
         self.mailbox: Mailbox = mailbox or LocalMailbox()
-        self.default_config: RunConfig = default_config or RunConfig()
-        self.debug: bool = debug
 
         self._paused: bool = False
         self._cancelled: bool = False
@@ -122,7 +123,7 @@ class BaseAgent(AgentActor):
             `ActorRunOutput`: Results or status messages.
         """
         logger.info(f"BaseAgent {self.actor_id} received run input for request {input_data.request_id}, kind: {input_data.envelope_kind}.")
-        session_id = input_data.context_id or f"session_{input_data.request_id}_{uuid.uuid4().hex[:4]}"
+        context_id = input_data.context_id or f"session_{uuid.uuid4().hex[:4]}"
         start_time = time.time()
 
         if input_data.envelope_kind == EnvelopeKind.A2A_MESSAGE:
@@ -132,16 +133,14 @@ class BaseAgent(AgentActor):
                 return
             try:
                 a2a_message = A2AMessage.model_validate(input_data.payload)
-                logger.info(f"BaseAgent {self.actor_id}: Successfully parsed A2A_MESSAGE for request {input_data.request_id} (session: {session_id}).")
-
-                state = await self._build_state_for_a2a_message(session_id, a2a_message, input_data.metadata, input_data.request_id)
+                state = await self._build_state_by_message(context_id, a2a_message, input_data.metadata, input_data.request_id, input_data.config)
 
                 await self._emit_event("run_start", {
-                    "agent_id": self.actor_id, "session_id": session_id,
+                    "agent_id": self.actor_id, "context_id": context_id,
                     "input_message_id": a2a_message.messageId, "request_id": input_data.request_id
                 })
 
-                async for output_item in self._execute_planning_loop(state, session_id, start_time):
+                async for output_item in self._execute_planning_loop(state, context_id, start_time):
                     yield output_item
 
             except ValidationError as e:
@@ -181,27 +180,25 @@ class BaseAgent(AgentActor):
         # then a specific kind of "task_end" event might be emitted here.
         # The existing _execute_planning_loop already emits task_end.
         # The superclass AgentActor.cleanup() will be called by supervisor.
-        logger.info(f"BaseAgent {self.actor_id} finished run method for request {input_data.request_id}, session {session_id}.")
+        logger.info(f"BaseAgent {self.actor_id} finished run method for request_id: {input_data.request_id}, context_id: {context_id}.")
         # Final _emit_event for run_end is handled by the original AgentRunInput logic, which is now inside the A2A_MESSAGE block.
         # This might need to be generalized if other kinds also have a similar "run_end" concept.
 
-    async def _build_state_for_a2a_message(
-        self, session_id: str, input_message: A2AMessage, actor_run_metadata: dict, request_id: str
+    async def _build_state_by_message(
+        self, session_id: str, input_message: A2AMessage, actor_run_metadata: dict, request_id: str, config: RunConfig
     ) -> State:
         """Builds the initial `State` for an agent run specifically for an `A2AMessage`.
 
         Args:
             session_id: The unique ID for the current session.
             input_message: The deserialized `A2AMessage` object from the input payload.
-            actor_run_metadata: Metadata from `ActorRunInput.metadata`. Used for `RunConfig`.
+            actor_run_metadata: Metadata from `ActorRunInput.metadata`.
             request_id: The `request_id` from `ActorRunInput`.
+            config: The `RunConfig` from `ActorRunInput.config` containing execution parameters.
 
         Returns:
             An initialized `State` object.
         """
-        if isinstance(self.memory, MemMemoryService):
-            self.memory.set_session_id(session_id)
-
         if input_message:
             # Ensure message has correct contextId for this session
             # This check might be redundant if contextId is already session_id from dispatcher
@@ -218,12 +215,8 @@ class BaseAgent(AgentActor):
         history = await self.memory.get_history()
         metrics = Metrics()
 
-        config_from_metadata = actor_run_metadata.get("config")
-        current_config = self.default_config
-        if isinstance(config_from_metadata, RunConfig):
-            current_config = config_from_metadata
-        elif isinstance(config_from_metadata, dict):
-            current_config = RunConfig(**config_from_metadata)
+        # Use the config from ActorRunInput
+        current_config = config
 
         task = None
         if input_message: # input_message is now guaranteed to be an A2AMessage
@@ -238,11 +231,9 @@ class BaseAgent(AgentActor):
         initial_metadata = {
             "agent_id": self.actor_id, "request_id": request_id,
             "memory_type": type(self.memory).__name__, "mailbox_type": type(self.mailbox).__name__,
+            "config_source": "actor_run_input",
             **(actor_run_metadata or {}),
         }
-        if current_config != self.default_config: initial_metadata['config_source'] = 'runtime_metadata'
-        else: initial_metadata['config_source'] = 'agent_default'
-        initial_metadata.pop('config', None)
 
         return State(
             session_id=session_id, agent_id=self.actor_id, created_at=datetime.now(),
@@ -259,13 +250,13 @@ class BaseAgent(AgentActor):
         # ... (implementation from previous version, with yields of Message/dict)
         await self._emit_event("task_start", {"session_id": session_id, "iteration": state.iteration, "elapsed_time": 0.0, "request_id": state.metadata.get("request_id")})
         while state.iteration < (state.config.turn_budget or 100):
-            if not await self.check_inbox_for_control() or self._cancelled: logger.info(f"Agent {self.id} ({self.name}): Planning loop interrupted for session {session_id}."); break
+            if not await self.check_inbox_for_control() or self._cancelled: logger.info(f"Agent {self.id}: Planning loop interrupted for session {session_id}."); break
             if self._paused: await self.wait_while_paused()
-            if self._cancelled: logger.info(f"Agent {self.id} ({self.name}): Planning loop broken post-pause for session {session_id}."); break
+            if self._cancelled: logger.info(f"Agent {self.id}: Planning loop broken post-pause for session {session_id}."); break
             elapsed_time = time.time() - start_time; state.metrics.time_used = elapsed_time
             is_exceeded, reason = state.config.is_budget_exceeded(state.metrics, elapsed_time)
             if is_exceeded:
-                logger.warning(f"Agent {self.id} ({self.name}): Budget constraint exceeded for session {session_id}: {reason}")
+                logger.warning(f"Agent {self.id}: Budget constraint exceeded for session {session_id}: {reason}")
                 finish_msg = A2AMessage(messageId=str(uuid.uuid4()),role=Role.agent,parts=[TextPart(text=f"Budget exceeded: {reason}")],contextId=session_id,kind="message")
                 finish_step = FinishStep(step_id=str(uuid.uuid4()), reason=f"Budget exceeded: {reason}", final_message=finish_msg)
                 await self.mailbox.put_outbox(finish_msg)
@@ -280,7 +271,7 @@ class BaseAgent(AgentActor):
                     if self._paused: await self.wait_while_paused()
                     if self._cancelled: break
                     steps_executed += 1
-                    if self.debug: logger.debug(f"Agent {self.id} ({self.name}): Executing step {step.step_id} ({step.step_type.value if isinstance(step.step_type, Enum) else step.step_type}) for session {session_id}")
+                    logger.debug(f"Agent {self.id}: Executing step {step.step_id} ({step.step_type.value if isinstance(step.step_type, Enum) else step.step_type}) for session {session_id}")
                     if step.step_type == StepType.MESSAGE and isinstance(step, MessageStep) and step.message:
                         if not any(h.messageId == step.message.messageId for h in state.history if h.messageId and step.message.messageId):
                             await self.memory.add_message(step.message); state.history.append(step.message)
@@ -289,12 +280,12 @@ class BaseAgent(AgentActor):
                         task_finished_by_step = True
                         await self._emit_event("task_complete", {"session_id": session_id, "iteration": state.iteration, "reason": step.reason if isinstance(step, FinishStep) and step.reason else "Finished", "request_id": state.metadata.get("request_id")})
                         break
-                    if steps_executed >= (state.config.max_steps_per_turn or 10): logger.warning(f"Agent {self.id} ({self.name}): Max steps per turn ({state.config.max_steps_per_turn or 10}) reached for session {session_id}."); break
+                    if steps_executed >= (state.config.max_steps_per_turn or 10): logger.warning(f"Agent {self.id}: Max steps per turn ({state.config.max_steps_per_turn or 10}) reached for session {session_id}."); break
                 if task_finished_by_step or self._cancelled: break
                 state.iteration += 1
                 await self._emit_event("turn_end", {"session_id": session_id, "iteration": state.iteration, "steps_executed": steps_executed, "request_id": state.metadata.get("request_id")})
             except Exception as e:
-                logger.error(f"Agent {self.id} ({self.name}): Error in planning loop for session {session_id}: {e}", exc_info=True); state.metrics.increment_errors()
+                logger.error(f"Agent {self.id}: Error in planning loop for session {session_id}: {e}", exc_info=True); state.metrics.increment_errors()
                 await self._emit_event("turn_error", {"session_id": session_id, "iteration": state.iteration, "error": str(e), "request_id": state.metadata.get("request_id")})
                 error_msg = A2AMessage(messageId=str(uuid.uuid4()),role=Role.agent,parts=[TextPart(text=f"Error during planning: {e!s}")],contextId=session_id,kind="message")
                 await self.mailbox.put_outbox(error_msg); yield error_msg
@@ -323,20 +314,20 @@ class BaseAgent(AgentActor):
                 await self.mailbox.put_outbox(event_msg); yield {"event_type": "agent_event", "details": step.event.model_dump() if hasattr(step.event, 'model_dump') else str(step.event), **step_output_metadata_base}
             elif step.step_type == StepType.TOOL_CALL and isinstance(step, ToolCallStep) and step.tool_call:
                 result_tool_use_part = await self._execute_tool_call(step.tool_call, state); step.tool_call_result = result_tool_use_part; state.metrics.increment_tool_calls()
-                tool_interaction_parts: list[_t.Union[TextPart, ToolUsePart]] = [step.tool_call]
+                tool_interaction_parts: list[TextPart | ToolUsePart] = [step.tool_call]
                 if result_tool_use_part: tool_interaction_parts.append(result_tool_use_part)
                 tool_interaction_message = A2AMessage(messageId=f"toolmsg_{step.tool_call.id if step.tool_call.id else str(uuid.uuid4())}",role=Role.agent,parts=tool_interaction_parts,contextId=session_id,kind="message")
                 await self.memory.add_message(tool_interaction_message); await self.mailbox.put_outbox(tool_interaction_message)
                 if not any(h.messageId == tool_interaction_message.messageId for h in state.history if h.messageId and tool_interaction_message.messageId): state.history.append(tool_interaction_message)
                 yield tool_interaction_message
-            elif step.step_type == StepType.THINK and isinstance(step, ThinkStep) and self.debug:
+            elif step.step_type == StepType.THINK and isinstance(step, ThinkStep):
                 await self._emit_event("agent_thinking", {"session_id": session_id, "step_id": step.step_id, "thinking": step.thinking, "request_id": state.metadata.get("request_id")})
             elif step.step_type == StepType.FINISH and isinstance(step, FinishStep) and step.final_message:
                 if not any(h.messageId == step.final_message.messageId for h in state.history if h.messageId and step.final_message.messageId):
                     await self.memory.add_message(step.final_message); state.history.append(step.final_message)
                 await self.mailbox.put_outbox(step.final_message); yield step.final_message
         except Exception as e:
-            logger.error(f"Agent {self.id} ({self.name}): Error executing step {step.step_id} for session {session_id}: {e}", exc_info=True); state.metrics.increment_errors()
+            logger.error(f"Agent {self.id}: Error executing step {step.step_id} for session {session_id}: {e}", exc_info=True); state.metrics.increment_errors()
             step_type_val = step.step_type.value if isinstance(step.step_type, Enum) else str(step.step_type)
             await self._emit_event("step_error", {"session_id": session_id, "step_id": step.step_id, "step_type": step_type_val, "error": str(e), "request_id": state.metadata.get("request_id")})
             error_text = f"Error executing step {step.step_id} ({step_type_val}): {e!s}"
@@ -372,7 +363,7 @@ class BaseAgent(AgentActor):
             event_message = A2AMessage(messageId=f"event_{uuid.uuid4().hex[:4]}_{event_type}",role=Role.agent,parts=[TextPart(text=f"Event: {event_type}")],contextId=data.get("session_id", self.id),kind="event",metadata={"event_type": event_type, "timestamp": datetime.now().isoformat(), **serializable_data})
             await self.mailbox.put_outbox(event_message)
         except Exception as e:
-            logger.warning(f"Agent {self.id}: Failed to emit event {event_type} for session {data.get('session_id', 'N/A')}: {e}", exc_info=self.debug)
+            logger.warning(f"Agent {self.id}: Failed to emit event {event_type} for session {data.get('session_id', 'N/A')}: {e}", exc_info=True)
 
     # cleanup method is inherited from AgentActor if not overridden.
     # If BaseAgent has specific cleanup beyond AgentActor, it can override it.
@@ -380,7 +371,7 @@ class BaseAgent(AgentActor):
     # The Agent ABC required it, so BaseAgent should have it.
     async def cleanup(self) -> None:
         """Cleans up resources used by the `BaseAgent` instance."""
-        logger.info(f"BaseAgent {self.id} ({self.name}) starting cleanup (actor_id: {self.actor_id}).")
+        logger.info(f"BaseAgent {self.id} starting cleanup (actor_id: {self.actor_id}).")
         try:
             if hasattr(self.planner, "cleanup") and callable(self.planner.cleanup):
                 await self.planner.cleanup()
@@ -390,8 +381,8 @@ class BaseAgent(AgentActor):
                 await self.mailbox.cleanup()
             # Call superclass cleanup if AgentActor has one and it's not just pass
             # await super().cleanup() # If AgentActor had a meaningful cleanup
-            logger.info(f"BaseAgent {self.id} ({self.name}) finished cleanup successfully.")
+            logger.info(f"BaseAgent {self.id} finished cleanup successfully.")
         except Exception as e:
-            logger.error(f"Error during BaseAgent {self.id} ({self.name}) cleanup: {e}", exc_info=True)
-            if self.debug: raise
+            logger.error(f"Error during BaseAgent {self.id} cleanup: {e}", exc_info=True)
+            raise
 

@@ -14,14 +14,14 @@ import typing as _t
 from ..client import Client, ClientConfig, LoggingTracer
 from .base import BaseLLM
 from .config import ModelConfig
-from .registry import register # Changed
 from .http_utils import (
-    make_post_request,
-    extract_content_from_json,
-    process_sse_stream,
     ContentExtractionError,
-    StreamProcessingError
+    StreamProcessingError,
+    extract_content_from_json,
+    make_post_request,
+    process_sse_stream,
 )
+from .registry import register  # Changed
 
 __all__ = [
     'GeminiLLM',
@@ -50,7 +50,7 @@ class GeminiLLM(BaseLLM):
     DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com'
     DEFAULT_TIMEOUT = 60.0
 
-    async def __init__(self, config: _t.Optional[ModelConfig] = None, model: str | None = None): # Changed to async
+    async def __init__(self, config: ModelConfig | None = None, model: str | None = None): # Changed to async
         """Initialize and prepare the Gemini LLM.
 
         Args:
@@ -190,7 +190,7 @@ class GeminiLLM(BaseLLM):
             return self._stream_response(endpoint, payload) # Use self._client internally
         return await self._complete_response(endpoint, payload) # Use self._client internally
 
-    def _extract_content_from_response(self, response_data: dict) -> _t.Optional[str]:
+    def _extract_content_from_response(self, response_data: dict) -> str | None:
         """Helper to extract content from Gemini's non-streaming response JSON."""
         candidates = response_data.get('candidates')
         if not candidates or not isinstance(candidates, list) or len(candidates) == 0:
@@ -216,7 +216,7 @@ class GeminiLLM(BaseLLM):
         # However, it's better to return None if truly no text parts, to let caller decide if "" or error.
         return "".join(text_parts) if text_parts else None
 
-    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> _t.Optional[str]:
+    def _extract_delta_from_stream_chunk(self, data_chunk: dict) -> str | None:
         """Helper to extract content delta from Gemini's streaming response chunk."""
         candidates = data_chunk.get('candidates')
         if candidates and isinstance(candidates, list) and len(candidates) > 0:

@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from .base import Extension, ExtensionContext
 

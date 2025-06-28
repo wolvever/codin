@@ -10,11 +10,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, AsyncIterator, Optional, Type
+from collections.abc import AsyncIterator
+from typing import Any
+
 from pydantic import BaseModel, ValidationError
 
-from .types import CallableActor, ActorRunInput, ActorRunOutput
 from .envelope_types import Capability, EnvelopeKind, TaskState
+from .types import ActorRunInput, ActorRunOutput, CallableActor
+
+
 # Define A2ATaskPayload locally since a2a module doesn't exist
 class A2ATaskPayload(BaseModel):
     """Payload for A2A task messages."""
@@ -49,15 +53,15 @@ class AgentActor(CallableActor):
         if kwargs:
             logger.warning(f"AgentActor {self.actor_id} received unexpected kwargs: {kwargs}")
 
-    async def request_cancel(self) -> None:
+    async def cancel(self) -> None:
         logger.info(f"AgentActor {self.actor_id} received cancel request.")
         self._cancel_requested = True
 
-    async def request_pause(self) -> None:
+    async def pause(self) -> None:
         logger.info(f"AgentActor {self.actor_id} received pause request.")
         self._paused = True
 
-    async def request_resume(self, followup_data: Optional[dict]) -> None:
+    async def resume(self, followup_data: dict | None) -> None:
         logger.info(f"AgentActor {self.actor_id} received resume request. Followup: {bool(followup_data)}. Resuming...")
         self._paused = False
         if followup_data:
@@ -151,7 +155,7 @@ class AgentActor(CallableActor):
                     logger.debug(f"AgentActor {self.actor_id} A2A_TASK processing paused for request {input.request_id}. Checking in 1s.")
                     await asyncio.sleep(1)
                 if self._cancel_requested:
-                    logger.info(f"AgentActor {self.actor_id} A2A_TASK for request {input.request_id} cancelled after pause.");
+                    logger.info(f"AgentActor {self.actor_id} A2A_TASK for request {input.request_id} cancelled after pause.")
                     yield {"status": TaskState.CANCELED.value, "detail": "Cancelled after pause during A2A_TASK."}; return
 
                 processed_result = {"example_output": f"task {a2a_task.task_name or 'unnamed'} completed successfully"}
@@ -184,7 +188,7 @@ class AgentActor(CallableActor):
 class PlainActor(CallableActor):
     """Processes generic tasks, with support for cancel, pause, resume."""
 
-    def __init__(self, actor_id: str, payload_schema: Type[BaseModel], **kwargs: Any):
+    def __init__(self, actor_id: str, payload_schema: type[BaseModel], **kwargs: Any):
         self.actor_id = actor_id
         self.payload_schema = payload_schema
         self.capability = Capability(
@@ -196,15 +200,15 @@ class PlainActor(CallableActor):
         if kwargs:
             logger.warning(f"PlainActor {self.actor_id} received unexpected kwargs: {kwargs}")
 
-    async def request_cancel(self) -> None:
+    async def cancel(self) -> None:
         logger.info(f"PlainActor {self.actor_id} received cancel request.")
         self._cancel_requested = True
 
-    async def request_pause(self) -> None:
+    async def pause(self) -> None:
         logger.info(f"PlainActor {self.actor_id} received pause request.")
         self._paused = True
 
-    async def request_resume(self, followup_data: Optional[dict]) -> None:
+    async def resume(self, followup_data: dict | None) -> None:
         logger.info(f"PlainActor {self.actor_id} received resume request. Followup: {bool(followup_data)}. Resuming...")
         self._paused = False
         if followup_data:
@@ -256,7 +260,7 @@ class PlainActor(CallableActor):
                         logger.debug(f"PlainActor {self.actor_id} processing step {i+1} paused for request {input.request_id}. Checking in 1s.")
                         await asyncio.sleep(1)
                     if self._cancel_requested:
-                        logger.info(f"PlainActor {self.actor_id} run for request {input.request_id} cancelled after pause in step {i+1}.");
+                        logger.info(f"PlainActor {self.actor_id} run for request {input.request_id} cancelled after pause in step {i+1}.")
                         yield {"status": TaskState.CANCELED.value, "detail": f"Cancelled after pause in step {i+1}."}; return
 
                     logger.debug(f"PlainActor {self.actor_id} processing step {i+1} for request {input.request_id}")

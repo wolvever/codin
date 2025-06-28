@@ -1,11 +1,10 @@
 """Tests for the client.base module."""
 
-import asyncio
-import pytest
-import typing as _t
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import httpx
+import pytest
+
 from codin.client.base import Client, ClientConfig, RequestTracer
 
 

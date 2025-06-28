@@ -4,16 +4,14 @@ This module provides integration with OpenAI's embedding models
 for text vectorization and similarity search capabilities.
 """
 
-import asyncio
 import logging
 import os
-import typing as _t # Ensure _t is imported if not already for ModelConfig hint
 
 from ..client import Client, ClientConfig, LoggingTracer
 from .base import BaseEmbedding
 from .config import ModelConfig
-from .registry import register # Changed
-from .http_utils import make_post_request, ContentExtractionError, ModelResponseParsingError, StreamProcessingError
+from .http_utils import ContentExtractionError, ModelResponseParsingError, make_post_request
+from .registry import register  # Changed
 
 __all__ = [
     'OpenAIEmbedding',
@@ -36,7 +34,7 @@ class OpenAIEmbedding(BaseEmbedding):
     # Note: OpenAIEmbedding often uses a specific model like 'text-embedding-ada-002'
     # The `model` parameter in __init__ is usually provided directly.
 
-    async def __init__(self, model: str, config: _t.Optional[ModelConfig] = None): # Changed to async
+    async def __init__(self, model: str, config: ModelConfig | None = None): # Changed to async
         """Initialize and prepare the OpenAI Embedding model.
 
         Args:

@@ -8,11 +8,11 @@ simply aggregates them, making the system much simpler.
 import asyncio
 import json
 from typing import Any
+
 import pydantic as pyd
 
-from codin.tool.base import Tool, ToolType, ExecutionMode, ToolContext
+from codin.tool.base import ExecutionMode, Tool, ToolContext, ToolType
 from codin.tool.registry import ToolRegistry
-from codin.tool.unified_executor import UnifiedToolExecutor
 
 
 # Example tool implementations
@@ -87,7 +87,6 @@ class FileListTool(Tool):
     
     async def run(self, args: dict[str, Any], tool_context: ToolContext) -> dict[str, Any]:
         """List files in the specified directory."""
-        import os
         from pathlib import Path
         
         path = args['path']
@@ -144,7 +143,6 @@ class DangerousDeleteTool(Tool):
     
     async def run(self, args: dict[str, Any], tool_context: ToolContext) -> dict[str, Any]:
         """Delete the specified file."""
-        import os
         from pathlib import Path
         
         filepath = args['filepath']

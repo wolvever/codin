@@ -1,8 +1,5 @@
 import abc
-import os
-import tempfile
 import typing as _t
-import zipfile
 from pathlib import Path
 
 from .base import ExecResult
@@ -209,7 +206,7 @@ class CommonCodeExecutionMixin(abc.ABC):
                     pass
 
                 executor = self._get_language_executor(language)
-                cmd_list: _t.List[str] = []
+                cmd_list: list[str] = []
 
                 # How to pass code to the executor varies by language
                 if language.lower() in ('python', 'py'):
@@ -352,7 +349,7 @@ class CommonCodeExecutionMixin(abc.ABC):
              # For now, we'll indicate it's not handled by this generic run_code.
              # A better approach would be for LocalSandbox.run_code to NOT call
              # super()._common_run_code_logic for C/C++ if it wants to handle it fully.
-            return ExecResult(stdout='', stderr=f"Generic mixin run_code does not handle C/C++ compilation. Override in concrete class.", exit_code=1)
+            return ExecResult(stdout='', stderr="Generic mixin run_code does not handle C/C++ compilation. Override in concrete class.", exit_code=1)
 
         # If file_path is a complex type (zip/dir), the concrete class should prepare it,
         # then call _common_run_code_logic with a simplified 'executable_file_path' and 'execution_cwd'.

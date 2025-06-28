@@ -1,16 +1,16 @@
-import pytest
+import asyncio
 import json
 import os
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
-import asyncio
-import aiofiles # Added import
+
+import aiofiles  # Added import
+import pytest
+from httpx import AsyncClient, MockTransport, Request, Response  # Added for HttpPersistor tests
 
 # Assuming Session and LocalFilePersistor are correctly exported from codin.session
 from codin.session import Session
-from codin.session.persistence import LocalFilePersistor, HttpPersistor
-
-from httpx import Request, Response, AsyncClient, MockTransport # Added for HttpPersistor tests
+from codin.session.persistence import HttpPersistor, LocalFilePersistor
 
 
 # --- Tests for LocalFilePersistor ---
@@ -27,7 +27,7 @@ async def test_localfilepersistor_save_and_load_session(tmp_path: Path):
     base_dir = tmp_path / "sessions_save_load"
     persistor = LocalFilePersistor(base_path=str(base_dir))
 
-    original_created_at = datetime.now(timezone.utc)
+    original_created_at = datetime.now(UTC)
     test_session = Session(
         session_id="test_s1",
         created_at=original_created_at,
@@ -57,7 +57,7 @@ async def test_localfilepersistor_delete_session(tmp_path: Path):
     base_dir = tmp_path / "sessions_delete"
     persistor = LocalFilePersistor(base_path=str(base_dir))
     session_id_to_delete = "test_s2"
-    created_at_for_delete_test = datetime.now(timezone.utc)
+    created_at_for_delete_test = datetime.now(UTC)
     session_to_delete = Session(
         session_id=session_id_to_delete,
         created_at=created_at_for_delete_test
@@ -94,7 +94,7 @@ async def test_localfilepersistor_concurrent_saves(tmp_path: Path):
     persistor = LocalFilePersistor(base_path=str(base_dir))
     session_ids = [f"s_concurrent_{i}" for i in range(5)]
     sessions_to_save = [
-        Session(session_id=sid, created_at=datetime.now(timezone.utc), context={"index": i})
+        Session(session_id=sid, created_at=datetime.now(UTC), context={"index": i})
         for i, sid in enumerate(session_ids)
     ]
     await asyncio.gather(*(persistor.save_session(s) for s in sessions_to_save))
@@ -112,7 +112,7 @@ async def test_localfilepersistor_concurrent_loads(tmp_path: Path):
     persistor = LocalFilePersistor(base_path=str(base_dir))
     session_ids = [f"s_concurrent_load_{i}" for i in range(5)]
     sessions_to_create = [
-        Session(session_id=sid, created_at=datetime.now(timezone.utc), context={"load_index": i})
+        Session(session_id=sid, created_at=datetime.now(UTC), context={"load_index": i})
         for i, sid in enumerate(session_ids)
     ]
     for s in sessions_to_create:
@@ -131,7 +131,7 @@ async def test_localfilepersistor_concurrent_loads(tmp_path: Path):
 async def test_localfilepersistor_datetime_precision_and_timezone(tmp_path: Path):
     base_dir = tmp_path / "sessions_datetime"
     persistor = LocalFilePersistor(base_path=str(base_dir))
-    original_dt = datetime(2023, 10, 26, 12, 30, 45, 123456, tzinfo=timezone.utc)
+    original_dt = datetime(2023, 10, 26, 12, 30, 45, 123456, tzinfo=UTC)
     test_session = Session(
         session_id="dt_test_s1",
         created_at=original_dt,
@@ -142,7 +142,7 @@ async def test_localfilepersistor_datetime_precision_and_timezone(tmp_path: Path
     loaded_session = await persistor.load_session("dt_test_s1")
     assert loaded_session is not None
     assert loaded_session.created_at == original_dt
-    assert loaded_session.created_at.tzinfo == timezone.utc
+    assert loaded_session.created_at.tzinfo == UTC
     assert loaded_session.metrics["last_activity"] == test_session.metrics["last_activity"]
     offset = timedelta(hours=-5)
     tz_minus_5 = timezone(offset)
@@ -158,7 +158,7 @@ async def test_localfilepersistor_datetime_precision_and_timezone(tmp_path: Path
     test_session_naive = Session(session_id="dt_test_s3", created_at=naive_dt)
     await persistor.save_session(test_session_naive)
     file_path_naive = base_dir / "dt_test_s3.json"
-    async with aiofiles.open(file_path_naive, 'r', encoding='utf-8') as f:
+    async with aiofiles.open(file_path_naive, encoding='utf-8') as f:
         raw_content = await f.read()
     loaded_session_naive = await persistor.load_session("dt_test_s3")
     assert loaded_session_naive is not None
@@ -223,7 +223,7 @@ async def test_httppersistor_save_session(http_transport: MockTransport):
     async with AsyncClient(transport=http_transport, base_url=BASE_HTTP_URL.rsplit('/api/sessions', 1)[0]) as client:
         persistor = HttpPersistor(base_url=BASE_HTTP_URL, client=client)
 
-        test_session = Session(session_id=session_id, created_at=datetime.now(timezone.utc))
+        test_session = Session(session_id=session_id, created_at=datetime.now(UTC))
         await persistor.save_session(test_session)
         # Assertion is within custom_save_handler
         await persistor.close() # Close client if persistor owns it, or manage externally
@@ -232,7 +232,7 @@ async def test_httppersistor_save_session(http_transport: MockTransport):
 async def test_httppersistor_load_session(http_transport: MockTransport):
     session_id = "s_http_load"
     load_url_path = f"/api/sessions/{session_id}"
-    created_at_iso = datetime.now(timezone.utc).isoformat() # Pydantic will parse this
+    created_at_iso = datetime.now(UTC).isoformat() # Pydantic will parse this
 
     sample_session_data = {"session_id": session_id, "created_at": created_at_iso, "context": {}, "metrics": {}}
     mock_responses[load_url_path] = {"GET": Response(200, json=sample_session_data)}
@@ -299,7 +299,7 @@ async def test_httppersistor_save_session_error(http_transport: MockTransport):
         persistor = HttpPersistor(base_url=BASE_HTTP_URL, client=client)
         # HttpPersistor prints error and does not re-raise by default.
         # If it were to re-raise, we'd use pytest.raises here.
-        await persistor.save_session(Session(session_id=session_id, created_at=datetime.now(timezone.utc)))
+        await persistor.save_session(Session(session_id=session_id, created_at=datetime.now(UTC)))
         # Add assertion for logged error if logging is captured, or check stdout if needed.
         await persistor.close()
 

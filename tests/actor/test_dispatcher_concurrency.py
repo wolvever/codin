@@ -1,13 +1,14 @@
 import asyncio
 import time
-import pytest
-import codin.actor.supervisor as scheduler
 
+import pytest
+
+import codin.actor.supervisor as scheduler
 from codin.actor.dispatcher import LocalDispatcher
-from codin.actor.supervisor import LocalActorManager, ActorInfo
-from codin.agent.base_agent import BaseAgent
+from codin.actor.supervisor import ActorInfo, LocalActorManager
 from codin.agent.base import Planner
-from codin.agent.types import AgentRunInput, AgentRunOutput, Message, TextPart, Role
+from codin.agent.base_agent import BaseAgent
+from codin.agent.types import AgentRunInput, AgentRunOutput, Message, Role, TextPart
 
 
 class DummyPlanner(Planner):

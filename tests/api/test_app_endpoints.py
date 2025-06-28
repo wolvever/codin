@@ -1,13 +1,12 @@
 import asyncio
 import json
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from fastapi.testclient import TestClient
-from fastapi import HTTPException
+from unittest.mock import AsyncMock, Mock
 
-from codin.api.app import create_app, SubmitRequest, SubmitResponse, _sse_stream
-from codin.actor.dispatcher import Dispatcher, DispatchResult, LocalDispatcher
-from codin.actor.supervisor import LocalActorManager
+import pytest
+from fastapi.testclient import TestClient
+
+from codin.actor.dispatcher import Dispatcher, DispatchResult
+from codin.api.app import SubmitRequest, SubmitResponse, _sse_stream, create_app
 
 
 @pytest.fixture

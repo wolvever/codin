@@ -9,16 +9,16 @@ import asyncio
 import json
 from pathlib import Path
 
-# Import the new tool system components
-from codin.tool.specs.base import ToolSpec, ToolType, ExecutionMode, ToolMetadata, ToolSpecRegistry
-from codin.tool.executors.base import ExecutorRegistry
+from codin.tool.base import ToolContext
+from codin.tool.extensions.approval import ApprovalExtension, ApprovalMode
+from codin.tool.extensions.auth import AuthExtension
 from codin.tool.extensions.base import ExtensionManager
 from codin.tool.extensions.logging import LoggingExtension
-from codin.tool.extensions.approval import ApprovalExtension, ApprovalMode
 from codin.tool.extensions.metrics import MetricsExtension
-from codin.tool.extensions.auth import AuthExtension, AuthPolicy
+
+# Import the new tool system components
+from codin.tool.specs.base import ExecutionMode, ToolMetadata, ToolSpec, ToolSpecRegistry, ToolType
 from codin.tool.unified_executor import UnifiedToolExecutor
-from codin.tool.base import ToolContext
 
 
 async def create_sample_tool_specs() -> list[ToolSpec]:
@@ -238,8 +238,8 @@ async def demo_custom_extensions():
     
     print("\n=== Custom Extension Demo ===")
     
-    from codin.tool.extensions.base import Extension, ExtensionContext, ExtensionPriority
     from codin.tool.executors.base import ExecutionResult
+    from codin.tool.extensions.base import Extension, ExtensionContext, ExtensionPriority
     
     class RateLimitExtension(Extension):
         """Custom extension that implements rate limiting."""

@@ -1,10 +1,11 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-import os
 
-from src.codin.model.vllm_client import VLLMClient
+import pytest
+
+from src.codin.client import Client  # For spec
 from src.codin.model.config import ModelConfig
-from src.codin.client import Client # For spec
+from src.codin.model.vllm_client import VLLMClient
+
 
 @pytest.fixture
 def mock_vllm_internal_client(): # Mocks the codin.client.Client

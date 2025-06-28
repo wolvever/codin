@@ -6,12 +6,12 @@ Daytona Runner API for secure remote code execution.
 
 import asyncio
 import base64
+import os  # For path manipulation
 import shlex
 import tempfile
 import typing as _t
 import zipfile
 from pathlib import Path
-import os # For path manipulation
 
 from .base import ExecResult, Sandbox, ShellEnvironmentPolicy
 from .common_exec import CommonCodeExecutionMixin
@@ -75,7 +75,7 @@ class DaytonaSandbox(Sandbox, CommonCodeExecutionMixin):
 
     async def _get(self, path: str):
         """Make a GET request to the Daytona API."""
-        import requests # Keep import local if only used here and _post
+        import requests  # Keep import local if only used here and _post
 
         loop = asyncio.get_event_loop()
 
@@ -258,7 +258,7 @@ class DaytonaSandbox(Sandbox, CommonCodeExecutionMixin):
 
     async def read_file(self, path: str) -> str:
         """Read a file from the Daytona sandbox. Path is relative to workspace root."""
-        import requests # For HTTPError specifically
+        import requests  # For HTTPError specifically
 
         # Ensure path is formatted correctly
         query_path = path.replace(os.sep, '/')
@@ -277,7 +277,7 @@ class DaytonaSandbox(Sandbox, CommonCodeExecutionMixin):
             # Map to FileNotFoundError for consistency if appropriate, or raise custom error
             if e.response is not None and e.response.status_code == 404:
                 raise FileNotFoundError(f"File not found in Daytona: {path} (query: {query_path})") from e
-            raise IOError(f"Failed to read file from Daytona '{path}': {e}") from e
+            raise OSError(f"Failed to read file from Daytona '{path}': {e}") from e
 
 
     async def write_file(self, path: str, content: str) -> None:
@@ -292,4 +292,4 @@ class DaytonaSandbox(Sandbox, CommonCodeExecutionMixin):
         try:
             await self._post('/fs/write', file_path=daytona_path, content=content)
         except Exception as e: # Catch HTTPError from _post
-            raise IOError(f"Failed to write file to Daytona '{path}': {e}") from e
+            raise OSError(f"Failed to write file to Daytona '{path}': {e}") from e

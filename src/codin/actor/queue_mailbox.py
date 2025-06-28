@@ -70,7 +70,7 @@ class QueueMailbox(Mailbox):
                 else:
                     msg = await self._inbox.get()
                 messages.append(msg)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
             except asyncio.QueueEmpty:
                 break
@@ -90,7 +90,7 @@ class QueueMailbox(Mailbox):
                 else:
                     msg = await self._outbox.get()
                 messages.append(msg)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
             except asyncio.QueueEmpty:
                 break

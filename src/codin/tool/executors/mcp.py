@@ -37,8 +37,8 @@ class MCPExecutor(BaseExecutor):
     
     async def _setup_tool(self, spec: ToolSpec) -> None:
         """Setup MCP session for the tool."""
+        from ..mcp import HttpServerParams, StdioServerParams
         from ..mcp.session_manager import MCPSessionManager
-        from ..mcp import StdioServerParams, HttpServerParams
         
         config = spec.implementation_config
         

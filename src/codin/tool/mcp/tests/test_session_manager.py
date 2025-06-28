@@ -1,21 +1,20 @@
 """Unit tests for MCP Session Managers."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, ANY
-import json # For http client serializing requests
+import json  # For http client serializing requests
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx # For exceptions
+import httpx  # For exceptions
+import pytest
 
 from .. import mcp_types
 from ..exceptions import MCPConnectionError, MCPHttpError, MCPProtocolError, MCPTimeoutError
+from ..server_connection import HttpServerParams, SseServerParams, StdioServerParams
 from ..session_manager import (
+    DEFAULT_CLIENT_CAPABILITIES,  # For creating InitializeRequest
+    DEFAULT_CLIENT_INFO,  # For creating InitializeRequest
     HttpSessionManager,
     StdioSessionManager,
-    SseSessionManager,
-    DEFAULT_CLIENT_CAPABILITIES, # For creating InitializeRequest
-    DEFAULT_CLIENT_INFO,       # For creating InitializeRequest
 )
-from ..server_connection import HttpServerParams, StdioServerParams, SseServerParams
 
 # --- Fixtures ---
 
@@ -304,4 +303,4 @@ async def test_stdio_session_manager_list_resources_success(
 def test_true_placeholder(): # Keep a simple placeholder if other tests are complex to write initially
     assert True
 
-```
+

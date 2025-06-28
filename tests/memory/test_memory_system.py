@@ -1,11 +1,11 @@
 """Tests for the memory system."""
 
-import pytest
-import uuid
 from datetime import datetime
 
-from codin.memory.base import MemoryService, MemMemoryService, MemoryChunk, ChunkType
-from codin.agent.types import Message, TextPart, Role
+import pytest
+
+from codin.agent.types import Message, Role, TextPart
+from codin.memory.base import ChunkType, MemMemoryService, MemoryChunk
 
 
 class TestMemoryChunk:

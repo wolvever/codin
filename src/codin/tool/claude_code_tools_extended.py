@@ -6,13 +6,11 @@ or more complex functionality.
 
 import asyncio
 import json
-import os
-import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
+
 import aiohttp
-from urllib.parse import urljoin
 
 from .claude_code_tools import ClaudeCodeTool, ToolContext, ToolResult
 
@@ -32,7 +30,7 @@ class EditTool(ClaudeCodeTool):
         file_path: str,
         old_string: str,
         new_string: str,
-        replace_all: Optional[bool] = False
+        replace_all: bool | None = False
     ) -> ToolResult:
         """Edit a file by replacing old_string with new_string."""
         try:
@@ -47,7 +45,7 @@ class EditTool(ClaudeCodeTool):
                 )
             
             # Read file content
-            with open(target_path, 'r', encoding='utf-8') as f:
+            with open(target_path, encoding='utf-8') as f:
                 content = f.read()
             
             # Check if old_string exists in content
@@ -102,7 +100,7 @@ class EditTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -147,7 +145,7 @@ class MultiEditTool(ClaudeCodeTool):
         self,
         context: ToolContext,
         file_path: str,
-        edits: List[Dict[str, Any]]
+        edits: list[dict[str, Any]]
     ) -> ToolResult:
         """Apply multiple edits to a file."""
         try:
@@ -162,7 +160,7 @@ class MultiEditTool(ClaudeCodeTool):
                 )
             
             # Read file content
-            with open(target_path, 'r', encoding='utf-8') as f:
+            with open(target_path, encoding='utf-8') as f:
                 content = f.read()
             
             original_content = content
@@ -241,7 +239,7 @@ class MultiEditTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -328,7 +326,7 @@ class WriteTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -379,7 +377,7 @@ class NotebookReadTool(ClaudeCodeTool):
                 )
             
             # Read and parse notebook
-            with open(target_path, 'r', encoding='utf-8') as f:
+            with open(target_path, encoding='utf-8') as f:
                 nb = json.load(f)
             
             # Extract cells with their outputs
@@ -428,7 +426,7 @@ class NotebookReadTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -463,8 +461,8 @@ class NotebookEditTool(ClaudeCodeTool):
         notebook_path: str,
         cell_number: int,
         new_source: str,
-        cell_type: Optional[str] = None,
-        edit_mode: Optional[str] = "replace"
+        cell_type: str | None = None,
+        edit_mode: str | None = "replace"
     ) -> ToolResult:
         """Edit a specific cell in a Jupyter notebook."""
         try:
@@ -479,7 +477,7 @@ class NotebookEditTool(ClaudeCodeTool):
                 )
             
             # Read notebook
-            with open(target_path, 'r', encoding='utf-8') as f:
+            with open(target_path, encoding='utf-8') as f:
                 nb = json.load(f)
             
             cells = nb.get('cells', [])
@@ -557,7 +555,7 @@ class NotebookEditTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -658,7 +656,7 @@ class WebFetchTool(ClaudeCodeTool):
                 output=result
             )
             
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ToolResult(
                 success=False,
                 error=f"Request timed out after {context.timeout} seconds"
@@ -669,7 +667,7 @@ class WebFetchTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -734,7 +732,7 @@ class TodoReadTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -761,7 +759,7 @@ class TodoWriteTool(ClaudeCodeTool):
     async def execute(
         self,
         context: ToolContext,
-        todos: List[Dict[str, str]]
+        todos: list[dict[str, str]]
     ) -> ToolResult:
         """Create or update the todo list."""
         try:
@@ -792,7 +790,7 @@ class TodoWriteTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -847,8 +845,8 @@ class WebSearchTool(ClaudeCodeTool):
         self,
         context: ToolContext,
         query: str,
-        allowed_domains: Optional[List[str]] = None,
-        blocked_domains: Optional[List[str]] = None
+        allowed_domains: list[str] | None = None,
+        blocked_domains: list[str] | None = None
     ) -> ToolResult:
         """Search the web with the given query."""
         try:
@@ -895,7 +893,7 @@ class WebSearchTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -958,7 +956,7 @@ class ExitPlanModeTool(ClaudeCodeTool):
                 error=str(e)
             )
     
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {

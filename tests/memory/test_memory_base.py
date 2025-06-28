@@ -1,9 +1,9 @@
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime
+from unittest.mock import AsyncMock, Mock
 
-from codin.memory.base import MemoryService, MemoryChunk, MemMemoryService
-from codin.agent.types import Message, TextPart, Role
+import pytest
+
+from codin.agent.types import Message, Role, TextPart
+from codin.memory.base import MemMemoryService, MemoryChunk, MemoryService
 
 
 @pytest.fixture

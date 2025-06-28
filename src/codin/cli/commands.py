@@ -14,14 +14,13 @@ from dotenv import load_dotenv
 
 from codin.agent.types import Message, Role, TextPart
 
-from ..agent.types import AgentRunInput
 from ..agent.code_agent import CodeAgent
+from ..agent.types import AgentRunInput
 from ..config import (
     ApprovalMode,
     find_config_files,
     get_api_key,
     get_config,
-    get_default_model_configs,
     get_default_provider_configs,
     load_agents_instructions,
 )
@@ -81,7 +80,7 @@ async def run_quiet_mode(
 
         toolsets = []
         # Create sandbox toolset (auto-generates tools from sandbox methods)
-        from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
+        from codin.tool import SandboxToolset  # Changed from codin.tool.sandbox
 
         sandbox_toolset = SandboxToolset(sandbox)
         toolsets.append(sandbox_toolset)
@@ -559,7 +558,7 @@ async def show_tools_info(verbose: bool = False, config_file: Path | None = None
             click.echo(f"[OK] Initialized sandbox: {type(sandbox).__name__}")
 
         # Create sandbox toolset (auto-generates tools from sandbox methods)
-        from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
+        from codin.tool import SandboxToolset  # Changed from codin.tool.sandbox
 
         sandbox_toolset = SandboxToolset(sandbox)
         await sandbox_toolset.up()

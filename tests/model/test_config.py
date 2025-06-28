@@ -1,5 +1,7 @@
 import unittest
+
 from src.codin.model.config import ModelConfig
+
 
 class TestModelConfig(unittest.TestCase):
 

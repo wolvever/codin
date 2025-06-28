@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from codin.agent.types import Message
-
 __all__ = [
     "format_history_for_prompt",
     "format_tool_results_for_conversation",

@@ -3,7 +3,6 @@
 
 import asyncio
 import importlib.util
-import sys
 from pathlib import Path
 
 # Load the lifecycle module directly

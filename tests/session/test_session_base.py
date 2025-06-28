@@ -1,14 +1,13 @@
 import asyncio
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
+import tempfile
 from datetime import datetime
 from pathlib import Path
-import tempfile
-import os
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 from codin.session.base import SessionContext, SessionManager
-from codin.session.persistence import SessionPersistence, FileSessionPersistence
-from codin.agent.types import Message, TextPart, Role
+from codin.session.persistence import FileSessionPersistence, SessionPersistence
 
 
 class TestSessionContext:

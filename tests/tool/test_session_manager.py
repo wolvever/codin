@@ -1,25 +1,23 @@
-from __future__ import annotations
-
 """Tests for the MCP session manager classes."""
 
-import asyncio
-import json
+from __future__ import annotations
+
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import httpx
+import pytest
 
 from src.codin.tool.mcp.server_connection import (
     HttpServerParams,
-    StdioServerParams,
     SseServerParams,
+    StdioServerParams,
 )
 from src.codin.tool.mcp.session_manager import (
-    MCPSessionManager,
     HttpSessionManager,
-    StdioSessionManager,
+    MCPSessionManager,
     SseSessionManager,
+    StdioSessionManager,
 )
 
 

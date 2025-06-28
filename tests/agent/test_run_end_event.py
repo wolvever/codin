@@ -1,9 +1,11 @@
-import asyncio
+
 import pytest
-from codin.agent.base_agent import BaseAgent
-from codin.agent.base import Planner
-from codin.agent.types import AgentRunInput, Message, TextPart, Role, FinishStep
+
 from codin.actor.mailbox import LocalMailbox
+from codin.agent.base import Planner
+from codin.agent.base_agent import BaseAgent
+from codin.agent.types import AgentRunInput, FinishStep, Message, Role, TextPart
+
 
 class FinishPlanner(Planner):
     async def next(self, state):
@@ -40,7 +42,7 @@ async def test_run_end_event_emitted():
             for m in msgs:
                 if m.metadata and m.metadata.get("event_type"):
                     events.append(m.metadata["event_type"])
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pass
 
     assert "run_end" in events

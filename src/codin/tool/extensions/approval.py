@@ -6,8 +6,7 @@ Use the simpler ApprovalHook class from codin.tool.executor instead.
 
 from __future__ import annotations
 
-import asyncio
-from typing import Callable, Awaitable
+from collections.abc import Awaitable, Callable
 
 from ...config import ApprovalMode
 from .base import Extension, ExtensionContext
@@ -75,7 +74,7 @@ class ApprovalExtension(Extension):
         args: dict
     ) -> bool:
         """Default approval handler that prompts via stdin/stdout."""
-        print(f"\n🔒 Approval Required")
+        print("\n🔒 Approval Required")
         print(f"Tool: {tool_name}")
         print(f"Description: {description}")
         print(f"Arguments: {args}")

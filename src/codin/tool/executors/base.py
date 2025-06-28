@@ -7,7 +7,7 @@ the tool execution system without providing significant benefits.
 from __future__ import annotations
 
 import typing as _t
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 
@@ -210,8 +210,8 @@ class ExecutorFactory:
         registry = ExecutorRegistry()
         
         # Register default executors
-        from .python import PythonExecutor
         from .mcp import MCPExecutor
+        from .python import PythonExecutor
         from .sandbox import SandboxExecutor
         
         registry.register_executor("python", PythonExecutor())

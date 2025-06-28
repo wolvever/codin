@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import typing as _t
-import uuid
-from datetime import datetime
 
-from codin.agent.types import Message, Role
+from codin.agent.types import Message
 
-from .base import ChunkType, Memory, MemoryChunk
+from .base import Memory, MemoryChunk
 
 try:  # pragma: no cover - optional dependency
     import lancedb  # type: ignore

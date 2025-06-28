@@ -1,13 +1,13 @@
 """Global pytest configuration and fixtures."""
 
+import asyncio
+import logging
 import os
 import sys
 import types
-import asyncio
-import logging
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-import typing as _t
-from unittest.mock import AsyncMock, MagicMock, patch
 
 # Ensure 'src.codin' imports refer to local 'codin' package
 # Add the local 'src' directory to sys.path so tests can import the package
@@ -16,10 +16,12 @@ SRC_DIR = os.path.join(ROOT_DIR, "src")
 sys.path.insert(0, SRC_DIR)
 
 import codin as _codin
+
 sys.modules.setdefault('src', types.ModuleType('src'))
 sys.modules['src.codin'] = _codin
 import codin.runtime.base as _runtime_base
 import codin.runtime.local as _runtime_local
+
 sys.modules['src.codin.runtime'] = sys.modules['codin.runtime']
 sys.modules['src.codin.runtime.base'] = _runtime_base
 sys.modules['src.codin.runtime.local'] = _runtime_local

@@ -1,6 +1,4 @@
-import pytest
-from codin.agent.types import Message, TextPart, Role
-from codin.agent.types import ToolCallResult
+from codin.agent.types import Message, Role, TextPart, ToolCallResult
 from codin.utils.message import (
     extract_text_from_message,
     format_history_for_prompt,

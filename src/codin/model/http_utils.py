@@ -10,7 +10,8 @@ import typing as _t
 
 if _t.TYPE_CHECKING:
     from httpx import Response as HttpxResponse
-    from ..client import Client # Assuming Client is httpx.AsyncClient or wraps it
+
+    from ..client import Client  # Assuming Client is httpx.AsyncClient or wraps it
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ async def make_post_request(
 
 def extract_content_from_json(
     response_data: dict,
-    extractor: _t.Callable[[dict], _t.Optional[str]],
+    extractor: _t.Callable[[dict], str | None],
     error_message_prefix: str = "Failed to extract content"
 ) -> str:
     """
@@ -101,9 +102,9 @@ def extract_content_from_json(
 
 async def process_sse_stream(
     response: HttpxResponse,
-    delta_extractor: _t.Callable[[dict], _t.Optional[str]],
+    delta_extractor: _t.Callable[[dict], str | None],
     stop_marker: str = "[DONE]", # OpenAI specific, others might use different signals or rely on stream end
-    event_filter: _t.Optional[_t.Callable[[str, dict], bool]] = None, # Optional filter based on event type and data
+    event_filter: _t.Callable[[str, dict], bool] | None = None, # Optional filter based on event type and data
     error_message_prefix: str = "SSE stream processing failed"
 ) -> _t.AsyncIterator[str]:
     """

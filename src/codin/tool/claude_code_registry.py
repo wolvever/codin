@@ -4,7 +4,8 @@ This module provides a complete registry of all Claude Code compatible tools
 with a clean interface for tool discovery and execution.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from .claude_code_tools import CLAUDE_CODE_TOOLS, ClaudeCodeTool, ToolContext, ToolResult
 from .claude_code_tools_extended import EXTENDED_CLAUDE_CODE_TOOLS
 
@@ -13,7 +14,7 @@ class ClaudeCodeRegistry:
     """Registry for all Claude Code compatible tools."""
     
     def __init__(self):
-        self._tools: Dict[str, ClaudeCodeTool] = {}
+        self._tools: dict[str, ClaudeCodeTool] = {}
         self._load_default_tools()
     
     def _load_default_tools(self):
@@ -21,19 +22,19 @@ class ClaudeCodeRegistry:
         self._tools.update(CLAUDE_CODE_TOOLS)
         self._tools.update(EXTENDED_CLAUDE_CODE_TOOLS)
     
-    def get_tool(self, name: str) -> Optional[ClaudeCodeTool]:
+    def get_tool(self, name: str) -> ClaudeCodeTool | None:
         """Get a tool by name."""
         return self._tools.get(name)
     
-    def list_tools(self) -> List[str]:
+    def list_tools(self) -> list[str]:
         """Get list of all available tool names."""
         return list(self._tools.keys())
     
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+    def get_tool_schemas(self) -> list[dict[str, Any]]:
         """Get OpenAI function calling schemas for all tools."""
         return [tool.get_schema() for tool in self._tools.values()]
     
-    def get_tool_info(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_tool_info(self, name: str) -> dict[str, Any] | None:
         """Get detailed information about a tool."""
         tool = self.get_tool(name)
         if not tool:
@@ -84,17 +85,17 @@ claude_code_registry = ClaudeCodeRegistry()
 
 
 # Convenience functions
-def get_tool(name: str) -> Optional[ClaudeCodeTool]:
+def get_tool(name: str) -> ClaudeCodeTool | None:
     """Get a Claude Code tool by name."""
     return claude_code_registry.get_tool(name)
 
 
-def list_tools() -> List[str]:
+def list_tools() -> list[str]:
     """Get list of all available Claude Code tools."""
     return claude_code_registry.list_tools()
 
 
-def get_tool_schemas() -> List[Dict[str, Any]]:
+def get_tool_schemas() -> list[dict[str, Any]]:
     """Get OpenAI function calling schemas for all Claude Code tools."""
     return claude_code_registry.get_tool_schemas()
 
@@ -108,7 +109,7 @@ async def execute_tool(
     return await claude_code_registry.execute_tool(name, context, **kwargs)
 
 
-def get_tool_info(name: str) -> Optional[Dict[str, Any]]:
+def get_tool_info(name: str) -> dict[str, Any] | None:
     """Get detailed information about a Claude Code tool."""
     return claude_code_registry.get_tool_info(name)
 

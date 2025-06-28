@@ -7,16 +7,15 @@ managed by the actor system.
 """
 
 import abc
-import typing as _t # For _t.AsyncIterator, _t.AsyncGenerator
+import typing as _t  # For _t.AsyncIterator, _t.AsyncGenerator
+
 from ..actor.types import ActorRunInput, ActorRunOutput
+from ..id import new_id
+from ..tool.base import Tool
 from .types import (
     State,
     Step,
-    Plan,
 )
-from ..tool.base import Tool
-from ..id import new_id
-
 
 __all__ = [
     'Agent',

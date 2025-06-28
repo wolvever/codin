@@ -1,13 +1,18 @@
-import pytest
+import json  # For JSONDecodeError
 from unittest.mock import AsyncMock, MagicMock, patch
-import os
 
-import json # For JSONDecodeError
-import httpx # For mock_http_response spec
-from src.codin.model.gemini_llm import GeminiLLM
+import httpx  # For mock_http_response spec
+import pytest
+
+from src.codin.client import Client  # For spec if needed
 from src.codin.model.config import ModelConfig
-from src.codin.client import Client # For spec if needed
-from src.codin.model.http_utils import ModelResponseParsingError, ContentExtractionError, StreamProcessingError # For new tests
+from src.codin.model.gemini_llm import GeminiLLM
+from src.codin.model.http_utils import (  # For new tests
+    ContentExtractionError,
+    ModelResponseParsingError,
+    StreamProcessingError,
+)
+
 
 @pytest.fixture
 def mock_gemini_client():

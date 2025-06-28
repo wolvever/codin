@@ -1,11 +1,11 @@
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
-import os
-import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.codin.model.openai_compatible_llm import OpenAICompatibleBaseLLM
-from src.codin.model.config import ModelConfig
+import pytest
+
 from src.codin.client import Client, ClientConfig
+from src.codin.model.config import ModelConfig
+from src.codin.model.openai_compatible_llm import OpenAICompatibleBaseLLM
+
 
 # Use a concrete class for testing, as BaseLLM might have abstract methods
 class ConcreteOpenAICompat(OpenAICompatibleBaseLLM):

@@ -1,7 +1,7 @@
 import pytest
-from codin.agent.types import Message, Role, TextPart
 
 from codin.actor.mailbox import RayMailbox
+from codin.agent.types import Message, Role, TextPart
 
 
 @pytest.mark.asyncio

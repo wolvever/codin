@@ -6,7 +6,6 @@ based on provider names and configuration settings.
 
 import logging
 import os
-import typing as _t
 
 from .anthropic_llm import AnthropicLLM
 from .base import BaseLLM
@@ -16,7 +15,6 @@ from .gemini_llm import GeminiLLM
 from .litellm_adapter import LiteLLMAdapter
 from .mock_llm import MockLLM
 from .openai_llm import OpenAILLM
-
 
 __all__ = [
     'LLMFactory',
@@ -54,8 +52,8 @@ class LLMFactory:
         provider: str | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
-        config: _t.Optional[ModelConfig] = None,
-        endpoint_config: _t.Optional[ModelEndpointConfig] = None,
+        config: ModelConfig | None = None,
+        endpoint_config: ModelEndpointConfig | None = None,
     ) -> BaseLLM:
         """Create an LLM instance based on configuration.
 
@@ -190,7 +188,7 @@ class LLMFactory:
         return 'openai'
 
 
-async def create_llm_from_env(config: _t.Optional[ModelConfig] = None) -> BaseLLM: # Changed to async
+async def create_llm_from_env(config: ModelConfig | None = None) -> BaseLLM: # Changed to async
     """Convenience function to create an LLM.
 
     If a config object is provided, it's used as a base.

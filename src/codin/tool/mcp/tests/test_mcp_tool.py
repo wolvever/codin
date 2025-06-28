@@ -1,13 +1,14 @@
 """Unit tests for MCPTool."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from ...base.lifecycle_manager import LifecycleState
 from .. import mcp_types
 from ..exceptions import MCPConnectionError, MCPInputError, MCPProtocolError, MCPToolError
-from ..mcp_tool import MCPTool, _DefaultInputModel, MCP_METHOD_MAP
-from ..session_manager import MCPSessionManager # Abstract, will be mocked
-from ...base.lifecycle_manager import LifecycleState
+from ..mcp_tool import MCPTool
+from ..session_manager import MCPSessionManager  # Abstract, will be mocked
 
 
 @pytest.fixture
@@ -247,4 +248,3 @@ async def test_mcp_tool_run_tool_not_up_reinitialize_fails(basic_mcp_tool, mock_
 # - Test _reinitialize_session more directly if possible, or more scenarios with retry_on_closed_resource.
 # - Test with actual input schema validation if MCPTool starts using self.mcp_input_schema_dict for that.
 
-```

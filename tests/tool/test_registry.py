@@ -1,15 +1,15 @@
 """Tests for tool registry implementation."""
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
 
-from codin.tool.registry import ToolRegistry, ToolRegistryConfig, ToolEndpoint
-from codin.tool.base import Tool, Toolset, ToolContext
-from codin.tool import SandboxToolset # Changed from codin.tool.sandbox
+import pytest
+
 from codin.sandbox.local import LocalSandbox
+from codin.tool import SandboxToolset  # Changed from codin.tool.sandbox
+from codin.tool.base import Tool, ToolContext, Toolset
+from codin.tool.registry import ToolEndpoint, ToolRegistry, ToolRegistryConfig
 
 
 class MockTool(Tool):
@@ -218,7 +218,6 @@ async def test_down_all_tools(sandbox):
 
 def test_tool_overwrite_warning():
     """Test that overwriting tools generates warnings."""
-    import logging
 
     registry = ToolRegistry()
     tool1 = MockTool("test_tool", "First tool")

@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Optional
 
-from ..actor.mailbox import Mailbox
 from ..actor.local_mailbox import LocalMailbox
+from ..actor.mailbox import Mailbox
+from ..replay import BaseReplay  # Assuming this path for BaseReplay
 from ..session.base import SessionManager
-from ..replay import BaseReplay # Assuming this path for BaseReplay
-from .base import Agent # Changed from .base_agent import BaseAgent
+from .base import Agent  # Changed from .base_agent import BaseAgent
 from .types import AgentRunInput, ControlSignal, RunnerControl
 
 __all__ = ["AgentRunner"]
@@ -31,7 +30,7 @@ class AgentRunner:
         *,
         mailbox: Mailbox | None = None,
         session_manager: SessionManager | None = None,
-        replay_backend: Optional[BaseReplay] = None,
+        replay_backend: BaseReplay | None = None,
     ) -> None:
         self.agent = agent
         self.mailbox = mailbox or agent.mailbox or LocalMailbox()

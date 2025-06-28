@@ -1,14 +1,12 @@
-from __future__ import annotations
-
 """Tests for the MCPToolset class."""
 
-import asyncio
+from __future__ import annotations
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.codin.tool.mcp.server_connection import HttpServerParams
-from src.codin.tool.mcp.mcp_tool import MCPTool
 from src.codin.tool.mcp.toolset import MCPToolset
 
 

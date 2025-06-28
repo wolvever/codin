@@ -5,18 +5,22 @@ lifecycles of `CallableActor` instances. Each actor's capabilities are
 tracked via the `Capability` model, stored within `ActorInfo`.
 """
 
-import asyncio # Added for _DefaultSupervisorActor's pause loop
+import asyncio  # Added for _DefaultSupervisorActor's pause loop
 import logging
-
 import typing as _t
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import AsyncIterator, Optional
-
-from pydantic import BaseModel, Field, ConfigDict
 from typing import Any
-from .types import CallableActor, ActorRunInput, ActorRunOutput
-from .envelope_types import Capability, EnvelopeKind, TaskState # Added TaskState for potential use in _DefaultSupervisorActor
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .envelope_types import (  # Added TaskState for potential use in _DefaultSupervisorActor
+    Capability,
+    EnvelopeKind,
+    TaskState,
+)
+from .types import ActorRunInput, ActorRunOutput, CallableActor
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +59,11 @@ class ActorSupervisor(ABC):
         """Lists all actors currently managed by the supervisor."""
         ...
     @abstractmethod
-    async def info(self, actor_id: str) -> Optional[ActorInfo]:
+    async def info(self, actor_id: str) -> ActorInfo | None:
         """Retrieves information about a specific actor."""
         ...
     @abstractmethod
-    async def get_actor_instance(self, actor_id: str) -> Optional[CallableActor]:
+    async def get_actor_instance(self, actor_id: str) -> CallableActor | None:
         """Retrieves an active actor instance by its ID."""
         ...
 
@@ -118,15 +122,15 @@ class _DefaultSupervisorActor(CallableActor):
         logger.debug(f"_DefaultSupervisorActor '{self.name}' (ID: {self.actor_id}) run finished for request: {input_data.request_id}.")
 
 
-    async def request_cancel(self) -> None:
+    async def cancel(self) -> None:
         logger.info(f"_DefaultSupervisorActor {self.actor_id} ({self.name}) received cancel request.")
         self._cancel_requested = True
 
-    async def request_pause(self) -> None:
+    async def pause(self) -> None:
         logger.info(f"_DefaultSupervisorActor {self.actor_id} ({self.name}) received pause request.")
         self._paused = True
 
-    async def request_resume(self, followup_data: Optional[dict]) -> None:
+    async def resume(self, followup_data: dict | None) -> None:
         logger.info(f"_DefaultSupervisorActor {self.actor_id} ({self.name}) received resume request. Followup: {bool(followup_data)}. Resuming...")
         self._paused = False
         # followup_data is not used by this simple actor.
@@ -181,10 +185,10 @@ class LocalActorManager(ActorSupervisor):
     async def list(self) -> list[ActorInfo]:
         return list(self._actors.values())
 
-    async def info(self, actor_id: str) -> Optional[ActorInfo]:
+    async def info(self, actor_id: str) -> ActorInfo | None:
         return self._actors.get(actor_id)
 
-    async def get_actor_instance(self, actor_id: str) -> Optional[CallableActor]:
+    async def get_actor_instance(self, actor_id: str) -> CallableActor | None:
         actor_info = self._actors.get(actor_id)
         return actor_info.agent if actor_info else None
 

@@ -1,18 +1,14 @@
-import asyncio
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from datetime import datetime
 
 from codin.agent.code_agent import CodeAgent
-from codin.agent.types import (
-    AgentRunInput, AgentRunOutput, Message, TextPart, ToolCallPart, 
-    ToolCall, ToolCallResult, Role
-)
+from codin.agent.types import AgentRunInput, Message, Role, TextPart, ToolCall, ToolCallPart, ToolCallResult
 from codin.memory.base import MemoryService
-from codin.tool.registry import ToolRegistry
-from codin.tool.base import Toolset
-from codin.sandbox.base import Sandbox
 from codin.model.base import LLM
+from codin.sandbox.base import Sandbox
+from codin.tool.base import Toolset
+from codin.tool.registry import ToolRegistry
 
 
 @pytest.fixture

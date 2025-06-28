@@ -1,5 +1,9 @@
-from .basic import BasicPlanner
-from .reactive import ReactivePlanner
-from .coding import CodingAssistantPlanner
+# Import consolidated planners from parent directory
+from ..codeact_planner import CodeActPlanner
+from ..react_planner import ReActPlanner
 
-__all__ = ["BasicPlanner", "ReactivePlanner", "CodingAssistantPlanner"]
+# Backward compatibility aliases
+BasicPlanner = ReActPlanner
+CodingAssistantPlanner = ReActPlanner
+
+__all__ = ["ReActPlanner", "CodeActPlanner", "BasicPlanner", "CodingAssistantPlanner"]

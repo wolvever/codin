@@ -1,12 +1,13 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.codin.model.facade_client import ModelFacade
-from src.codin.model.base import BaseLLM, BaseEmbedding # BaseReranker if used
+import pytest
+
+from src.codin.model.base import BaseEmbedding, BaseLLM  # BaseReranker if used
 from src.codin.model.config import ModelConfig
+from src.codin.model.facade_client import ModelFacade
 from src.codin.model.factory import LLMFactory
 from src.codin.model.registry import ModelRegistry
-from src.codin.model.openai_embedding import OpenAIEmbedding # For mocking specific embedding
+
 
 # Mock for the LLM instance
 @pytest.fixture

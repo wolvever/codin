@@ -12,16 +12,14 @@ import typing as _t
 import pydantic as _pyd
 
 from ..base import LifecycleState, Tool, ToolContext
+from . import mcp_types
+from .exceptions import (  # Import custom exceptions
+    MCPError,
+    MCPInputError,
+    MCPToolError,
+)
 from .session_manager import MCPSessionManager
 from .utils import retry_on_closed_resource
-from . import mcp_types
-from .exceptions import ( # Import custom exceptions
-    MCPError,
-    MCPConnectionError,
-    MCPInputError,
-    MCPProtocolError,
-    MCPToolError
-)
 
 __all__ = [
     'MCPTool',
@@ -29,7 +27,7 @@ __all__ = [
 
 _logger = logging.getLogger(__name__)
 
-MCP_METHOD_MAP: dict[str, tuple[str, _t.Type[_pyd.BaseModel] | None, _t.Type[_pyd.BaseModel] | None ]] = {
+MCP_METHOD_MAP: dict[str, tuple[str, type[_pyd.BaseModel] | None, type[_pyd.BaseModel] | None ]] = {
     "resources/list": ("list_resources", mcp_types.ListResourcesRequestParams, mcp_types.ListResourcesResult),
     "resources/templates/list": ("list_resource_templates", mcp_types.ListResourceTemplatesRequestParams, mcp_types.ListResourceTemplatesResult),
     "resources/read": ("read_resource", mcp_types.ReadResourceRequestParams, mcp_types.ReadResourceResult),

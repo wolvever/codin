@@ -1,29 +1,30 @@
-from dataclasses import dataclass, field
 import typing as _t
+from dataclasses import dataclass
+
 
 @dataclass
 class ModelConfig:
     """Configuration for language and embedding models."""
-    model_name: _t.Optional[str] = None
-    api_key: _t.Optional[str] = None
-    base_url: _t.Optional[str] = None
-    api_version: _t.Optional[str] = None  # Specific to some models like Anthropic
+    model_name: str | None = None
+    api_key: str | None = None
+    base_url: str | None = None
+    api_version: str | None = None  # Specific to some models like Anthropic
 
     # For OpenAI/Azure specific fields, could be added later if needed
     # e.g., deployment_name: _t.Optional[str] = None
 
     # Timeout settings, could also be part of a more general ClientConfig if separated
-    timeout: _t.Optional[float] = None
-    connect_timeout: _t.Optional[float] = None
+    timeout: float | None = None
+    connect_timeout: float | None = None
 
     # Retry settings
-    max_retries: _t.Optional[int] = None
-    retry_min_wait: _t.Optional[float] = None
-    retry_max_wait: _t.Optional[float] = None
-    retry_on_status_codes: _t.Optional[list[int]] = None
+    max_retries: int | None = None
+    retry_min_wait: float | None = None
+    retry_max_wait: float | None = None
+    retry_on_status_codes: list[int] | None = None
 
     # Provider, could be used by factory to determine which model class to use
-    provider: _t.Optional[str] = None
+    provider: str | None = None
 
     # Any other model-specific parameters can be added as needed
     # For example, temperature, max_tokens for LLMs, but these are usually runtime params

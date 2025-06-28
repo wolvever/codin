@@ -1,8 +1,7 @@
 """Model configuration using unified endpoint system."""
 
 import os
-import typing as _t
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from codin.endpoint import EndpointConfig
 
@@ -14,23 +13,23 @@ class ModelEndpointConfig:
     """Model configuration with unified endpoint support."""
     
     # Model identification
-    model_name: _t.Optional[str] = None
-    provider: _t.Optional[str] = None
+    model_name: str | None = None
+    provider: str | None = None
     
     # Endpoint configuration
-    endpoint_config: _t.Optional[EndpointConfig] = None
+    endpoint_config: EndpointConfig | None = None
     
     # Authentication
-    api_key: _t.Optional[str] = None
-    api_version: _t.Optional[str] = None
+    api_key: str | None = None
+    api_version: str | None = None
     
     # Request settings
-    timeout: _t.Optional[float] = None
-    connect_timeout: _t.Optional[float] = None
-    max_retries: _t.Optional[int] = None
-    retry_min_wait: _t.Optional[float] = None
-    retry_max_wait: _t.Optional[float] = None
-    retry_on_status_codes: _t.Optional[list[int]] = None
+    timeout: float | None = None
+    connect_timeout: float | None = None
+    max_retries: int | None = None
+    retry_min_wait: float | None = None
+    retry_max_wait: float | None = None
+    retry_on_status_codes: list[int] | None = None
     
     def __post_init__(self):
         """Initialize endpoint configuration if not provided."""
@@ -52,7 +51,7 @@ class ModelEndpointConfig:
                 self.endpoint_config = EndpointConfig(endpoint=default_endpoint)
     
     @property
-    def base_url(self) -> _t.Optional[str]:
+    def base_url(self) -> str | None:
         """Get base URL from endpoint configuration."""
         if self.endpoint_config and self.endpoint_config.is_remote:
             return self.endpoint_config.base_url
@@ -69,7 +68,7 @@ class ModelEndpointConfig:
         return self.endpoint_config and self.endpoint_config.is_remote
     
     @property
-    def local_model_path(self) -> _t.Optional[str]:
+    def local_model_path(self) -> str | None:
         """Get local model path for filesystem endpoints."""
         if self.is_local_model:
             return self.endpoint_config.local_path
@@ -113,7 +112,7 @@ class ModelEndpointConfig:
         )
     
     @classmethod
-    def from_env(cls, provider: _t.Optional[str] = None) -> "ModelEndpointConfig":
+    def from_env(cls, provider: str | None = None) -> "ModelEndpointConfig":
         """Create configuration from environment variables."""
         # Get model configuration from env
         model_name = os.getenv('LLM_MODEL')
@@ -143,8 +142,8 @@ class ModelEndpointConfig:
     def openai(
         cls, 
         model: str = "gpt-4", 
-        api_key: _t.Optional[str] = None,
-        base_url: _t.Optional[str] = None
+        api_key: str | None = None,
+        base_url: str | None = None
     ) -> "ModelEndpointConfig":
         """Create OpenAI model configuration."""
         endpoint_url = base_url or "https://api.openai.com/v1"
@@ -161,8 +160,8 @@ class ModelEndpointConfig:
     def anthropic(
         cls,
         model: str = "claude-3-sonnet-20240229",
-        api_key: _t.Optional[str] = None,
-        base_url: _t.Optional[str] = None
+        api_key: str | None = None,
+        base_url: str | None = None
     ) -> "ModelEndpointConfig":
         """Create Anthropic model configuration."""
         endpoint_url = base_url or "https://api.anthropic.com/v1"
@@ -179,7 +178,7 @@ class ModelEndpointConfig:
     def local_model(
         cls,
         model_path: str,
-        model_name: _t.Optional[str] = None
+        model_name: str | None = None
     ) -> "ModelEndpointConfig":
         """Create local model configuration."""
         endpoint_config = EndpointConfig(endpoint=f"fs://{model_path}")

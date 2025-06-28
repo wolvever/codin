@@ -1,14 +1,15 @@
 """Tests for the codin.config module."""
 
 import os
-import pytest
-from unittest.mock import patch, mock_open
-import yaml # For creating test config file content
-import tempfile # For creating temporary config file
+import tempfile  # For creating temporary config file
 from pathlib import Path
+from unittest.mock import patch
 
-from codin.config import get_config, load_config, get_api_key, CodinConfig, get_default_model_configs
-from src.codin.model.config import ModelConfig as ModelClientConfig # Use alias for clarity
+import pytest
+import yaml  # For creating test config file content
+
+from codin.config import CodinConfig, get_api_key, get_config, get_default_model_configs, load_config
+from src.codin.model.config import ModelConfig as ModelClientConfig  # Use alias for clarity
 
 
 class TestConfig:

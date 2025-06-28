@@ -1,7 +1,6 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-import os
-import asyncio
 
 # Conditional import for LiteLLM
 try:
@@ -10,8 +9,8 @@ try:
 except ImportError:
     _HAS_LITELLM = False
 
-from src.codin.model.litellm_adapter import LiteLLMAdapter
 from src.codin.model.config import ModelConfig
+from src.codin.model.litellm_adapter import LiteLLMAdapter
 
 # Skip all tests in this file if litellm is not installed
 pytestmark = pytest.mark.skipif(not _HAS_LITELLM, reason="litellm not installed")

@@ -1,4 +1,3 @@
-import pytest
 from codin.cli.repl import ReplSession
 
 

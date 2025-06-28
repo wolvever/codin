@@ -2,13 +2,14 @@
 
 import asyncio
 import time
-import pytest
 import typing as _t
 
+import pytest
+
+from codin.agent.types import TextPart
 from codin.tool.base import Tool, ToolContext
 from codin.tool.executor import ToolExecutor
 from codin.tool.registry import ToolRegistry
-from codin.agent.types import TextPart
 
 
 class AsyncGeneratorTestTool(Tool):

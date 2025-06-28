@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-from typing import Optional, Dict
 
 from pydantic import BaseModel, Field
 
-from .envelope_types import TaskState, EnvelopeKind
+from .envelope_types import EnvelopeKind, TaskState
 
 
 class TaskInfo(BaseModel):
@@ -36,10 +35,10 @@ class TaskInfo(BaseModel):
     actor_id: str = "" # May be updated after actor assignment
     current_state: TaskState = TaskState.SUBMITTED
     envelope_kind: EnvelopeKind
-    reply_to: Optional[str] = None
+    reply_to: str | None = None
     submitted_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     last_updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
-    error_info: Optional[str] = None
+    error_info: str | None = None
 
     class Config:
         """Pydantic model configuration."""
@@ -56,7 +55,7 @@ class TaskRegistry:
 
     def __init__(self):
         """Initializes the TaskRegistry with an empty task store and an asyncio Lock."""
-        self._tasks: Dict[str, TaskInfo] = {}
+        self._tasks: dict[str, TaskInfo] = {}
         self._lock = asyncio.Lock()
 
     async def add_task(self, task_info: TaskInfo) -> None:
@@ -72,7 +71,7 @@ class TaskRegistry:
             task_info.last_updated_at = datetime.datetime.now() # Ensure update time on any add/overwrite
             self._tasks[task_info.task_id] = task_info
 
-    async def get_task(self, task_id: str) -> Optional[TaskInfo]:
+    async def get_task(self, task_id: str) -> TaskInfo | None:
         """Retrieves a task from the registry by its ID.
 
         Args:
@@ -85,7 +84,7 @@ class TaskRegistry:
             return self._tasks.get(task_id)
 
     async def update_task_state(
-        self, task_id: str, new_state: TaskState, error_info: Optional[str] = None
+        self, task_id: str, new_state: TaskState, error_info: str | None = None
     ) -> bool:
         """Updates the state of an existing task.
 

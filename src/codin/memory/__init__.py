@@ -1,6 +1,7 @@
 """Memory system for codin agents."""
 
-from .base import ChunkType, Memory as MemoryBase, MemoryChunk, MemoryService
+from .base import ChunkType, MemoryChunk, MemoryService
+from .base import Memory as MemoryBase
 from .chunk_builder import prompt_chunk_builder
 from .local import MemMemoryService
 from .remote import MemoryClient

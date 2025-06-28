@@ -1,25 +1,22 @@
 """Test enhanced Step system with A2A compatibility."""
 
-import pytest
-from datetime import datetime
 from codin.agent.types import (
-    Step,
-    StepType,
-    MessageStep,
     EventStep,
-    ToolCallStep,
-    ThinkStep,
+    EventType,
     FinishStep,
     Message,
-    Task,
+    MessageStep,
+    RunEvent,
+    Step,
+    StepType,
+    TaskState,
+    TaskStatus,
+    TaskStatusUpdateEvent,
     ToolCall,
     ToolCallResult,
+    ToolCallStep,
     ToolUsePart,
-    EventType,
-    RunEvent,
-    TaskStatusUpdateEvent,
 )
-from codin.agent.types import TaskState, TaskStatus
 
 
 class TestEnhancedSteps:

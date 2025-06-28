@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import logging
-import typing as _t
 
 # pydantic and requests related imports are no longer needed if FetchTool is the only user
 # from bs4 import BeautifulSoup # No longer needed if FetchTool is removed
-
-from .base import Tool, ToolContext # Tool and ToolContext might be used by other tools if any remain
 
 __all__ = [] # FetchTool removed from __all__
 

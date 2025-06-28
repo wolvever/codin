@@ -1,10 +1,10 @@
 """Tests for the tools command functionality."""
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock
-import pydantic as _pyd
 
-from codin.cli.commands import format_tool_signature, _extract_python_type
+import pydantic as _pyd
+import pytest
+
+from codin.cli.commands import _extract_python_type, format_tool_signature
 from codin.tool.base import Tool, ToolContext
 
 

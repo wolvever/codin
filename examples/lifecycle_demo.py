@@ -6,10 +6,11 @@ with proper up/down lifecycle management.
 """
 
 import asyncio
-from codin.tool.specs.base import ToolSpec, ToolType, ToolMetadata
-from codin.tool.executors.python import PythonExecutor
-from codin.tool.base import ToolContext
+
 from codin.lifecycle import lifecycle_context
+from codin.tool.base import ToolContext
+from codin.tool.executors.python import PythonExecutor
+from codin.tool.specs.base import ToolMetadata, ToolSpec, ToolType
 
 
 async def demo_executor_lifecycle():

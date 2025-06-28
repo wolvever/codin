@@ -5,11 +5,11 @@ This module provides session management components including session state track
 """
 
 import asyncio
+import os  # Added
 import typing as _t
 from contextlib import asynccontextmanager
 from datetime import datetime
-import os # Added
-from urllib.parse import urlparse # Added
+from urllib.parse import urlparse  # Added
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,10 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field
 # from codin.replay.base import ReplayService
 # from ..agent.types import State # Not directly used in this file after refactor
 # from ..memory.base import MemMemoryService, MemoryService # Not directly used in this file after refactor
-
 # Added for persistence
-from .persistence import SessionPersistor, LocalFilePersistor, HttpPersistor
-
+from .persistence import HttpPersistor, LocalFilePersistor, SessionPersistor
 
 __all__ = [
     # ReplayService might be re-exported from __init__ if still needed there
@@ -84,7 +82,7 @@ class Session(BaseModel):
 class SessionManager:
     """Manages active sessions with optional persistence and cleanup."""
 
-    def __init__(self, endpoint: _t.Optional[str] = None):
+    def __init__(self, endpoint: str | None = None):
         """Initialize the SessionManager.
 
         Args:
@@ -102,7 +100,7 @@ class SessionManager:
                 file persistence, or sent to the HTTP endpoint.
         """
         self._sessions: dict[str, Session] = {}
-        self._persistor: _t.Optional[SessionPersistor] = None
+        self._persistor: SessionPersistor | None = None
         self._cleanup_lock = asyncio.Lock()
 
         if endpoint:
@@ -240,7 +238,7 @@ class SessionManager:
                 except Exception as e:
                     print(f"Error saving session {session_id} during main cleanup: {e}")
 
-            if hasattr(self._persistor, 'close') and callable(getattr(self._persistor, 'close')):
+            if hasattr(self._persistor, 'close') and callable(self._persistor.close):
                 try:
                     # print("Closing persistor during main cleanup.") # Debug
                     await self._persistor.close() # type: ignore

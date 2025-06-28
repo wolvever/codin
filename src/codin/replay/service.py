@@ -4,7 +4,8 @@ import json
 import logging
 from typing import Any
 
-from codin.endpoint import EndpointConfig, EndpointResolver, ReplayConfig
+from codin.endpoint import EndpointConfig, ReplayConfig
+
 from .base import BaseReplay
 
 logger = logging.getLogger(__name__)

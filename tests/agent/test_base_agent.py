@@ -1,23 +1,20 @@
-import pytest
-import asyncio
 import uuid
-from typing import AsyncGenerator, Any
+from collections.abc import AsyncGenerator
+
+import pytest
 
 from src.codin.agent.base import Planner
 from src.codin.agent.base_agent import BaseAgent
 from src.codin.agent.types import (
     AgentRunInput,
+    AgentRunOutput,
+    FinishStep,
     Message,
-    TextPart,
     Role,
     State,
-    Task,
-    FinishStep,
     Step,
-    StepType,
-    AgentRunOutput,
-    TaskState,
-    TaskStatus,
+    Task,
+    TextPart,
 )
 from src.codin.memory.base import MemMemoryService
 

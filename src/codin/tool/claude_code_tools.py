@@ -4,18 +4,16 @@ Implements all tools specified in docs/claude_code_tools.md with exact signature
 """
 
 import asyncio
-import json
-import os
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-import re
-import glob as glob_module
 import fnmatch
+import glob as glob_module
+import os
+import re
+from pathlib import Path
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from .base import Tool, ToolContext
-
-
 
 
 class TaskArgs(BaseModel):
@@ -33,7 +31,7 @@ class Task(Tool):
             input_schema=TaskArgs
         )
     
-    async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> Dict[str, Any]:
+    async def execute(self, args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
         """Execute task by launching an agent."""
         validated = self.validate_input(args)
         
@@ -49,8 +47,8 @@ class Task(Tool):
 
 class BashArgs(BaseModel):
     command: str = Field(description="Shell command to execute")
-    description: Optional[str] = Field(None, description="Optional description of what the command does")
-    timeout: Optional[float] = Field(None, description="Optional timeout in seconds (max 600)")
+    description: str | None = Field(None, description="Optional description of what the command does")
+    timeout: float | None = Field(None, description="Optional timeout in seconds (max 600)")
 
 
 class Bash(Tool):
@@ -63,7 +61,7 @@ class Bash(Tool):
             input_schema=BashArgs
         )
     
-    async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> Dict[str, Any]:
+    async def execute(self, args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
         """Execute bash command."""
         validated = self.validate_input(args)
         command = validated["command"]
@@ -90,7 +88,7 @@ class Bash(Tool):
                 "description": validated.get("description")
             }
             
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise RuntimeError(f"Command timed out after {timeout} seconds")
         except Exception as e:
             raise RuntimeError(f"Command failed: {e}")
@@ -98,7 +96,7 @@ class Bash(Tool):
 
 class GlobArgs(BaseModel):
     pattern: str = Field(description="Glob pattern to match files against")
-    path: Optional[str] = Field(None, description="Directory to search in (defaults to current directory)")
+    path: str | None = Field(None, description="Directory to search in (defaults to current directory)")
 
 
 class Glob(Tool):
@@ -111,7 +109,7 @@ class Glob(Tool):
             input_schema=GlobArgs
         )
     
-    async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> List[str]:
+    async def execute(self, args: dict[str, Any], ctx: ToolContext) -> list[str]:
         """Find files matching glob pattern."""
         validated = self.validate_input(args)
         pattern = validated["pattern"]
@@ -129,8 +127,8 @@ class Glob(Tool):
 
 class GrepArgs(BaseModel):
     pattern: str = Field(description="Regular expression pattern to search for")
-    include: Optional[str] = Field(None, description="File pattern to include in search (e.g. '*.js', '*.{ts,tsx}')")
-    path: Optional[str] = Field(None, description="Directory to search in (defaults to current directory)")
+    include: str | None = Field(None, description="File pattern to include in search (e.g. '*.js', '*.{ts,tsx}')")
+    path: str | None = Field(None, description="Directory to search in (defaults to current directory)")
 
 
 class Grep(Tool):
@@ -143,7 +141,7 @@ class Grep(Tool):
             input_schema=GrepArgs
         )
     
-    async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> List[str]:
+    async def execute(self, args: dict[str, Any], ctx: ToolContext) -> list[str]:
         """Search file contents with regex."""
         validated = self.validate_input(args)
         pattern = validated["pattern"]
@@ -164,7 +162,7 @@ class Grep(Tool):
         
         for file_path in files_to_search:
             try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(file_path, encoding='utf-8', errors='ignore') as f:
                     content = f.read()
                     if regex.search(content):
                         matches.append(file_path)
@@ -177,7 +175,7 @@ class Grep(Tool):
 
 class LSArgs(BaseModel):
     path: str = Field(description="Directory path to list")
-    ignore: Optional[List[str]] = Field(None, description="List of glob patterns to ignore")
+    ignore: list[str] | None = Field(None, description="List of glob patterns to ignore")
 
 
 class LS(Tool):
@@ -190,7 +188,7 @@ class LS(Tool):
             input_schema=LSArgs
         )
     
-    async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> List[Dict[str, Any]]:
+    async def execute(self, args: dict[str, Any], ctx: ToolContext) -> list[dict[str, Any]]:
         """List directory contents."""
         validated = self.validate_input(args)
         path = validated["path"]
@@ -229,8 +227,8 @@ class LS(Tool):
 
 class ReadArgs(BaseModel):
     file_path: str = Field(description="Path to the file to read")
-    offset: Optional[int] = Field(None, description="Line number to start reading from (0-based)")
-    limit: Optional[int] = Field(None, description="Maximum number of lines to read")
+    offset: int | None = Field(None, description="Line number to start reading from (0-based)")
+    limit: int | None = Field(None, description="Maximum number of lines to read")
 
 
 class Read(Tool):
@@ -243,7 +241,7 @@ class Read(Tool):
             input_schema=ReadArgs
         )
     
-    async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> str:
+    async def execute(self, args: dict[str, Any], ctx: ToolContext) -> str:
         """Read file contents."""
         validated = self.validate_input(args)
         file_path = validated["file_path"]
@@ -262,7 +260,7 @@ class Read(Tool):
         # Try to read with different encodings
         for encoding in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
             try:
-                with open(target_path, 'r', encoding=encoding) as f:
+                with open(target_path, encoding=encoding) as f:
                     lines = f.readlines()
                 break
             except UnicodeDecodeError:
@@ -292,7 +290,7 @@ class EditArgs(BaseModel):
     file_path: str = Field(description="Path to the file to edit")
     old_string: str = Field(description="Text to replace")
     new_string: str = Field(description="Replacement text")
-    replace_all: Optional[bool] = Field(False, description="Replace all occurrences")
+    replace_all: bool | None = Field(False, description="Replace all occurrences")
 
 
 class Edit(Tool):
@@ -305,7 +303,7 @@ class Edit(Tool):
             input_schema=EditArgs
         )
     
-    async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> Dict[str, Any]:
+    async def execute(self, args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
         """Edit file by replacing text."""
         validated = self.validate_input(args)
         file_path = validated["file_path"]
@@ -359,7 +357,7 @@ class Write(Tool):
             input_schema=WriteArgs
         )
     
-    async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> Dict[str, Any]:
+    async def execute(self, args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
         """Write content to file."""
         validated = self.validate_input(args)
         file_path = validated["file_path"]
@@ -382,7 +380,7 @@ class Write(Tool):
 
 
 # Claude Code tool registry
-def create_claude_code_tools() -> List[Tool]:
+def create_claude_code_tools() -> list[Tool]:
     """Create all Claude Code tools."""
     return [
         Task(),
@@ -396,7 +394,7 @@ def create_claude_code_tools() -> List[Tool]:
     ]
 
 
-def get_claude_code_tool(name: str) -> Optional[Tool]:
+def get_claude_code_tool(name: str) -> Tool | None:
     """Get Claude Code tool by name."""
     tools = {tool.name: tool for tool in create_claude_code_tools()}
     return tools.get(name)

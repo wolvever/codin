@@ -10,7 +10,7 @@ from enum import Enum
 import pydantic as _pyd
 from pydantic import BaseModel, ConfigDict
 
-from ..lifecycle import LifecycleMixin, LifecycleState
+from ..lifecycle import LifecycleMixin
 
 __all__ = [
     'Tool',

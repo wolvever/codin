@@ -230,7 +230,7 @@ API Layer (e.g., `src/codin/api/app.py`):
 from .base import BaseReplay
 from .file import FileReplay
 from .http import HttpReplay
-from .service import Replay, create_replay_service, create_replay_factory
+from .service import Replay, create_replay_factory, create_replay_service
 
 __all__ = [
     "BaseReplay",

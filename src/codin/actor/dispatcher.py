@@ -18,10 +18,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, ValidationError
 
-from .supervisor import ActorSupervisor, ActorInfo
-from .types import CallableActor, ActorRunInput, ActorRunOutput
-from .envelope_types import Envelope, EnvelopeKind, ControlPayload, Capability, ControlAction, TaskState
-from .task_manager import TaskRegistry, TaskInfo
+from .envelope_types import ControlAction, ControlPayload, Envelope, EnvelopeKind, TaskState
+from .supervisor import ActorSupervisor
+from .task_manager import TaskInfo, TaskRegistry
+from .types import ActorRunInput, ActorRunOutput, CallableActor
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ class LocalDispatcher(Dispatcher):
                     logger.error(f"{error_message} Task: {task_id_for_registry}. Accepted: {existing_actor_info.capability.accepts}")
                     result.status = TaskState.FAILED.value; result.metadata['error'] = error_message
                     await self._task_registry.update_task_state(task_id_for_registry, TaskState.FAILED, error_info=error_message)
-                    await stream_queue.put({"error": error_message, "status": result.status, "accepted_kinds": list(existing_actor_info.capability.accepts)});
+                    await stream_queue.put({"error": error_message, "status": result.status, "accepted_kinds": list(existing_actor_info.capability.accepts)})
                     return
                 logger.debug(f"Capability check passed for existing actor {actor_id_for_check}, task: {task_id_for_registry}")
 
@@ -174,22 +174,22 @@ class LocalDispatcher(Dispatcher):
                     if action == ControlAction.PAUSE:
                         logger.info(f"Processing PAUSE for task_id '{target_control_task_id}'")
                         if actor_instance:
-                            try: await actor_instance.request_pause()
-                            except Exception as e: logger.error(f"Error calling request_pause on actor {target_task_info.actor_id if target_task_info else 'unknown'}: {e}", exc_info=True)
+                            try: await actor_instance.pause()
+                            except Exception as e: logger.error(f"Error calling pause on actor {target_task_info.actor_id if target_task_info else 'unknown'}: {e}", exc_info=True)
                         else: logger.warning(f"No active actor instance found for {target_task_info.actor_id if target_task_info else 'unknown actor'} (task {target_control_task_id}) to send pause signal.")
                         new_task_state = TaskState.PAUSED
                     elif action == ControlAction.RESUME:
                         logger.info(f"Processing RESUME for task_id '{target_control_task_id}' with followup: {bool(followup_data)}")
                         if actor_instance:
-                            try: await actor_instance.request_resume(followup_data)
-                            except Exception as e: logger.error(f"Error calling request_resume on actor {target_task_info.actor_id if target_task_info else 'unknown'}: {e}", exc_info=True)
+                            try: await actor_instance.resume(followup_data)
+                            except Exception as e: logger.error(f"Error calling resume on actor {target_task_info.actor_id if target_task_info else 'unknown'}: {e}", exc_info=True)
                         else: logger.warning(f"No active actor instance found for {target_task_info.actor_id if target_task_info else 'unknown actor'} (task {target_control_task_id}) to send resume signal.")
                         new_task_state = TaskState.PENDING
                     elif action == ControlAction.CANCEL:
                         logger.info(f"Processing CANCEL for task_id '{target_control_task_id}'")
                         if actor_instance:
-                            try: await actor_instance.request_cancel()
-                            except Exception as e: logger.error(f"Error calling request_cancel on actor {target_task_info.actor_id if target_task_info else 'unknown'}: {e}", exc_info=True)
+                            try: await actor_instance.cancel()
+                            except Exception as e: logger.error(f"Error calling cancel on actor {target_task_info.actor_id if target_task_info else 'unknown'}: {e}", exc_info=True)
                         else: logger.warning(f"No active actor instance for {target_task_info.actor_id if target_task_info else 'unknown actor'} (task {target_control_task_id}) to send cancel signal.")
                         new_task_state = TaskState.CANCELED
 
@@ -197,7 +197,7 @@ class LocalDispatcher(Dispatcher):
                         update_success = await self._task_registry.update_task_state(target_control_task_id, new_task_state)
                         if not update_success:
                             logger.warning(f"Target task_id '{target_control_task_id}' for control action '{action.value}' not found in registry for state update.")
-                            result.status = f"CONTROL_TARGET_NOT_FOUND"; result.metadata["control_error"] = f"Target task {target_control_task_id} not found."
+                            result.status = "CONTROL_TARGET_NOT_FOUND"; result.metadata["control_error"] = f"Target task {target_control_task_id} not found."
                         else:
                             result.status = f"CONTROL_{action.value.upper()}_PROCESSED"
                     else: result.status = "CONTROL_UNKNOWN_ACTION"
@@ -236,14 +236,14 @@ class LocalDispatcher(Dispatcher):
                         logger.error(f"{error_message} Task: {task_id_for_registry}. Accepted: {list(actor_info_after_creation.capability.accepts)}")
                         result.status = TaskState.FAILED.value; result.metadata['error'] = error_message
                         await self._task_registry.update_task_state(task_id_for_registry, TaskState.FAILED, error_info=error_message)
-                        await stream_queue.put({"error": error_message, "status": result.status, "accepted_kinds": list(actor_info_after_creation.capability.accepts)});
+                        await stream_queue.put({"error": error_message, "status": result.status, "accepted_kinds": list(actor_info_after_creation.capability.accepts)})
                         return
                     logger.debug(f"Capability check passed for new actor {primary_actor_id}, task: {task_id_for_registry}")
                 elif not actor_info_after_creation :
                      logger.error(f"Failed to retrieve info for actor {primary_actor_id}. Task: {task_id_for_registry}")
                      result.status = TaskState.FAILED.value; result.metadata['error'] = f"Info for {primary_actor_id} unavailable post-acquisition."
                      await self._task_registry.update_task_state(task_id_for_registry, TaskState.FAILED, error_info=result.metadata['error'])
-                     await stream_queue.put({"error": result.metadata['error'], "status": result.status});
+                     await stream_queue.put({"error": result.metadata['error'], "status": result.status})
                      return
 
             await self._task_registry.update_task_state(task_id_for_registry, TaskState.RUNNING)

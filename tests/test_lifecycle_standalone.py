@@ -136,12 +136,11 @@ async def test_restart():
     
     resource = TestResource("restart-test")
     await resource.up()
-    initial_startup_state = resource.startup_called
     
     await resource.restart()
     assert resource.is_up
     assert resource.shutdown_called
-    # startup_called flag would still be True from both calls
+    assert resource.startup_called
     
     print("✓ Restart test passed")
 

@@ -1,13 +1,14 @@
 """Tests for the prompt.engine module."""
 
-import pytest
 import typing as _t
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-from codin.prompt.engine import PromptEngine
-from codin.prompt.registry import PromptRegistry, get_registry
-from codin.prompt.base import PromptTemplate, RenderedPrompt
+import pytest
+
 from codin.model.base import BaseLLM
+from codin.prompt.base import PromptTemplate
+from codin.prompt.engine import PromptEngine
+from codin.prompt.registry import get_registry
 
 
 class MockLLM(BaseLLM):
@@ -78,7 +79,6 @@ class MockLLM(BaseLLM):
 @pytest.fixture
 def clean_registry():
     """Provide a clean registry for tests."""
-    from codin.prompt.registry import get_registry
     
     # Get the registry that the engine will actually use
     registry = get_registry()

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import abc
 import typing as _t
-from uuid import uuid4
 from datetime import datetime
 from enum import Enum
-import abc
+from uuid import uuid4
 
 import pydantic as _pyd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -142,7 +142,7 @@ class Message(BaseModel):
         return '\n'.join(text_parts)
 
     @classmethod
-    def from_text(cls, text: str, role: Role = Role.agent, **kwargs) -> "Message":
+    def from_text(cls, text: str, role: Role = Role.agent, **kwargs) -> Message:
         """Create a message from text content."""
         return cls(
             role=role,
@@ -482,7 +482,7 @@ class Plan(abc.ABC):
     """Abstract plan that can be executed by a TaskExecutor."""
 
     @abc.abstractmethod
-    async def execute(self, executor: "TaskExecutor") -> _t.Any:
+    async def execute(self, executor: TaskExecutor) -> _t.Any:
         """Execute the plan using the provided executor."""
         raise NotImplementedError
 

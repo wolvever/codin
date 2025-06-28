@@ -10,11 +10,15 @@ This module includes:
 
 from __future__ import annotations
 
-from typing import Any, Protocol, AsyncIterator, Optional # Added Optional
+from collections.abc import AsyncIterator  # Added Optional
+from typing import Any, Protocol
+
 from pydantic import BaseModel, Field
 
+from ..agent.types import RunConfig
+
 # Import types from the envelope definitions
-from .envelope_types import EnvelopeKind, EnvelopeHeaders
+from .envelope_types import EnvelopeHeaders, EnvelopeKind
 
 
 class ActorRunInput(BaseModel):
@@ -43,6 +47,8 @@ class ActorRunInput(BaseModel):
             relevant for the actor's execution, not directly part of the
             envelope structure but potentially added during dispatching or
             pre-processing.
+        config: The RunConfig instance containing execution parameters for the actor,
+            such as budget constraints, turn limits, and other operational settings.
     """
     request_id: str
     context_id: str | None = None
@@ -50,6 +56,7 @@ class ActorRunInput(BaseModel):
     headers: EnvelopeHeaders
     payload: Any # Raw payload, actor needs to deserialize based on kind/headers
     metadata: dict[str, Any] = Field(default_factory=dict)
+    config: RunConfig = Field(default_factory=RunConfig)
 
 
 ActorRunOutput = Any
@@ -67,7 +74,7 @@ class CallableActor(Protocol):
         """Processes the given input and asynchronously yields outputs."""
         ...
 
-    async def request_cancel(self) -> None:
+    async def cancel(self) -> None:
         """Requests the actor to gracefully cancel its current work.
 
         Implementations should set an internal flag that `run` can check.
@@ -77,18 +84,18 @@ class CallableActor(Protocol):
         """
         ...
 
-    async def request_pause(self) -> None:
+    async def pause(self) -> None:
         """Requests the actor to pause its current work, if pausable.
 
         Implementations should set an internal flag. The `run` method should
         check this flag and, if set, suspend its operation (e.g., by awaiting
         a resume signal or periodically sleeping). The actor should ideally still
-        be responsive to other control signals like `request_cancel`.
+        be responsive to other control signals like `cancel`.
         This method should be quick and non-blocking.
         """
         ...
 
-    async def request_resume(self, followup_data: Optional[dict]) -> None:
+    async def resume(self, followup_data: dict | None) -> None:
         """Requests the actor to resume its paused work.
 
         Implementations should clear the internal pause flag. The `run` method,

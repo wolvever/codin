@@ -3,8 +3,9 @@
 Test script for Sealos AI Proxy API
 """
 
-import requests
 import json
+
+import requests
 
 
 def test_sealos_api():

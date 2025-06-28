@@ -6,13 +6,12 @@ Test script for prompt_run with Sealos AI Proxy API configuration
 import asyncio
 import os
 import sys
-import json
 from pathlib import Path
 
 # Add src to path so we can import codin modules
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from codin.prompt.run import prompt_run, set_endpoint
+from codin.prompt.run import prompt_run
 
 
 async def test_prompt_run_with_sealos():
@@ -77,7 +76,6 @@ async def test_simple_prompt():
     
     try:
         # Import the engine directly for a simpler test
-        from codin.prompt.engine import PromptEngine
         from codin.model.factory import create_llm_from_env
         
         # Create LLM instance
@@ -92,7 +90,7 @@ async def test_simple_prompt():
             print(f"Result: {result}")
         else:
             print(
-                f"❌ LLM doesn't have generate method. Available methods: " +
+                "❌ LLM doesn't have generate method. Available methods: " +
                 f"{[m for m in dir(llm) if not m.startswith('_')]}"
             )
         

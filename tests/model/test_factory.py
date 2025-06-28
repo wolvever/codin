@@ -1,11 +1,12 @@
-import pytest
-import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from src.codin.model.factory import LLMFactory, create_llm_from_env
-from src.codin.model.config import ModelConfig
-from src.codin.model.openai_llm import OpenAILLM
+import pytest
+
 from src.codin.model.anthropic_llm import AnthropicLLM
+from src.codin.model.config import ModelConfig
+from src.codin.model.factory import LLMFactory, create_llm_from_env
+from src.codin.model.openai_llm import OpenAILLM
+
 # Add other LLM types if they are part of PROVIDER_CLASSES and need specific testing
 
 # Mock the actual LLM classes to prevent real API calls and to check constructor args

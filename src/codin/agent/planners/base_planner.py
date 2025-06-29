@@ -7,13 +7,38 @@ import typing as _t
 import uuid
 from datetime import datetime
 
-from ..id import new_id
-from ..prompt.run import prompt_run
-from ..sandbox.local import LocalSandbox
-from ..tool.base import to_definitions as to_tool_definitions
-from ..utils.message import format_history_for_prompt, format_tool_results_for_conversation
-from .base import Planner
-from .types import (
+try:  # Support import as both 'codin' and 'src.codin'
+    from ...id import new_id
+except Exception:  # pragma: no cover - fallback for regular package
+    from ..id import new_id
+
+try:
+    from ..prompt.run import prompt_run
+except Exception:  # pragma: no cover - fallback when namespaced under src
+    from ...prompt.run import prompt_run
+
+try:
+    from ..sandbox.local import LocalSandbox
+except Exception:  # pragma: no cover - fallback for namespaced import
+    from ...sandbox.local import LocalSandbox
+
+try:
+    from ..tool.base import to_definitions as to_tool_definitions
+except Exception:  # pragma: no cover
+    from ...tool.base import to_definitions as to_tool_definitions
+
+try:
+    from ..utils.message import format_history_for_prompt, format_tool_results_for_conversation
+except Exception:  # pragma: no cover
+    from ...utils.message import (
+        format_history_for_prompt,
+        format_tool_results_for_conversation,
+    )
+try:
+    from ..base import Planner
+except Exception:  # pragma: no cover
+    from .base import Planner
+from ..types import (
     ErrorStep,
     FinishStep,
     Message,
@@ -34,7 +59,7 @@ logger = logging.getLogger("codin.agent.codeact_planner")
 class CodeActPlanner(Planner):
     """
     CodeAct Planner specialized for code generation and execution.
-    
+
     This planner focuses on:
     - Code generation from natural language
     - Automatic code execution
@@ -74,10 +99,10 @@ class CodeActPlanner(Planner):
         """Generate execution steps with code generation and execution."""
         try:
             self._iteration_count = 0
-            
+
             while self._iteration_count < self.max_iterations:
                 self._iteration_count += 1
-                
+
                 # Get LLM response
                 variables = await self._build_prompt_variables(state)
                 response = await prompt_run(
@@ -89,10 +114,10 @@ class CodeActPlanner(Planner):
 
                 # Handle streaming response
                 message_content = await self._handle_response(response, state)
-                
+
                 # Parse structured response
                 parsed_response = self._parse_response(message_content)
-                
+
                 # Emit thinking step if enabled
                 if self.thinking_enabled and parsed_response.get("thinking"):
                     yield ThinkStep(
@@ -119,7 +144,7 @@ class CodeActPlanner(Planner):
                         text=message_content,
                         role=Role.agent,
                         contextId=state.session_id,
-                        messageId=new_id("msg")
+                        messageId=new_id("msg"),
                     )
                     yield MessageStep(
                         step_id=str(uuid.uuid4()),
@@ -131,13 +156,13 @@ class CodeActPlanner(Planner):
                     for i, code_block in enumerate(code_blocks):
                         try:
                             execution_result = await self._execute_code(code_block)
-                            
+
                             # Emit execution result
                             result_message = Message.from_text(
                                 text=f"Code execution result:\n```\n{execution_result}\n```",
                                 role=Role.agent,
                                 contextId=state.session_id,
-                                messageId=new_id("msg")
+                                messageId=new_id("msg"),
                             )
                             yield MessageStep(
                                 step_id=str(uuid.uuid4()),
@@ -145,7 +170,7 @@ class CodeActPlanner(Planner):
                                 created_at=datetime.now(),
                                 metadata={"execution_result": True, "block_index": i},
                             )
-                            
+
                             # Add execution result to state for next iteration
                             state.last_tool_results = [
                                 {
@@ -154,13 +179,13 @@ class CodeActPlanner(Planner):
                                     "success": True,
                                 }
                             ]
-                            
+
                         except Exception as e:
                             error_message = Message.from_text(
                                 text=f"Code execution error: {e!s}",
                                 role=Role.agent,
                                 contextId=state.session_id,
-                                messageId=new_id("msg")
+                                messageId=new_id("msg"),
                             )
                             yield ErrorStep(
                                 step_id=str(uuid.uuid4()),
@@ -168,7 +193,7 @@ class CodeActPlanner(Planner):
                                 error=str(e),
                                 created_at=datetime.now(),
                             )
-                            
+
                             # Add error to state for next iteration
                             state.last_tool_results = [
                                 {
@@ -188,7 +213,7 @@ class CodeActPlanner(Planner):
                         text=regular_message,
                         role=Role.agent,
                         contextId=state.session_id,
-                        messageId=new_id("msg")
+                        messageId=new_id("msg"),
                     )
                     yield MessageStep(
                         step_id=str(uuid.uuid4()),
@@ -203,7 +228,7 @@ class CodeActPlanner(Planner):
                         text=regular_message or "CodeAct execution complete",
                         role=Role.agent,
                         contextId=state.session_id,
-                        messageId=new_id("msg")
+                        messageId=new_id("msg"),
                     )
                     yield FinishStep(
                         step_id=str(uuid.uuid4()),
@@ -220,7 +245,7 @@ class CodeActPlanner(Planner):
                     text=f"Reached maximum iterations ({self.max_iterations})",
                     role=Role.agent,
                     contextId=state.session_id,
-                    messageId=new_id("msg")
+                    messageId=new_id("msg"),
                 )
                 yield FinishStep(
                     step_id=str(uuid.uuid4()),
@@ -236,7 +261,7 @@ class CodeActPlanner(Planner):
                 text=f"CodeAct planner error: {e!s}",
                 role=Role.agent,
                 contextId=state.session_id,
-                messageId=new_id("msg")
+                messageId=new_id("msg"),
             )
             yield ErrorStep(
                 step_id=str(uuid.uuid4()),
@@ -297,7 +322,7 @@ class CodeActPlanner(Planner):
 
         # Extract tool calls from text
         parsed["tool_calls"] = self._parse_tool_calls_from_text(content)
-        
+
         return parsed
 
     def _parse_tool_calls_from_text(self, content: str) -> list[ToolCall]:
@@ -309,11 +334,7 @@ class CodeActPlanner(Planner):
         for tool_name, args_str in matches:
             try:
                 arguments = json.loads(args_str)
-                tool_call = ToolCall(
-                    call_id=str(uuid.uuid4()),
-                    name=tool_name,
-                    arguments=arguments
-                )
+                tool_call = ToolCall(call_id=str(uuid.uuid4()), name=tool_name, arguments=arguments)
                 tool_calls.append(tool_call)
             except json.JSONDecodeError:
                 logger.error(f"Failed to parse arguments for tool {tool_name}: {args_str}")
@@ -393,6 +414,7 @@ class CodeActPlanner(Planner):
 
     def _clean_parameters(self, parameters: dict) -> dict:
         """Clean parameters to remove Undefined values and make them JSON serializable."""
+
         def clean_value(value):
             if hasattr(value, "__class__") and value.__class__.__name__ == "Undefined":
                 return None

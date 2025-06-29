@@ -12,6 +12,7 @@ from enum import Enum
 __all__ = [
     'BaseEmbedding',
     'BaseLLM',
+    'LLM',
     'BaseModel',
     'BaseReranker',
     'ModelType',
@@ -100,6 +101,10 @@ class BaseLLM(BaseModel):
         Returns:
             Dict with 'content' and/or 'tool_calls', or async iterator of such dicts
         """
+
+
+# Compatibility alias for older tests
+LLM = BaseLLM
 
 
 class BaseEmbedding(BaseModel):

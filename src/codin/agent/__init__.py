@@ -18,7 +18,7 @@ from .config import AgentEndpointConfig
 from .factory import AgentFactory, create_agent, create_local_agent, create_remote_agent
 from .planners import BasicPlanner, CodingAssistantPlanner, ReactivePlanner
 from .react_planner import ReActPlanner
-from .runner import AgentRunner as Runner
+from ..runner.runner import AgentRunner as Runner
 from .session import Session
 from .types import (
     FinishStep,

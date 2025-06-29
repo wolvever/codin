@@ -33,6 +33,7 @@ from ..agent.base import Agent
 from ..agent.types import AgentRunInput, AgentRunOutput, ToolCall, ToolCallResult
 from ..config import ApprovalMode
 from ..memory.base import MemMemoryService, MemoryService
+from ..model.base import LLM
 from ..model.factory import LLMFactory
 from ..prompt import prompt_run
 from ..sandbox.base import Sandbox
@@ -84,14 +85,16 @@ class CodeAgent(Agent):
         name: str = "CodeAgent",
         description: str = "Python agent with sandbox + tools support and iterative execution",
         llm_model: str | None = None,
+        llm: LLM | None = None,
         sandbox: Sandbox | None = None,
         tool_registry: ToolRegistry | None = None,
         toolsets: list[Toolset] | None = None,
         approval_mode: ApprovalMode = ApprovalMode.UNSAFE_ONLY,
         max_turns: int = 100,
         rules: str | None = None,
-        memory_system: MemoryService | None = None,
+        memory: MemoryService | None = None,
         debug: bool = False,
+        agent_id: str | None = None,
     ) -> None:
         """Initialize the CodeAgent.
 
@@ -108,11 +111,10 @@ class CodeAgent(Agent):
             memory_system: Memory system for conversation history
             debug: Enable debug mode to print LLM requests and responses
         """
-        super().__init__(name=name, description=description)
+        super().__init__(name=agent_id or name, description=description)
 
         # Initialize LLM
-
-        self.llm = LLMFactory.create_llm(model=llm_model)
+        self.llm = llm or LLMFactory.create_llm(model=llm_model)
 
         # Initialize sandbox
         self.sandbox = sandbox or LocalSandbox()
@@ -123,16 +125,10 @@ class CodeAgent(Agent):
         # Initialize tool executor
         self.tool_executor = ToolExecutor(self.tool_registry)
 
-        # Register toolsets
+        # Register toolsets if provided
         if toolsets:
             for toolset in toolsets:
                 self.tool_registry.register_toolset(toolset)
-        else:
-            # Default toolsets
-            from ..tool.sandbox import SandboxToolset
-
-            sandbox_toolset = SandboxToolset(self.sandbox)
-            self.tool_registry.register_toolset(sandbox_toolset)
 
         # Configuration
         self.approval_mode = approval_mode
@@ -143,7 +139,7 @@ class CodeAgent(Agent):
         self.rules = rules
 
         # Initialize memory system
-        self.memory_system = memory_system or MemMemoryService()
+        self.memory_system = memory or MemMemoryService()
 
         # State tracking
         self._conversation_history: list[Message] = []
@@ -159,7 +155,11 @@ class CodeAgent(Agent):
         # Event callbacks
         self._event_callbacks: list[_t.Callable[[AgentEvent], _t.Awaitable[None]]] = []
 
-        logger.info(f"Initialized CodeAgent with {len(self.tool_registry.get_tools())} tools")
+        try:
+            tool_count = len(self.tool_registry.get_tools())
+        except Exception:
+            tool_count = 0
+        logger.info(f"Initialized CodeAgent with {tool_count} tools")
 
     def add_event_callback(self, callback: _t.Callable[[AgentEvent], _t.Awaitable[None]]) -> None:
         """Add an event callback for monitoring agent execution."""
@@ -520,10 +520,14 @@ class CodeAgent(Agent):
     def _parse_json_tool_calls(self, content: str) -> list[ToolCall]: # Omitted for brevity
         return []
 
-    async def run(self, input_data: AgentRunInput) -> AgentRunOutput: # Omitted for brevity, assume uses _run_turn correctly
+    async def run(self, input_data: AgentRunInput) -> _t.AsyncGenerator[AgentRunOutput, None]:
         self._start_time = time.time()
         task_id = str(uuid.uuid4())
-        tool_definitions = to_tool_definitions(self.tool_registry.get_tools())
+        try:
+            tools = list(self.tool_registry.get_tools())
+        except Exception:
+            tools = []
+        tool_definitions = to_tool_definitions(tools)
         run_context = { "task_id": task_id, "task_list": {"completed": [], "pending": []}, "tool_definitions": tool_definitions, "should_continue": True, }
         conversation_history = [input_data.message]
         total_tool_calls = 0; iteration = 0
@@ -547,14 +551,24 @@ class CodeAgent(Agent):
             final_response = next((msg for msg in reversed(conversation_history) if msg.role == Role.agent), self._create_agent_message("Task completed.", task_id))
             if self.memory_system:
                 for msg in conversation_history: await self.memory_system.add_message(msg)
-            await self._emit_event("task_end", { "task_id": task_id, "session_id": self._context_id, "iteration": iteration, "elapsed_time": time.time() - self._start_time, })
-            return AgentRunOutput(result=final_response, metadata={ "task_id": task_id, "iterations": iteration })
+            await self._emit_event(
+                "task_end",
+                {
+                    "task_id": task_id,
+                    "session_id": self._context_id,
+                    "iteration": iteration,
+                    "elapsed_time": time.time() - self._start_time,
+                },
+            )
+            yield AgentRunOutput(result=final_response, metadata={"task_id": task_id, "iterations": iteration})
+            return
         except Exception as e:
             logger.error(f"Error in agent execution: {e}", exc_info=True)
             await self._emit_event("task_error", {"task_id": task_id, "error": str(e), "iteration": iteration})
             error_response = self._create_agent_message(f"I encountered an error: {e!s}", task_id)
-            await self._emit_event("task_end", {"task_id": task_id })
-            return AgentRunOutput(result=error_response, metadata={"task_id": task_id, "error": str(e) })
+            await self._emit_event("task_end", {"task_id": task_id})
+            yield AgentRunOutput(result=error_response, metadata={"task_id": task_id, "error": str(e)})
+            return
 
     def _is_task_complete(
         self, response_messages: list[Message], tool_results: list[ToolCallResult], run_context: dict[str, _t.Any]

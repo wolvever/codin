@@ -33,6 +33,7 @@ __all__ = [
     "TaskStatus",
     "TaskStatusUpdateEvent",
     "TaskArtifactUpdateEvent",
+    "ToolCallPart",
     "ToolUsePart",
     "ToolCall",
     "ToolCallResult",
@@ -70,6 +71,9 @@ class Role(str, Enum):
     user = "user"
     agent = "agent"
     assistant = "assistant"
+    USER = "user"
+    AGENT = "agent"
+    ASSISTANT = "assistant"
 
 
 class TextPart(BaseModel):
@@ -100,6 +104,13 @@ class Message(BaseModel):
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
     taskId: str | None = None
     referenceTaskIds: list[str] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _convert_content(cls, data: dict[str, _t.Any]) -> dict[str, _t.Any]:
+        if "content" in data and "parts" not in data:
+            data["parts"] = data.pop("content")
+        return data
 
     def add_text_part(self, text: str, metadata: dict[str, _t.Any] | None = None) -> None:
         """Append a TextPart to the message."""
@@ -200,20 +211,23 @@ class ToolCall(_pyd.BaseModel):
     arguments: dict[str, _t.Any]
 
 
+class ToolCallPart(_pyd.BaseModel):
+    """Message part containing tool calls."""
+
+    kind: _t.Literal["tool_calls"] = "tool_calls"
+    tool_calls: list[ToolCall]
+
+
 class ToolUsePart(_pyd.BaseModel):
-    """Represents a tool use (call and/or result) segment within message parts."""
+    """Represents a tool call or result within a message."""
 
     kind: _t.Literal["tool-use"] = "tool-use"
-    """Part type - tool-use for ToolUseParts"""
-
     type: _t.Literal["call", "result"] = "call"
-    """Whether this is a tool call or tool result"""
-
     id: str
-    """Unique identifier for the tool use"""
-
     name: str
-    arguments: dict[str, _t.Any]
+    input: dict[str, _t.Any] | None = None
+    output: _t.Any | None = None
+    metadata: dict[str, _t.Any] | None = None
 
 
 class ToolCallResult(_pyd.BaseModel):
@@ -316,6 +330,15 @@ class AgentRunInput(_pyd.BaseModel):
     id: str | int | None = None
     message: Message
     metadata: dict[str, _t.Any] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _convert_messages(cls, data: dict[str, _t.Any]) -> dict[str, _t.Any]:
+        if "messages" in data and "message" not in data:
+            messages = data.pop("messages")
+            if isinstance(messages, list) and messages:
+                data["message"] = messages[-1]
+        return data
     """Additional metadata about the tool call or result"""
 
 
@@ -328,10 +351,12 @@ class AgentRunOutput(_pyd.BaseModel):
     status: str = "completed"
     artifacts: list[_t.Any] | None = None
     metadata: dict[str, _t.Any] = Field(default_factory=dict)
+    runner_id: str | None = None
+    request_id: str | None = None
 
 
 # Union type for message parts
-Part = TextPart | DataPart | FilePart | ToolUsePart
+Part = TextPart | DataPart | FilePart | ToolUsePart | ToolCallPart
 
 
 class RunConfig(BaseModel):

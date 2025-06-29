@@ -12,6 +12,7 @@ import importlib
 import sys
 
 import prompti as _prompti
+from prompti import *  # type: ignore F401,F403
 
 # Re-export commonly used submodules so imports like
 # ``from codin.prompt.engine import PromptEngine`` continue to work.
@@ -32,6 +33,4 @@ for _name in (
         pass
 
 # Re-export everything defined by prompti at the package level
-from prompti import *  # type: ignore F401,F403
-
 __all__ = getattr(_prompti, "__all__", [])

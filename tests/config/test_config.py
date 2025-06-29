@@ -1,5 +1,6 @@
 """Tests for the codin.config module."""
 
+import json
 import os
 import tempfile  # For creating temporary config file
 from pathlib import Path
@@ -20,15 +21,16 @@ class TestConfig:
         """Set up test environment variables."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("MY_CUSTOM_KEY", raising=False) # For custom env_key tests
+        monkeypatch.delenv("MY_CUSTOM_KEY", raising=False)  # For custom env_key tests
         monkeypatch.delenv("UNUSED_KEY", raising=False)
         monkeypatch.delenv("LLM_MODEL", raising=False)
         monkeypatch.delenv("DEBUG", raising=False)
 
         # Clear config cache
         import codin.config
+
         codin.config._config = None
-        codin.config._config_file = None # Also clear the stored config file path
+        codin.config._config_file = None  # Also clear the stored config file path
 
     def test_default_config(self):
         """Test that default configuration is loaded correctly."""
@@ -58,34 +60,38 @@ class TestConfig:
         """Test the get_config function."""
         monkeypatch.setenv("LLM_MODEL", "gpt-4o")
 
-        with patch("codin.config.find_config_files", return_value=[]): # Ensure no file loading interference
+        with patch("codin.config.find_config_files", return_value=[]):  # Ensure no file loading interference
             config = get_config()
             assert isinstance(config, CodinConfig)
             assert config.model == "gpt-4o"
 
-            config2 = get_config() # Should return cached instance
+            config2 = get_config()  # Should return cached instance
             assert config is config2
 
     def test_get_config_reloads_if_file_changes(self, monkeypatch):
         dummy_path_1 = Path("dummy_cfg_1.yaml")
         dummy_path_2 = Path("dummy_cfg_2.yaml")
 
-        with patch("codin.config.find_config_files", return_value=[dummy_path_1]), \
-             patch("codin.config.load_config_file", return_value={"model": "model1"}):
+        with (
+            patch("codin.config.find_config_files", return_value=[dummy_path_1]),
+            patch("codin.config.load_config_file", return_value={"model": "model1"}),
+        ):
             cfg1 = get_config(config_file=dummy_path_1)
             assert cfg1.model == "model1"
 
         # Clear global _config to simulate new call context for get_config
         import codin.config as AppConfigModule
+
         AppConfigModule._config = None
         AppConfigModule._config_file = None
 
-        with patch("codin.config.find_config_files", return_value=[dummy_path_2]), \
-             patch("codin.config.load_config_file", return_value={"model": "model2"}):
-            cfg2 = get_config(config_file=dummy_path_2) # Different file
+        with (
+            patch("codin.config.find_config_files", return_value=[dummy_path_2]),
+            patch("codin.config.load_config_file", return_value={"model": "model2"}),
+        ):
+            cfg2 = get_config(config_file=dummy_path_2)  # Different file
             assert cfg2.model == "model2"
             assert cfg1 is not cfg2
-
 
     def test_get_api_key_uses_defaults(self, monkeypatch):
         """Test retrieving API keys using default model_configs."""
@@ -96,6 +102,7 @@ class TestConfig:
         with patch("codin.config.find_config_files", return_value=[]):
             # Clear global _config to force reload defaults
             import codin.config as AppConfigModule
+
             AppConfigModule._config = None
             AppConfigModule._config_file = None
 
@@ -145,7 +152,7 @@ class TestConfig:
                     # "name": "Custom Provider", # Old field, not used by new ModelClientConfig directly for provider
                     "base_url": "https://custom.api/v1",
                     "env_key": "MY_FILE_KEY",
-                    "models": ["custom-model-1", "custom-model-2"]
+                    "models": ["custom-model-1", "custom-model-2"],
                 }
             }
         }
@@ -172,12 +179,12 @@ class TestConfig:
                 "new_provider": {
                     # provider field in ModelClientConfig is set by the dict key 'new_provider'
                     "model_name": "new-model-x",
-                    "api_key": "direct_api_key_in_file", # Direct API key
+                    "api_key": "direct_api_key_in_file",  # Direct API key
                     "base_url": "https://new.api/v2",
                     "api_version": "2024-01-01",
                     "timeout": 77.0,
                     # env_key should be ignored if api_key is present
-                    "env_key": "SOME_OTHER_KEY_THAT_SHOULD_BE_IGNORED"
+                    "env_key": "SOME_OTHER_KEY_THAT_SHOULD_BE_IGNORED",
                 }
             }
         }
@@ -194,7 +201,7 @@ class TestConfig:
             assert isinstance(new_cfg, ModelClientConfig)
             assert new_cfg.provider == "new_provider"
             assert new_cfg.model_name == "new-model-x"
-            assert new_cfg.api_key == "direct_api_key_in_file" # Direct key wins
+            assert new_cfg.api_key == "direct_api_key_in_file"  # Direct key wins
             assert new_cfg.base_url == "https://new.api/v2"
             assert new_cfg.api_version == "2024-01-01"
             assert new_cfg.timeout == 77.0
@@ -203,18 +210,13 @@ class TestConfig:
 
     def test_get_api_key_with_new_model_config_loaded_from_file(self, monkeypatch):
         """Test get_api_key after config loading with new ModelClientConfig from file."""
-        content = {
-            "model_configs": {
-                "provider_for_get_key": {
-                    "api_key": "key_for_get_api_key_test_from_file"
-                }
-            }
-        }
+        content = {"model_configs": {"provider_for_get_key": {"api_key": "key_for_get_api_key_test_from_file"}}}
         temp_config_path = self._create_temp_config_file(content)
         try:
             with patch("codin.config.find_config_files", return_value=[temp_config_path]):
                 import codin.config as AppConfigModule
-                AppConfigModule._config = None # Force reload
+
+                AppConfigModule._config = None  # Force reload
                 AppConfigModule._config_file = None
 
                 # get_api_key calls get_config which calls load_config

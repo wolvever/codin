@@ -5,7 +5,7 @@ from typing import Any
 
 from ..memory.base import Memory
 from ..tool.base import Tool
-from .types import RunConfig
+from .types import Message, RunConfig
 
 
 @dataclass

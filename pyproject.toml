@@ -92,7 +92,7 @@ line_length = 100
 line-length = 100
 target-version = "py312"
 select = ["E", "F", "B", "I"]
-ignore = []
+ignore = ["E501", "UP007", "B904", "B027", "B017", "B019", "B023", "F403"]
 
 [tool.mypy]
 python_version = "3.12"

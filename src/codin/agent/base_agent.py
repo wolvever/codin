@@ -359,7 +359,7 @@ class BaseAgent(AgentActor):
     async def _emit_event(self, event_type: str, data: dict) -> None:
         # ... (implementation from previous version)
         try:
-            serializable_data = {k: (v if isinstance(v, (str, int, float, bool, list, dict)) else str(v)) for k, v in data.items()}
+            serializable_data = {k: (v if isinstance(v, str | int | float | bool | list | dict) else str(v)) for k, v in data.items()}
             event_message = A2AMessage(messageId=f"event_{uuid.uuid4().hex[:4]}_{event_type}",role=Role.agent,parts=[TextPart(text=f"Event: {event_type}")],contextId=data.get("session_id", self.id),kind="event",metadata={"event_type": event_type, "timestamp": datetime.now().isoformat(), **serializable_data})
             await self.mailbox.put_outbox(event_message)
         except Exception as e:

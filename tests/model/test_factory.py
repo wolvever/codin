@@ -19,7 +19,7 @@ def mock_llm_classes():
         # 'litellm': MagicMock(spec=LiteLLMAdapter) # Assuming LiteLLMAdapter exists
     }) as mock_providers:
         # Configure the .return_value for each mocked class constructor
-        for provider_name, mock_class in mock_providers.items():
+        for _provider_name, mock_class in mock_providers.items():
             llm_instance_mock = MagicMock()
             # Mock methods expected to be called on the instance, e.g., prepare, generate
             llm_instance_mock.prepare = MagicMock()
@@ -40,7 +40,7 @@ class TestLLMFactory:
     @pytest.mark.asyncio
     async def test_create_llm_with_direct_args(self, mock_llm_classes): # Made async
         """Test creating LLM with direct arguments."""
-        factory_instance = await LLMFactory.create_llm( # Added await
+        await LLMFactory.create_llm( # Added await
             model="gpt-direct",
             provider="openai",
             api_key="direct_key",

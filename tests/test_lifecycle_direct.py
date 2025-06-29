@@ -124,7 +124,7 @@ async def test_error_handling():
     
     try:
         await failing_resource.up()
-        assert False, "Expected exception"
+        raise AssertionError("Expected exception")
     except RuntimeError:
         assert failing_resource.state == LifecycleState.ERROR
         assert failing_resource.is_error

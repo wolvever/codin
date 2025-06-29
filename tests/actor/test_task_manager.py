@@ -98,7 +98,7 @@ class TestTaskRegistry:
     async def test_update_task_state(self, registry):
         """Test updating task state."""
         runner_id = "runner_123"
-        task_id = await registry.add_task(runner_id, "req_123", {})
+        await registry.add_task(runner_id, "req_123", {})
         
         # Update to running
         await registry.update_task_state(runner_id, TaskState.RUNNING)
@@ -226,7 +226,7 @@ class TestTaskRegistry:
         metadata = {"agent_id": "lifecycle_agent"}
         
         # Add task
-        task_id = await registry.add_task(runner_id, request_id, metadata)
+        await registry.add_task(runner_id, request_id, metadata)
         
         # Verify initial state
         task_info = await registry.get_task(runner_id)

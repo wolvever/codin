@@ -55,7 +55,7 @@ async def create_agent_and_planner():
     logger.info(f"✓ Registered {len(tool_registry.get_tools())} tools")
 
     # 3. Create LLM instance
-    model_provider = os.getenv("MODEL_PROVIDER", "openai")
+    os.getenv("MODEL_PROVIDER", "openai")
     model_name = os.getenv("MODEL_NAME", "gpt-4")
     llm = LLMFactory.create_llm(model=model_name)
     logger.info(f"✓ LLM created: {model_name}")

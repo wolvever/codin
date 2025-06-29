@@ -61,7 +61,7 @@ class TestOpenAIEmbedding:
             max_retries=2
         )
         with patch("src.codin.model.openai_embedding.Client", return_value=mock_embedding_client) as mock_client_cls:
-            emb_model = await OpenAIEmbedding(model="text-embedding-ada-002", config=config) # Await
+            await OpenAIEmbedding(model="text-embedding-ada-002", config=config) # Await
 
             mock_client_cls.assert_called_once()
             client_config_arg = mock_client_cls.call_args[0][0]
@@ -78,7 +78,7 @@ class TestOpenAIEmbedding:
         config = ModelConfig(api_key="cfg-override-key", base_url="https://cfg.openai.com/embed")
 
         with patch("src.codin.model.openai_embedding.Client", return_value=mock_embedding_client) as mock_client_cls:
-            emb_model = await OpenAIEmbedding(model="text-embedding-ada-002", config=config) # Await
+            await OpenAIEmbedding(model="text-embedding-ada-002", config=config) # Await
 
             client_config_arg = mock_client_cls.call_args[0][0]
             assert client_config_arg.default_headers["Authorization"] == "Bearer cfg-override-key"
@@ -92,7 +92,7 @@ class TestOpenAIEmbedding:
         config = ModelConfig(api_key="partial-cfg-key")
 
         with patch("src.codin.model.openai_embedding.Client", return_value=mock_embedding_client) as mock_client_cls:
-            emb_model = await OpenAIEmbedding(model="text-embedding-ada-002", config=config) # Await
+            await OpenAIEmbedding(model="text-embedding-ada-002", config=config) # Await
 
             client_config_arg = mock_client_cls.call_args[0][0]
             assert client_config_arg.default_headers["Authorization"] == "Bearer partial-cfg-key"

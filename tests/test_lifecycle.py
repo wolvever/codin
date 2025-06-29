@@ -521,7 +521,7 @@ class TestLifecycleContext:
         resource2 = MockResource("resource2")
         
         with pytest.raises(ValueError):
-            async with lifecycle_context(resource1, resource2) as manager:
+            async with lifecycle_context(resource1, resource2):
                 assert resource1.state == LifecycleState.UP
                 assert resource2.state == LifecycleState.UP
                 raise ValueError("Test exception")
@@ -559,7 +559,7 @@ class TestLifecycleContext:
         """Test context manager with single resource."""
         resource = MockResource("single")
         
-        async with lifecycle_context(resource) as manager:
+        async with lifecycle_context(resource):
             assert resource.state == LifecycleState.UP
         
         assert resource.state == LifecycleState.DOWN

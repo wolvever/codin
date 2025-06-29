@@ -240,7 +240,7 @@ class TestOpenAICompatibleBaseLLM:
             # For now, we'll just ensure the structure is there.
             # A more robust test might involve checking logs after specific deletion.
             # The current __del__ in the class just logs, so direct call is for checking that.
-            with patch.object(logger, 'warning') as mock_log_warning:
+            with patch.object(logger, 'warning'):
                 del llm
                 # This doesn't guarantee __del__ is called immediately in Python.
                 # We are mostly testing that the __del__ method exists and has the logic.

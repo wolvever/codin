@@ -65,7 +65,7 @@ async def test_session_manager_with_http_endpoint_loads_and_saves(mocker):
     mock_persistor_instance.load_session.return_value = Session(session_id=session_id, context={"loaded": True}, created_at=datetime.now(UTC))
 
     # Patch the HttpPersistor class within the base module where SessionManager looks for it
-    with patch('codin.session.base.HttpPersistor', return_value=mock_persistor_instance) as mock_http_persistor_class:
+    with patch('codin.session.base.HttpPersistor', return_value=mock_persistor_instance):
         manager = SessionManager(endpoint="http://dummy-endpoint.com/api")
 
         # Check if the manager's persistor is indeed our mocked instance

@@ -20,6 +20,6 @@ class BaseReplay(ABC):
         """Serializes a message. Can be overridden by subclasses if needed."""
         if hasattr(message, 'dict'):
             return message.dict()
-        if isinstance(message, (str, int, float, bool, list, dict)) or message is None:
+        if isinstance(message, str | int | float | bool | list | dict) or message is None:
             return message
         return str(message) # Fallback to string representation

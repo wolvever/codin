@@ -146,7 +146,7 @@ class LoggingExtension(Extension):
         try:
             if isinstance(result, str):
                 return len(result)
-            elif isinstance(result, (list, dict)):
+            elif isinstance(result, list | dict):
                 return len(str(result))
             elif hasattr(result, '__len__'):
                 return len(result)

@@ -129,7 +129,7 @@ class TestOpenAILLM:
     async def test_init_with_env_vars(self, mock_client, setup_environment): # Renamed from test_prepare_...
         """Test initializing the model using environment variables."""
         with patch("codin.model.openai_llm.Client", return_value=mock_client) as mock_client_cls:
-            llm = await OpenAILLM(model="gpt-4-env", config=None) # Await instantiation
+            await OpenAILLM(model="gpt-4-env", config=None) # Await instantiation
 
             mock_client_cls.assert_called_once()
             client_constructor_config = mock_client_cls.call_args[0][0]
@@ -150,7 +150,7 @@ class TestOpenAILLM:
                 timeout=99.0,
                 max_retries=5
             )
-            llm = await OpenAILLM(model="gpt-4-config", config=model_config) # Await
+            await OpenAILLM(model="gpt-4-config", config=model_config) # Await
 
             mock_client_cls.assert_called_once()
             client_constructor_config = mock_client_cls.call_args[0][0]
@@ -165,7 +165,7 @@ class TestOpenAILLM:
         """Test ModelConfig overrides environment variables during initialization."""
         with patch("codin.model.openai_llm.Client", return_value=mock_client) as mock_client_cls:
             model_config = ModelConfig(api_key="config-override-key", base_url="https://config.override/v1")
-            llm = await OpenAILLM(model="gpt-4-override", config=model_config) # Await
+            await OpenAILLM(model="gpt-4-override", config=model_config) # Await
 
             mock_client_cls.assert_called_once()
             client_constructor_config = mock_client_cls.call_args[0][0]
@@ -178,7 +178,7 @@ class TestOpenAILLM:
         """Test partial ModelConfig merges with environment variables during initialization."""
         with patch("codin.model.openai_llm.Client", return_value=mock_client) as mock_client_cls:
             model_config = ModelConfig(api_key="partial-config-key")
-            llm = await OpenAILLM(model="gpt-4-partial", config=model_config) # Await
+            await OpenAILLM(model="gpt-4-partial", config=model_config) # Await
 
             mock_client_cls.assert_called_once()
             client_constructor_config = mock_client_cls.call_args[0][0]

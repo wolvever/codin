@@ -14,7 +14,7 @@ class TestToolFormatting:
     @pytest.fixture
     def repl_session(self):
         """Create a test REPL session."""
-        config = CodinConfig()
+        CodinConfig()
         return ReplSession(verbose=False, debug=False)
     
     @patch('click.echo')

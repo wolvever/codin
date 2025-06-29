@@ -275,7 +275,7 @@ class TestLocalAgentHost:
         await agent_host.cleanup()
         
         # Cleanup should remove completed tasks
-        status = await agent_host.get_task_status(task_id)
+        await agent_host.get_task_status(task_id)
         # Task might be removed or marked as cleaned up
         
         await agent_host.stop()

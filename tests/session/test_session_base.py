@@ -428,7 +428,7 @@ class TestSessionIntegration:
             
             # Create session
             session_id = "lifecycle_test"
-            context = await manager.create_session(
+            await manager.create_session(
                 session_id=session_id,
                 user_id="test_user",
                 metadata={"project": "integration_test"}
@@ -444,7 +444,7 @@ class TestSessionIntegration:
             await manager.save_session_data(session_id, "conversation", conversation_data)
             
             # Update metadata
-            updated_context = await manager.update_session_metadata(
+            await manager.update_session_metadata(
                 session_id,
                 {"status": "active", "last_activity": "now"}
             )

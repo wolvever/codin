@@ -181,7 +181,7 @@ class TestDebugEvents:
         # Verify the structure
         assert debug_data["thinking"] == "Test thinking content"
         assert debug_data["message"] == "Test message content"
-        assert debug_data["should_continue"] == False  # Updated to match new mock
+        assert not debug_data["should_continue"]  # Updated to match new mock
         assert debug_data["task_list"]["completed_count"] == 2
         assert debug_data["task_list"]["pending_count"] == 1
         assert debug_data["task_list"]["completed"] == ["Task 1", "Task 2"]

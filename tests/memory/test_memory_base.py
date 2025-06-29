@@ -244,7 +244,7 @@ class TestMemMemoryService:
         await memory_service.add_message(message2)
         
         # Build a chunk
-        chunk = await memory_service.build_chunk("test_chunk")
+        await memory_service.build_chunk("test_chunk")
         
         # Add more messages
         message3 = Message(role=Role.USER, content=[TextPart(text="Second message")])

@@ -182,7 +182,7 @@ class TestInMemoryStore:
     async def test_search_memory_chunks(self, memory_store, sample_messages):
         """Test searching memory chunks."""
         # Create chunks
-        chunks = await memory_store.create_memory_chunk("session1", sample_messages)
+        await memory_store.create_memory_chunk("session1", sample_messages)
 
         # Search for relevant chunks
         results = await memory_store.search_memory_chunks("session1", "python", limit=5)
@@ -197,7 +197,7 @@ class TestInMemoryStore:
         for msg in sample_messages:
             await memory_store.add_message(msg)
 
-        chunks = await memory_store.create_memory_chunk("session1", sample_messages[:2])
+        await memory_store.create_memory_chunk("session1", sample_messages[:2])
 
         # Get history with query
         history = await memory_store.get_history("session1", limit=10, query="hello")

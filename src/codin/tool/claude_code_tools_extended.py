@@ -163,7 +163,6 @@ class MultiEditTool(ClaudeCodeTool):
             with open(target_path, encoding='utf-8') as f:
                 content = f.read()
             
-            original_content = content
             edits_applied = []
             
             # Validate all edits first

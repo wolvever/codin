@@ -78,7 +78,7 @@ class TestAnthropicLLM:
     async def test_init_client_with_env_vars(self, mock_anthropic_client, anthropic_env_vars): # Renamed
         """Test async __init__ using environment variables."""
         with patch("src.codin.model.anthropic_llm.Client", return_value=mock_anthropic_client) as mock_client_cls:
-            llm = await AnthropicLLM(model="claude-2.0", config=None) # Await instantiation
+            await AnthropicLLM(model="claude-2.0", config=None) # Await instantiation
 
             mock_client_cls.assert_called_once()
             client_config_arg = mock_client_cls.call_args[0][0]
@@ -101,7 +101,7 @@ class TestAnthropicLLM:
             max_retries=3
         )
         with patch("src.codin.model.anthropic_llm.Client", return_value=mock_anthropic_client) as mock_client_cls:
-            llm = await AnthropicLLM(model="claude-configured", config=config) # Await
+            await AnthropicLLM(model="claude-configured", config=config) # Await
 
             mock_client_cls.assert_called_once()
             client_config_arg = mock_client_cls.call_args[0][0]
@@ -119,7 +119,7 @@ class TestAnthropicLLM:
         config = ModelConfig(api_key="cfg-override-key", api_version="v-cfg")
 
         with patch("src.codin.model.anthropic_llm.Client", return_value=mock_anthropic_client) as mock_client_cls:
-            llm = await AnthropicLLM(model="claude-override", config=config) # Await
+            await AnthropicLLM(model="claude-override", config=config) # Await
 
             client_config_arg = mock_client_cls.call_args[0][0]
             assert client_config_arg.default_headers["x-api-key"] == "cfg-override-key"
@@ -135,7 +135,7 @@ class TestAnthropicLLM:
         config = ModelConfig(api_key="partial-cfg-key")
 
         with patch("src.codin.model.anthropic_llm.Client", return_value=mock_anthropic_client) as mock_client_cls:
-            llm = await AnthropicLLM(model="claude-partial-cfg", config=config) # Await
+            await AnthropicLLM(model="claude-partial-cfg", config=config) # Await
 
             client_config_arg = mock_client_cls.call_args[0][0]
             assert client_config_arg.default_headers["x-api-key"] == "partial-cfg-key"

@@ -278,7 +278,7 @@ class CommonCodeExecutionMixin(abc.ABC):
             # Simplified approach: Assume file_path is directly usable or prepared by caller
             # This part will likely be overridden or supplemented by the concrete classes.
 
-            file_path_obj = Path(file_path) # Ensure it's a Path object
+            Path(file_path) # Ensure it's a Path object
 
             # The following is a very simplified placeholder.
             # Real implementation needs to handle:

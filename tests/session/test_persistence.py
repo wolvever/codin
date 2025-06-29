@@ -18,7 +18,7 @@ from codin.session.persistence import HttpPersistor, LocalFilePersistor
 async def test_localfilepersistor_base_path_creation(tmp_path: Path):
     base_dir = tmp_path / "sessions_create_dir"
     assert not base_dir.exists()
-    persistor = LocalFilePersistor(base_path=str(base_dir))
+    LocalFilePersistor(base_path=str(base_dir))
     assert base_dir.exists()
     assert base_dir.is_dir()
 

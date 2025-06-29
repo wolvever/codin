@@ -385,8 +385,7 @@ class StdioSessionManagerBase(MCPSessionManager):
             clientInfo=self._client_info,
             protocolVersion=self._protocol_version
         )
-        method_name = "initialize"
-        request_id = self._next_mcp_lib_id() # Use the ID format expected by mcp-lib's internal request if possible
+        self._next_mcp_lib_id() # Use the ID format expected by mcp-lib's internal request if possible
 
         try:
             _logger.debug(f"Stdio/Sse: Sending typed InitializeRequest: {init_params}")
@@ -623,7 +622,6 @@ class StdioSessionManager(StdioSessionManagerBase):
         self._exit_stack = AsyncExitStack() # Replace for future use if any (though typically not)
 
         original_stderr = sys.stderr
-        original_showwarning = warnings.showwarning
         try:
             # Suppress warnings/errors during cleanup
             with open(os.devnull, 'w') as devnull:

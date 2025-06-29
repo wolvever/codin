@@ -1,4 +1,5 @@
 """Comprehensive tests for the codin.id module."""
+# ruff: noqa: E402
 
 import sys
 import uuid
@@ -21,7 +22,7 @@ class TestNewId:
     def test_basic_id_generation(self):
         """Test basic ID generation with default parameters."""
         result = new_id("test")
-        
+
         # Should have the format "test-{8_random_chars}"
         assert result.startswith("test-")
         suffix = result.split("-", 1)[1]
@@ -31,7 +32,7 @@ class TestNewId:
     def test_custom_prefix(self):
         """Test ID generation with custom prefixes."""
         prefixes = ["agent", "task", "session", "memory"]
-        
+
         for prefix in prefixes:
             result = new_id(prefix)
             assert result.startswith(f"{prefix}-")
@@ -41,7 +42,7 @@ class TestNewId:
     def test_custom_length(self):
         """Test ID generation with custom lengths."""
         lengths = [4, 12, 16, 32]
-        
+
         for length in lengths:
             result = new_id("test", length=length)
             suffix = result.split("-", 1)[1]
@@ -51,10 +52,10 @@ class TestNewId:
     def test_uuid_generation(self):
         """Test ID generation with UUID suffix."""
         result = new_id("test", uuid=True)
-        
+
         assert result.startswith("test-")
         suffix = result.split("-", 1)[1]
-        
+
         # Should be a valid UUID4 string
         try:
             parsed_uuid = uuid.UUID(suffix)
@@ -66,15 +67,15 @@ class TestNewId:
         """Test that length parameter is ignored when uuid=True."""
         result1 = new_id("test", length=4, uuid=True)
         result2 = new_id("test", length=20, uuid=True)
-        
+
         # Both should have UUID format regardless of length parameter
         suffix1 = result1.split("-", 1)[1]
         suffix2 = result2.split("-", 1)[1]
-        
+
         # Both should be valid UUIDs
         uuid.UUID(suffix1)
         uuid.UUID(suffix2)
-        
+
         # Both should have standard UUID length (36 chars with hyphens)
         assert len(suffix1) == 36
         assert len(suffix2) == 36
@@ -82,7 +83,7 @@ class TestNewId:
     def test_empty_prefix(self):
         """Test ID generation with empty prefix."""
         result = new_id("")
-        
+
         # Should start with a hyphen
         assert result.startswith("-")
         suffix = result[1:]  # Remove leading hyphen
@@ -92,7 +93,7 @@ class TestNewId:
     def test_prefix_with_special_characters(self):
         """Test ID generation with prefixes containing special characters."""
         special_prefixes = ["test_case", "user@domain", "item#1", "node.js"]
-        
+
         for prefix in special_prefixes:
             result = new_id(prefix)
             assert result.startswith(f"{prefix}-")
@@ -125,14 +126,14 @@ class TestNewId:
         # Generate multiple IDs to check character distribution
         ids = [new_id("test") for _ in range(100)]
         suffixes = [id_str.split("-", 1)[1] for id_str in ids]
-        
+
         # Combine all characters used
         all_chars = "".join(suffixes)
         unique_chars = set(all_chars)
-        
+
         # Should only contain alphanumeric characters
         assert all(c.isalnum() for c in unique_chars)
-        
+
         # Should contain both letters and digits (with high probability)
         has_letter = any(c.isalpha() for c in unique_chars)
         has_digit = any(c.isdigit() for c in unique_chars)
@@ -143,7 +144,7 @@ class TestNewId:
         """Test that generated IDs are unique."""
         # Generate many IDs with the same parameters
         ids = [new_id("test") for _ in range(1000)]
-        
+
         # All should be unique
         assert len(set(ids)) == len(ids)
 
@@ -151,40 +152,40 @@ class TestNewId:
         """Test that UUID-based IDs are unique."""
         # Generate many UUID-based IDs
         ids = [new_id("test", uuid=True) for _ in range(100)]
-        
+
         # All should be unique
         assert len(set(ids)) == len(ids)
 
     def test_deterministic_with_mocked_random(self):
         """Test that ID generation is deterministic when random is mocked."""
-        with patch('random.choices') as mock_choices:
-            mock_choices.return_value = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-            
+        with patch("random.choices") as mock_choices:
+            mock_choices.return_value = ["a", "b", "c", "d", "e", "f", "g", "h"]
+
             result = new_id("test")
             assert result == "test-abcdefgh"
-            
+
             # Should call random.choices with correct parameters
             mock_choices.assert_called_once()
             args, kwargs = mock_choices.call_args
-            assert kwargs['k'] == 8
+            assert kwargs["k"] == 8
 
     def test_deterministic_with_mocked_uuid(self):
         """Test that UUID generation is deterministic when uuid is mocked."""
         mock_uuid_value = "12345678-1234-4567-8901-123456789012"
-        
-        with patch('uuid.uuid4') as mock_uuid4:
+
+        with patch("uuid.uuid4") as mock_uuid4:
             mock_uuid4.return_value = uuid.UUID(mock_uuid_value)
-            
+
             result = new_id("test", uuid=True)
             assert result == f"test-{mock_uuid_value}"
 
     def test_multiple_hyphens_in_prefix(self):
         """Test behavior with prefixes containing multiple hyphens."""
         result = new_id("multi-part-prefix")
-        
+
         # Should maintain all hyphens in prefix
         assert result.startswith("multi-part-prefix-")
-        
+
         # The last segment should be the generated suffix
         parts = result.split("-")
         suffix = parts[-1]
@@ -194,7 +195,7 @@ class TestNewId:
     def test_numeric_prefix(self):
         """Test ID generation with numeric prefix."""
         result = new_id("123")
-        
+
         assert result.startswith("123-")
         suffix = result.split("-", 1)[1]
         assert len(suffix) == 8
@@ -204,7 +205,7 @@ class TestNewId:
         """Test ID generation with very long prefix."""
         long_prefix = "a" * 100
         result = new_id(long_prefix)
-        
+
         assert result.startswith(f"{long_prefix}-")
         suffix = result.split("-", 1)[1]
         assert len(suffix) == 8
@@ -226,17 +227,17 @@ class TestNewId:
     def test_concurrent_generation_uniqueness(self):
         """Test that concurrent ID generation maintains uniqueness."""
         import concurrent.futures
-        
+
         def generate_ids(count):
             return [new_id("concurrent") for _ in range(count)]
-        
+
         # Generate IDs concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(generate_ids, 25) for _ in range(4)]
             results = []
             for future in concurrent.futures.as_completed(futures):
                 results.extend(future.result())
-        
+
         # All 100 IDs should be unique
         assert len(set(results)) == len(results)
 
@@ -251,9 +252,9 @@ class TestNewId:
         """Test that imports are done locally within the function."""
         # This test verifies that the function imports are local
         # by checking that we can call the function without pre-importing
-        
+
         # Clear any existing imports in the module namespace
-        
+
         # The function should work even if we haven't imported the dependencies globally
         result = new_id("import_test")
         assert result.startswith("import_test-")

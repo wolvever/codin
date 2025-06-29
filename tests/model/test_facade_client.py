@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.codin.model.base import BaseEmbedding, BaseLLM  # BaseReranker if used
+from src.codin.model.base import BaseEmbedding, BaseLLM, BaseReranker
 from src.codin.model.config import ModelConfig
 from src.codin.model.facade_client import ModelFacade
 from src.codin.model.factory import LLMFactory
@@ -20,6 +20,7 @@ def mock_llm_instance():
     llm.close = AsyncMock()
     return llm
 
+
 # Mock for the Embedding instance
 @pytest.fixture
 def mock_embedding_instance():
@@ -29,12 +30,14 @@ def mock_embedding_instance():
     embedding.close = AsyncMock()
     return embedding
 
+
 # Mocks for Factory and Registry
 @pytest.fixture
 def mock_llm_factory(mock_llm_instance):
     factory = MagicMock(spec=LLMFactory)
     factory.create_llm = AsyncMock(return_value=mock_llm_instance)
     return factory
+
 
 @pytest.fixture
 def mock_model_registry(mock_embedding_instance):
@@ -45,16 +48,15 @@ def mock_model_registry(mock_embedding_instance):
 
 
 class TestModelFacade:
-
     @pytest.mark.asyncio
     async def test_create_with_llm_only(self, mock_llm_factory, mock_model_registry):
         """Test ModelFacade.create instantiates LLM, embedding might be None."""
         facade = await ModelFacade.create(
             provider="mock_provider",
             model_name="mock_llm",
-            config=ModelConfig(provider="mock_provider"), # Pass a config with provider
+            config=ModelConfig(provider="mock_provider"),  # Pass a config with provider
             llm_factory=mock_llm_factory,
-            model_registry=mock_model_registry
+            model_registry=mock_model_registry,
         )
         mock_llm_factory.create_llm.assert_called_once()
         # Embedding might be None if provider is not 'openai' and no embedding_model_name
@@ -62,25 +64,30 @@ class TestModelFacade:
             mock_model_registry.create_embedding.assert_called_once()
 
         assert facade._llm is not None
-        assert facade._llm.model == "mocked-llm" # From mock_llm_instance
+        assert facade._llm.model == "mocked-llm"  # From mock_llm_instance
 
     @pytest.mark.asyncio
-    async def test_create_with_openai_provider_instantiates_default_embedding(self, mock_llm_factory, mock_model_registry, mock_llm_instance):
+    async def test_create_with_openai_provider_instantiates_default_embedding(
+        self, mock_llm_factory, mock_model_registry, mock_llm_instance
+    ):
         """Test ModelFacade.create instantiates default OpenAI embedding for openai LLM."""
         # Ensure the mock_llm_instance created by factory has 'openai' provider in its config
         mock_llm_instance.config = ModelConfig(provider="openai", model_name="mocked-gpt")
-        mock_llm_factory.create_llm.return_value = mock_llm_instance # Update factory to return this
+        mock_llm_factory.create_llm.return_value = mock_llm_instance  # Update factory to return this
 
         facade = await ModelFacade.create(
             provider="openai",
             model_name="mocked-gpt",
-            config=ModelConfig(provider="openai"), # Crucial for provider detection
+            config=ModelConfig(provider="openai"),  # Crucial for provider detection
             llm_factory=mock_llm_factory,
-            model_registry=mock_model_registry
+            model_registry=mock_model_registry,
         )
         mock_llm_factory.create_llm.assert_called_once()
         mock_model_registry.create_embedding.assert_called_once()
-        assert mock_model_registry.create_embedding.call_args.kwargs['model_name'] == ModelFacade.DEFAULT_OPENAI_EMBEDDING_MODEL
+        assert (
+            mock_model_registry.create_embedding.call_args.kwargs["model_name"]
+            == ModelFacade.DEFAULT_OPENAI_EMBEDDING_MODEL
+        )
         assert facade._embedding is not None
         assert facade._embedding.model == "mocked-embedding"
 
@@ -93,10 +100,10 @@ class TestModelFacade:
             model_name="any_llm",
             llm_factory=mock_llm_factory,
             model_registry=mock_model_registry,
-            embedding_model_name=explicit_embed_model
+            embedding_model_name=explicit_embed_model,
         )
         mock_model_registry.create_embedding.assert_called_once()
-        assert mock_model_registry.create_embedding.call_args.kwargs['model_name'] == explicit_embed_model
+        assert mock_model_registry.create_embedding.call_args.kwargs["model_name"] == explicit_embed_model
         assert facade._embedding is not None
 
     @pytest.mark.asyncio
@@ -105,10 +112,10 @@ class TestModelFacade:
         mock_model_registry.create_embedding.side_effect = Exception("Embedding init failed")
 
         facade = await ModelFacade.create(
-            provider="openai", # To trigger embedding creation attempt
+            provider="openai",  # To trigger embedding creation attempt
             model_name="any_llm",
             llm_factory=mock_llm_factory,
-            model_registry=mock_model_registry
+            model_registry=mock_model_registry,
         )
         assert facade._embedding is None
         assert "Could not instantiate embedding model" in caplog.text
@@ -116,7 +123,7 @@ class TestModelFacade:
 
     @pytest.mark.asyncio
     async def test_generate_delegates_to_llm(self, mock_llm_instance):
-        facade = ModelFacade(llm=mock_llm_instance) # Use direct constructor for this test
+        facade = ModelFacade(llm=mock_llm_instance)  # Use direct constructor for this test
         prompt = "Test prompt"
         kwargs = {"temperature": 0.5}
         await facade.generate(prompt, **kwargs)
@@ -151,7 +158,6 @@ class TestModelFacade:
         with pytest.raises(RuntimeError, match="Reranker client not configured"):
             await facade.rerank("query", ["doc1"])
 
-
     @pytest.mark.asyncio
     async def test_close_calls_close_on_clients(self, mock_llm_instance, mock_embedding_instance):
         # Mock a reranker instance as well for complete test
@@ -168,7 +174,7 @@ class TestModelFacade:
     @pytest.mark.asyncio
     async def test_async_context_manager(self, mock_llm_instance, mock_embedding_instance):
         facade_instance = ModelFacade(llm=mock_llm_instance, embedding=mock_embedding_instance)
-        with patch.object(facade_instance, 'close', new_callable=AsyncMock) as mock_close:
+        with patch.object(facade_instance, "close", new_callable=AsyncMock) as mock_close:
             async with facade_instance as facade:
                 assert facade is facade_instance
                 # Test some operation
@@ -182,7 +188,7 @@ class TestModelFacade:
         assert facade.llm is mock_llm_instance
         assert facade.embedding_model is mock_embedding_instance
         with pytest.raises(RuntimeError, match="Reranker client not configured"):
-            _ = facade.reranker_model # Access property
+            _ = facade.reranker_model  # Access property
 
         facade_no_embed = ModelFacade(llm=mock_llm_instance)
         with pytest.raises(RuntimeError, match="Embedding client not configured"):
@@ -198,13 +204,15 @@ class TestModelFacade:
                 provider="failing_provider",
                 model_name="failing_llm",
                 llm_factory=mock_llm_factory,
-                model_registry=mock_model_registry
+                model_registry=mock_model_registry,
             )
-        mock_model_registry.create_embedding.assert_not_called() # Embedding should not be attempted
+        mock_model_registry.create_embedding.assert_not_called()  # Embedding should not be attempted
 
     # Test case for when embedding_model_name is given but provider is not openai
     @pytest.mark.asyncio
-    async def test_create_with_explicit_embedding_non_openai_provider(self, mock_llm_factory, mock_model_registry, mock_llm_instance):
+    async def test_create_with_explicit_embedding_non_openai_provider(
+        self, mock_llm_factory, mock_model_registry, mock_llm_instance
+    ):
         mock_llm_instance.config = ModelConfig(provider="custom_provider", model_name="custom_llm")
         mock_llm_factory.create_llm.return_value = mock_llm_instance
 
@@ -214,15 +222,17 @@ class TestModelFacade:
             model_name="custom_llm",
             llm_factory=mock_llm_factory,
             model_registry=mock_model_registry,
-            embedding_model_name=explicit_embed_model
+            embedding_model_name=explicit_embed_model,
         )
         mock_model_registry.create_embedding.assert_called_once()
-        assert mock_model_registry.create_embedding.call_args.kwargs['model_name'] == explicit_embed_model
+        assert mock_model_registry.create_embedding.call_args.kwargs["model_name"] == explicit_embed_model
         assert facade._embedding is not None
 
     # Test case for when provider is not OpenAI and no explicit embedding model is given
     @pytest.mark.asyncio
-    async def test_create_no_default_embedding_for_non_openai_provider(self, mock_llm_factory, mock_model_registry, mock_llm_instance):
+    async def test_create_no_default_embedding_for_non_openai_provider(
+        self, mock_llm_factory, mock_model_registry, mock_llm_instance
+    ):
         mock_llm_instance.config = ModelConfig(provider="custom_provider", model_name="custom_llm")
         mock_llm_factory.create_llm.return_value = mock_llm_instance
 
@@ -230,7 +240,7 @@ class TestModelFacade:
             provider="custom_provider",
             model_name="custom_llm",
             llm_factory=mock_llm_factory,
-            model_registry=mock_model_registry
+            model_registry=mock_model_registry,
             # No embedding_model_name
         )
         mock_model_registry.create_embedding.assert_not_called()

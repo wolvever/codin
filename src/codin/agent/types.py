@@ -17,6 +17,9 @@ Any = _t.Any
 if _t.TYPE_CHECKING:
     from ..tool.base import Tool
 
+    class TaskExecutor(_t.Protocol):
+        async def execute_plan(self, plan: Plan) -> Any: ...
+
 
 __all__ = [
     # Core types (A2A compatible)
@@ -41,7 +44,7 @@ __all__ = [
     "RunnerInput",
     # Agent types
     "AgentRunInput",
-    "AgentRunOutput", 
+    "AgentRunOutput",
     "RunConfig",
     "Metrics",
     "State",
@@ -102,9 +105,7 @@ class Message(BaseModel):
         """Append a TextPart to the message."""
         self.parts.append(TextPart(text=text, metadata=metadata))
 
-    def add_data_part(
-        self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None
-    ) -> None:
+    def add_data_part(self, data: dict[str, _t.Any], metadata: dict[str, _t.Any] | None = None) -> None:
         """Append a DataPart to the message."""
         self.parts.append(DataPart(data=data, metadata=metadata))
 
@@ -137,18 +138,15 @@ class Message(BaseModel):
         for part in self.parts:
             if isinstance(part, TextPart):
                 text_parts.append(part.text)
-            elif hasattr(part, 'text'):
+            elif hasattr(part, "text"):
                 text_parts.append(part.text)
-        return '\n'.join(text_parts)
+        return "\n".join(text_parts)
 
     @classmethod
     def from_text(cls, text: str, role: Role = Role.agent, **kwargs) -> Message:
         """Create a message from text content."""
-        return cls(
-            role=role,
-            parts=[TextPart(text=text)],
-            **kwargs
-        )
+        return cls(role=role, parts=[TextPart(text=text)], **kwargs)
+
 
 class TaskState(str, Enum):
     QUEUED = "queued"
@@ -157,10 +155,12 @@ class TaskState(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+
 class TaskStatus(BaseModel):
     state: TaskState
     message: str | None = None
     timestamp: datetime = Field(default_factory=datetime.now)
+
 
 class TaskStatusUpdateEvent(BaseModel):
     contextId: str
@@ -172,7 +172,7 @@ class TaskStatusUpdateEvent(BaseModel):
 class TaskArtifactUpdateEvent(BaseModel):
     contextId: str
     taskId: str
-    artifact: Artifact | None = None # Updated type hint
+    artifact: Artifact | None = None  # Updated type hint
     final: bool = False
 
 
@@ -198,15 +198,6 @@ class ToolCall(_pyd.BaseModel):
     call_id: str
     name: str
     arguments: dict[str, _t.Any]
-
-
-class ToolCallResult(_pyd.BaseModel):
-    """Represents the result of a tool call."""
-
-    call_id: str
-    success: bool
-    output: _t.Any = None
-    error: str | None = None
 
 
 class ToolUsePart(_pyd.BaseModel):
@@ -341,7 +332,6 @@ class AgentRunOutput(_pyd.BaseModel):
 
 # Union type for message parts
 Part = TextPart | DataPart | FilePart | ToolUsePart
-
 
 
 class RunConfig(BaseModel):
@@ -551,7 +541,7 @@ class Step(BaseModel):
 
 class MessageStep(Step):
     """A2A compatible message step with enhanced support for mixed content."""
-    
+
     is_streaming: bool = False
     message_stream: _t.AsyncIterator[str] | None = None
     step_type: StepType = StepType.MESSAGE
@@ -560,7 +550,7 @@ class MessageStep(Step):
         if self.message is None and self.message_stream is None:
             raise ValueError("message or message_stream is required for MessageStep")
 
-    async def stream_content(self) -> _t.AsyncGenerator[str, None]: # Added None for send type
+    async def stream_content(self) -> _t.AsyncGenerator[str, None]:  # Added None for send type
         """Stream message content if ``is_streaming`` is True."""
         if self.message_stream is not None:
             async for chunk in self.message_stream:
@@ -582,15 +572,15 @@ class ToolCallStep(Step):
     """Step for executing a tool call with enhanced result handling."""
 
     step_type: StepType = StepType.TOOL_CALL
-    tool_call: ToolUsePart | None = None # Must be ToolUsePart type='call'
-    tool_call_result: ToolUsePart | None = None # Must be ToolUsePart type='result'
+    tool_call: ToolUsePart | None = None  # Must be ToolUsePart type='call'
+    tool_call_result: ToolUsePart | None = None  # Must be ToolUsePart type='result'
     success: bool = True
 
     @model_validator(mode="before")
     @classmethod
     def _convert_calls(cls, data: dict[str, _t.Any]) -> dict[str, _t.Any]:
         call = data.get("tool_call")
-        if isinstance(call, ToolCall): # If old ToolCall type is passed
+        if isinstance(call, ToolCall):  # If old ToolCall type is passed
             data["tool_call"] = ToolUsePart(
                 type="call",
                 id=call.call_id,
@@ -598,11 +588,13 @@ class ToolCallStep(Step):
                 input=call.arguments,
             )
         result = data.get("tool_call_result")
-        if isinstance(result, ToolCallResult): # If old ToolCallResult type is passed
+        if isinstance(result, ToolCallResult):  # If old ToolCallResult type is passed
             data["tool_call_result"] = ToolUsePart(
                 type="result",
                 id=result.call_id,
-                name=call.name if isinstance(call, ToolCall) else (data.get("tool_call").name if data.get("tool_call") else ""), # type: ignore
+                name=call.name
+                if isinstance(call, ToolCall)
+                else (data.get("tool_call").name if data.get("tool_call") else ""),  # type: ignore
                 output=result.output,
                 metadata={"error": result.error} if result.error else None,
             )
@@ -611,7 +603,7 @@ class ToolCallStep(Step):
     def model_post_init(self, __context: _t.Any) -> None:
         if self.tool_call is None:
             raise ValueError("tool_call (ToolUsePart type='call') is required for ToolCallStep")
-        if not isinstance(self.tool_call, ToolUsePart) or self.tool_call.type != "call": # type: ignore
+        if not isinstance(self.tool_call, ToolUsePart) or self.tool_call.type != "call":  # type: ignore
             raise ValueError("ToolCallStep.tool_call must be a ToolUsePart with type='call'")
 
     def add_result(self, result: ToolCallResult) -> None:
@@ -629,8 +621,8 @@ class ToolCallStep(Step):
 
     def to_message_parts(self) -> tuple[ToolUsePart, ToolUsePart | None]:
         """Return tool call and result parts for message conversion."""
-        if not self.tool_call: # Should not happen due to model_post_init
-             raise ValueError("ToolCallStep.tool_call cannot be None when calling to_message_parts")
+        if not self.tool_call:  # Should not happen due to model_post_init
+            raise ValueError("ToolCallStep.tool_call cannot be None when calling to_message_parts")
         return self.tool_call, self.tool_call_result
 
 
@@ -658,7 +650,8 @@ class ThinkStep(Step):
 
     def model_post_init(self, __context: _t.Any) -> None:
         if self.thinking is None:
-            self.thinking = "" # Default to empty string if not provided
+            self.thinking = ""  # Default to empty string if not provided
+
 
 class FinishStep(Step):
     """Step indicating task completion with enhanced content support."""
@@ -667,7 +660,7 @@ class FinishStep(Step):
     final_message: Message | None = None
     reason: str | None = None
     success: bool = True
-    task: Task | None = None # Optional task snapshot at finish
+    task: Task | None = None  # Optional task snapshot at finish
 
     def model_post_init(self, __context: _t.Any) -> None:
         if self.reason is None:
@@ -679,7 +672,7 @@ class FinishStep(Step):
                 messageId=f"finish-{self.step_id}",
                 role=Role.agent,
                 parts=[TextPart(text=self.reason)],
-                contextId=None, # Context ID might be set by the agent later
+                contextId=None,  # Context ID might be set by the agent later
                 kind="message",
             )
             # self.message = msg # Step.message is already available.
@@ -690,6 +683,5 @@ class ErrorStep(Step):
     """Step emitted when planning fails or an unrecoverable error occurs."""
 
     step_type: StepType = StepType.ERROR
-    error: str | None = None # Description of the error
-    original_step_id: str | None = None # If error occurred processing a specific step
-
+    error: str | None = None  # Description of the error
+    original_step_id: str | None = None  # If error occurred processing a specific step

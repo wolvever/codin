@@ -5,8 +5,6 @@ that interoperate via the A2A protocol. It also provides core modules for
 actor systems, agent definitions, and A2A specific types.
 """
 
-import sys as _sys
-
 # Import submodules or specific types to make them available at the 'codin' level
 from . import config
 
@@ -29,42 +27,47 @@ except Exception:  # pragma: no cover - optional module
 # For example, if these were defined in config.py:
 # from .config import get_api_key, get_config, load_config
 
+
 # Utility functions - keep them as they are if they are meant to be top-level
 # Consider moving them into a 'utils' submodule if not already there and re-exporting.
 # For now, assuming their current definition style is intentional.
 def extract_text_from_message(*args, **kwargs):
     from .utils.message import extract_text_from_message as _f
+
     return _f(*args, **kwargs)
 
 
 def format_history_for_prompt(*args, **kwargs):
     from .utils.message import format_history_for_prompt as _f
+
     return _f(*args, **kwargs)
 
 
 def format_tool_results_for_conversation(*args, **kwargs):
     from .utils.message import format_tool_results_for_conversation as _f
+
     return _f(*args, **kwargs)
 
+
 # Version of the codin package
-version: str = '0.1.0'
+version: str = "0.1.0"
 
 __all__: list[str] = [
     # Config functions (assuming they are still top-level or re-exported)
-    'get_api_key', # Requires from .config import get_api_key
-    'get_config',  # Requires from .config import get_config
-    'load_config', # Requires from .config import load_config
+    "get_api_key",  # Requires from .config import get_api_key
+    "get_config",  # Requires from .config import get_config
+    "load_config",  # Requires from .config import load_config
     # Utility functions
-    'extract_text_from_message',
-    'format_history_for_prompt',
-    'format_tool_results_for_conversation',
+    "extract_text_from_message",
+    "format_history_for_prompt",
+    "format_tool_results_for_conversation",
     # Submodules
-    'agent',
-    'actor',
-    'a2a',       # Added a2a
-    'config',    # Added config (if it's meant to be accessed as codin.config)
+    "agent",
+    "actor",
+    "a2a",  # Added a2a
+    "config",  # Added config (if it's meant to be accessed as codin.config)
     # Package version
-    'version',
+    "version",
 ]
 
 # For backward compatibility or specific testing setups, these sys.modules manipulations exist.
@@ -91,4 +94,3 @@ __all__: list[str] = [
 # For now, these are not directly imported at the top, so they would fail if not in __init__
 # or if config is not imported as `from . import config`.
 # The __all__ list implies they should be available. Let's add the import for config's contents.
-from .config import get_api_key, get_config, load_config

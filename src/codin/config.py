@@ -15,6 +15,8 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
+from codin.model.config import ModelConfig
+
 
 # Define ApprovalMode locally to avoid circular import
 class ApprovalMode(str, Enum):
@@ -41,9 +43,6 @@ __all__ = [
     "load_config",
 ]
 
-# Import the canonical ModelConfig from codin.model.config
-from codin.model.config import ModelConfig
-
 
 class HistoryConfig(BaseModel):
     """Configuration for conversation history."""
@@ -65,7 +64,7 @@ class MCPServerConfig(BaseModel):
 
 class ProviderConfig(BaseModel):
     """Configuration for a provider with display information."""
-    
+
     name: str
     base_url: str
     env_key: str
@@ -101,8 +100,8 @@ class CodinConfig(BaseModel):
     prevent_duplicate_tools: bool = False  # Prevent duplicate tool calls in same turn
 
     # Model configurations
-    model_configs: dict[str, ModelConfig] = Field(default_factory=dict) # Use direct ModelConfig
-    
+    model_configs: dict[str, ModelConfig] = Field(default_factory=dict)  # Use direct ModelConfig
+
     # Provider configurations (for CLI display)
     provider_configs: dict[str, ProviderConfig] = Field(default_factory=dict)
 
@@ -123,25 +122,85 @@ class CodinConfig(BaseModel):
 def _get_provider_defaults_static() -> dict[str, dict[str, _t.Any]]:
     """Get static provider configuration data."""
     return {
-        "openai": {"name": "OpenAI", "base_url": "https://api.openai.com/v1", "env_key": "OPENAI_API_KEY", "models": ["gpt-4o-mini", "gpt-4o", "gpt-4", "gpt-3.5-turbo"]},
-        "azure": {"name": "Azure OpenAI", "base_url": "https://YOUR_PROJECT_NAME.openai.azure.com/openai", "env_key": "AZURE_OPENAI_API_KEY", "models": ["gpt-4", "gpt-35-turbo"]},
-        "openrouter": {"name": "OpenRouter", "base_url": "https://openrouter.ai/api/v1", "env_key": "OPENROUTER_API_KEY", "models": ["anthropic/claude-3.5-sonnet", "openai/gpt-4o"]},
-        "gemini": {"name": "Gemini", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "env_key": "GEMINI_API_KEY", "models": ["gemini-1.5-pro", "gemini-1.5-flash"]},
-        "ollama": {"name": "Ollama", "base_url": "http://localhost:11434/v1", "env_key": "OLLAMA_API_KEY", "models": ["llama2", "codellama", "mistral"]}, # Ollama API key is optional
-        "mistral": {"name": "Mistral", "base_url": "https://api.mistral.ai/v1", "env_key": "MISTRAL_API_KEY", "models": ["mistral-large", "mistral-medium", "mistral-small"]},
-        "deepseek": {"name": "DeepSeek", "base_url": "https://api.deepseek.com", "env_key": "DEEPSEEK_API_KEY", "models": ["deepseek-coder", "deepseek-chat"]},
-        "xai": {"name": "xAI", "base_url": "https://api.x.ai/v1", "env_key": "XAI_API_KEY", "models": ["grok-1", "grok-beta"]},
-        "groq": {"name": "Groq", "base_url": "https://api.groq.com/openai/v1", "env_key": "GROQ_API_KEY", "models": ["llama2-70b-4096", "mixtral-8x7b-32768"]},
-        "arceeai": {"name": "ArceeAI", "base_url": "https://conductor.arcee.ai/v1", "env_key": "ARCEEAI_API_KEY", "models": ["arcee-agent", "arcee-nova"]},
-        "anthropic": {"name": "Anthropic", "base_url": "https://api.anthropic.com", "env_key": "ANTHROPIC_API_KEY", "models": ["claude-3.5-sonnet", "claude-3-opus", "claude-3-haiku"]},
-        "mock": {"name": "Mock LLM", "base_url": "http://localhost:8000", "env_key": "MOCK_API_KEY", "models": ["mock-llm", "test-llm"]},
+        "openai": {
+            "name": "OpenAI",
+            "base_url": "https://api.openai.com/v1",
+            "env_key": "OPENAI_API_KEY",
+            "models": ["gpt-4o-mini", "gpt-4o", "gpt-4", "gpt-3.5-turbo"],
+        },
+        "azure": {
+            "name": "Azure OpenAI",
+            "base_url": "https://YOUR_PROJECT_NAME.openai.azure.com/openai",
+            "env_key": "AZURE_OPENAI_API_KEY",
+            "models": ["gpt-4", "gpt-35-turbo"],
+        },
+        "openrouter": {
+            "name": "OpenRouter",
+            "base_url": "https://openrouter.ai/api/v1",
+            "env_key": "OPENROUTER_API_KEY",
+            "models": ["anthropic/claude-3.5-sonnet", "openai/gpt-4o"],
+        },
+        "gemini": {
+            "name": "Gemini",
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+            "env_key": "GEMINI_API_KEY",
+            "models": ["gemini-1.5-pro", "gemini-1.5-flash"],
+        },
+        "ollama": {
+            "name": "Ollama",
+            "base_url": "http://localhost:11434/v1",
+            "env_key": "OLLAMA_API_KEY",
+            "models": ["llama2", "codellama", "mistral"],
+        },  # Ollama API key is optional
+        "mistral": {
+            "name": "Mistral",
+            "base_url": "https://api.mistral.ai/v1",
+            "env_key": "MISTRAL_API_KEY",
+            "models": ["mistral-large", "mistral-medium", "mistral-small"],
+        },
+        "deepseek": {
+            "name": "DeepSeek",
+            "base_url": "https://api.deepseek.com",
+            "env_key": "DEEPSEEK_API_KEY",
+            "models": ["deepseek-coder", "deepseek-chat"],
+        },
+        "xai": {
+            "name": "xAI",
+            "base_url": "https://api.x.ai/v1",
+            "env_key": "XAI_API_KEY",
+            "models": ["grok-1", "grok-beta"],
+        },
+        "groq": {
+            "name": "Groq",
+            "base_url": "https://api.groq.com/openai/v1",
+            "env_key": "GROQ_API_KEY",
+            "models": ["llama2-70b-4096", "mixtral-8x7b-32768"],
+        },
+        "arceeai": {
+            "name": "ArceeAI",
+            "base_url": "https://conductor.arcee.ai/v1",
+            "env_key": "ARCEEAI_API_KEY",
+            "models": ["arcee-agent", "arcee-nova"],
+        },
+        "anthropic": {
+            "name": "Anthropic",
+            "base_url": "https://api.anthropic.com",
+            "env_key": "ANTHROPIC_API_KEY",
+            "models": ["claude-3.5-sonnet", "claude-3-opus", "claude-3-haiku"],
+        },
+        "mock": {
+            "name": "Mock LLM",
+            "base_url": "http://localhost:8000",
+            "env_key": "MOCK_API_KEY",
+            "models": ["mock-llm", "test-llm"],
+        },
     }
 
 
 def get_default_model_configs() -> dict[str, ModelConfig]:
     """Get default model configurations using the new ModelConfig."""
     provider_defaults = _get_provider_defaults_static()
-    
+
     new_defaults: dict[str, ModelConfig] = {}
     for provider_key, details in provider_defaults.items():
         api_key_val = os.environ.get(details["env_key"])
@@ -172,10 +231,11 @@ def get_default_provider_configs() -> dict[str, ProviderConfig]:
 # Simple file-based cache with modification time checking
 _config_file_cache: dict[tuple[str, float], dict[str, _t.Any]] = {}
 
+
 def load_config_file(config_path: Path) -> dict[str, _t.Any]:
     """Load configuration from a YAML or JSON file with caching."""
     global _config_file_cache
-    
+
     if not config_path.exists():
         return {}
 
@@ -184,7 +244,7 @@ def load_config_file(config_path: Path) -> dict[str, _t.Any]:
     try:
         mtime = config_path.stat().st_mtime
         cache_key = (file_path_str, mtime)
-        
+
         if cache_key in _config_file_cache:
             return _config_file_cache[cache_key].copy()
     except OSError:
@@ -200,19 +260,17 @@ def load_config_file(config_path: Path) -> dict[str, _t.Any]:
             result = json.loads(content) or {}
         else:
             raise ValueError(f"Unsupported config file format: {config_path.suffix}")
-        
+
         # Cache the result
         if mtime is not None:
             # Clean old cache entries for this file
             _config_file_cache = {k: v for k, v in _config_file_cache.items() if k[0] != file_path_str}
             _config_file_cache[cache_key] = result.copy()
-        
+
         return result
 
     except Exception as e:
-        raise ValueError(
-            f"Failed to load config from {config_path}: {e}"
-        ) from e
+        raise ValueError(f"Failed to load config from {config_path}: {e}") from e
 
 
 def find_config_files(config_file: Path | None = None) -> list[Path]:
@@ -387,10 +445,12 @@ def load_config(config_file: Path | str | None = None) -> CodinConfig:
                         models_list = cfg_data.get("models", [])
                         default_model_name = models_list[0] if models_list else None
 
-                        configs[cfg_name] = ModelConfig( # Use direct ModelConfig
-                            provider=cfg_name, # Use the key from the config dict as provider
-                            model_name=cfg_data.get("model_name", default_model_name), # Allow direct model_name in config
-                            api_key=cfg_data.get("api_key", api_key_from_env), # Prioritize direct api_key from config
+                        configs[cfg_name] = ModelConfig(  # Use direct ModelConfig
+                            provider=cfg_name,  # Use the key from the config dict as provider
+                            model_name=cfg_data.get(
+                                "model_name", default_model_name
+                            ),  # Allow direct model_name in config
+                            api_key=cfg_data.get("api_key", api_key_from_env),  # Prioritize direct api_key from config
                             base_url=cfg_data.get("base_url"),
                             api_version=cfg_data.get("api_version"),
                             timeout=cfg_data.get("timeout"),
@@ -398,12 +458,12 @@ def load_config(config_file: Path | str | None = None) -> CodinConfig:
                             max_retries=cfg_data.get("max_retries"),
                             retry_min_wait=cfg_data.get("retry_min_wait"),
                             retry_max_wait=cfg_data.get("retry_max_wait"),
-                            retry_on_status_codes=cfg_data.get("retry_on_status_codes")
+                            retry_on_status_codes=cfg_data.get("retry_on_status_codes"),
                             # Note: The old 'name' field (e.g., "OpenAI") from cfg_data is not directly mapped
                             # as provider key 'cfg_name' now serves this role.
                             # The 'models' list from old config is used for default_model_name.
                         )
-                    elif isinstance(cfg_data, ModelConfig): # If already a ModelConfig (e.g. from defaults)
+                    elif isinstance(cfg_data, ModelConfig):  # If already a ModelConfig (e.g. from defaults)
                         configs[cfg_name] = cfg_data
                     # Else, if it's some other type, it might be an error or ignored depending on strictness.
                     # For now, we only convert dicts or accept existing ModelConfig instances.
@@ -452,7 +512,7 @@ def load_config(config_file: Path | str | None = None) -> CodinConfig:
     # Set up default model configurations if not configured
     if not config.model_configs:
         config.model_configs = get_default_model_configs()
-    
+
     # Set up default provider configurations if not configured
     if not config.provider_configs:
         config.provider_configs = get_default_provider_configs()

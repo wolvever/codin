@@ -1,13 +1,16 @@
 """Unit tests for MCP Pydantic type definitions."""
 
+from typing import Union
+
 import pytest
 from pydantic import ValidationError
-import json
 
 from .. import mcp_types
 
+
 def test_request_id():
     assert isinstance(mcp_types.RequestId, type(Union[str, int]))
+
 
 def test_json_rpc_request_serialization():
     req = mcp_types.JSONRPCRequest(method="test/method", id=1, params={"arg1": "val1"})
@@ -34,6 +37,7 @@ def test_json_rpc_response_serialization():
     dumped = resp.model_dump()
     assert dumped == {"jsonrpc": "2.0", "id": 1, "result": {"data": "success"}}
 
+
 def test_json_rpc_error_serialization():
     err_data = mcp_types.JSONRPCErrorData(code=-32000, message="Server error", data="Extra info")
     err = mcp_types.JSONRPCError(id=1, error=err_data)
@@ -47,17 +51,16 @@ def test_json_rpc_error_serialization():
     assert dumped == {
         "jsonrpc": "2.0",
         "id": 1,
-        "error": {"code": -32000, "message": "Server error", "data": "Extra info"}
+        "error": {"code": -32000, "message": "Server error", "data": "Extra info"},
     }
+
 
 def test_initialize_request_and_result():
     # InitializeRequest
     client_caps = mcp_types.ClientCapabilities(experimental={"foo": {"bar": True}})
     client_info = mcp_types.Implementation(name="test-client", version="0.1")
     init_params = mcp_types.InitializeRequestParams(
-        capabilities=client_caps,
-        clientInfo=client_info,
-        protocolVersion="0.1.0"
+        capabilities=client_caps, clientInfo=client_info, protocolVersion="0.1.0"
     )
     init_req = mcp_types.InitializeRequest(id="init-1", params=init_params)
 
@@ -72,8 +75,8 @@ def test_initialize_request_and_result():
         "params": {
             "capabilities": {"experimental": {"foo": {"bar": True}}},
             "clientInfo": {"name": "test-client", "version": "0.1"},
-            "protocolVersion": "0.1.0"
-        }
+            "protocolVersion": "0.1.0",
+        },
     }
     assert dumped_req == expected_req_dict
 
@@ -84,7 +87,7 @@ def test_initialize_request_and_result():
         "capabilities": server_caps.model_dump(exclude_none=True),
         "serverInfo": server_info.model_dump(exclude_none=True),
         "protocolVersion": "0.1.0",
-        "instructions": "Use wisely"
+        "instructions": "Use wisely",
     }
     init_result = mcp_types.InitializeResult.model_validate(init_result_data)
     assert init_result.capabilities.prompts["listChanged"] is True
@@ -100,12 +103,9 @@ def test_list_tools_result():
         "name": "test_tool",
         "description": "A test tool",
         "inputSchema": {"type": "object", "properties": {"param1": {"type": "string"}}},
-        "annotations": {"title": "Test Tool Title"}
+        "annotations": {"title": "Test Tool Title"},
     }
-    list_tools_result_data = {
-        "tools": [tool_data],
-        "nextCursor": "cursor123"
-    }
+    list_tools_result_data = {"tools": [tool_data], "nextCursor": "cursor123"}
     list_tools_res = mcp_types.ListToolsResult.model_validate(list_tools_result_data)
 
     assert len(list_tools_res.tools) == 1
@@ -116,6 +116,7 @@ def test_list_tools_result():
 
     dumped = list_tools_res.model_dump(exclude_none=True)
     assert dumped == list_tools_result_data
+
 
 def test_call_tool_request_and_result():
     # CallToolRequest
@@ -131,12 +132,12 @@ def test_call_tool_request_and_result():
     audio_content_data = {"type": "audio", "mimeType": "audio/mp3", "data": "base64audiodata"}
 
     text_res_contents_data = {"uri": "resource:/text/1", "text": "Embedded text"}
-    embedded_res_data = {"type": "resource", "resource": text_res_contents_data} # Test with TextResourceContents
+    embedded_res_data = {"type": "resource", "resource": text_res_contents_data}  # Test with TextResourceContents
 
     call_result_data = {
         "content": [text_content_data, image_content_data, audio_content_data, embedded_res_data],
         "isError": False,
-        "_meta": {"traceId": "xyz"}
+        "_meta": {"traceId": "xyz"},
     }
     call_res = mcp_types.CallToolResult.model_validate(call_result_data)
     assert len(call_res.content) == 4
@@ -169,27 +170,25 @@ def test_role_enum():
     with pytest.raises(ValidationError):
         mcp_types.PromptMessage(role="invalid_role", content={"type": "text", "text": "hi"})
 
+
 def test_logging_level_enum():
     assert mcp_types.LoggingLevelEnum.INFO == "info"
     assert mcp_types.LoggingLevelEnum.ERROR == "error"
     with pytest.raises(ValidationError):
         mcp_types.SetLevelRequestParams(level="invalid_level")
 
+
 def test_tool_annotations():
     # Test defaults
     anno = mcp_types.ToolAnnotation()
     assert anno.readOnlyHint is False
     assert anno.idempotentHint is False
-    assert anno.destructiveHint is True # Default from schema
-    assert anno.openWorldHint is True # Default from schema
+    assert anno.destructiveHint is True  # Default from schema
+    assert anno.openWorldHint is True  # Default from schema
 
     # Test setting values
     anno_set = mcp_types.ToolAnnotation(
-        title="My Tool",
-        readOnlyHint=True,
-        idempotentHint=True,
-        destructiveHint=False,
-        openWorldHint=False
+        title="My Tool", readOnlyHint=True, idempotentHint=True, destructiveHint=False, openWorldHint=False
     )
     assert anno_set.title == "My Tool"
     assert anno_set.readOnlyHint is True
@@ -197,15 +196,5 @@ def test_tool_annotations():
     assert anno_set.destructiveHint is False
     assert anno_set.openWorldHint is False
 
-# Placeholder for more tests
-# TODO:
-# - Test models with more complex nesting or specific validation rules if any were missed.
-# - Test deserialization with missing optional fields.
-# - Test cases that should raise ValidationError for required fields or incorrect types.
-# - Test `Annotations` model.
-# - Test `*RequestParams` for various methods.
-# - Test `*Result` for various methods, especially those with unions or lists.
 
-from typing import Union # For RequestId type hint
-
-```
+# TODO: Add more comprehensive tests for MCP model classes

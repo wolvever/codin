@@ -10,7 +10,7 @@ from enum import Enum
 import pydantic as _pyd
 from pydantic import BaseModel, ConfigDict
 
-from ..lifecycle import LifecycleMixin
+from ..lifecycle import LifecycleMixin, LifecycleState
 
 __all__ = [
     'Tool',
@@ -19,6 +19,9 @@ __all__ = [
     'ToolDefinition',
     'ToolSpec',
     'ToolMetadata',
+    'LifecycleState',
+    'to_tool_definition',
+    'to_tool_definitions',
 ]
 
 
@@ -252,3 +255,18 @@ def to_definitions(tools: list[Tool | ToolDefinition] | None) -> list[ToolDefini
     if not tools:
         return []
     return [to_definition(tool) for tool in tools]
+
+
+# ---------------------------------------------------------------------------
+# Compatibility helpers
+# ---------------------------------------------------------------------------
+
+def to_tool_definition(tool: Tool | ToolDefinition) -> ToolDefinition:
+    """Alias for :func:`to_definition` for backwards compatibility."""
+    return to_definition(tool)
+
+
+def to_tool_definitions(tools: list[Tool | ToolDefinition] | None) -> list[ToolDefinition]:
+    """Alias for :func:`to_definitions` for backwards compatibility."""
+    return to_definitions(tools)
+

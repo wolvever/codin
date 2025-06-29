@@ -9,7 +9,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..agent.types import Message
 
-__all__ = ["Mailbox"]
+try:  # Import lazily to avoid circular import during module init
+    from .local_mailbox import LocalMailbox
+except Exception:  # pragma: no cover - import may fail during type checking
+    LocalMailbox = None  # type: ignore
+
+__all__ = ["Mailbox", "LocalMailbox"]
 
 
 class Mailbox(ABC):

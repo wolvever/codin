@@ -196,7 +196,7 @@ class Tool(LifecycleMixin):
 class Toolset(LifecycleMixin):
     """Collection of related tools."""
 
-    def __init__(self, name: str, tools: list[Tool] | None = None):
+    def __init__(self, name: str = "toolset", tools: list[Tool] | None = None):
         super().__init__()
         self.name = name
         self.tools = tools or []

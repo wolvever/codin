@@ -87,4 +87,10 @@ class FileReplay(BaseReplay):
         return self._writer
 
 
-__all__ = ["FileReplay"]
+
+class FileReplayService(FileReplay):
+    """Backward compatibility alias used in tests."""
+
+    pass
+
+__all__ = ["FileReplay", "FileReplayService"]
